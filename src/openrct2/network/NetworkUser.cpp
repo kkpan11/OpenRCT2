@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,19 +9,22 @@
 
 #ifndef DISABLE_NETWORK
 
-#    include "NetworkUser.h"
+    #include "NetworkUser.h"
 
-#    include "../Context.h"
-#    include "../PlatformEnvironment.h"
-#    include "../core/Console.hpp"
-#    include "../core/File.h"
-#    include "../core/Guard.hpp"
-#    include "../core/Json.hpp"
-#    include "../core/Path.hpp"
+    #include "../Context.h"
+    #include "../PlatformEnvironment.h"
+    #include "../core/Console.hpp"
+    #include "../core/File.h"
+    #include "../core/Guard.hpp"
+    #include "../core/Json.hpp"
+    #include "../core/Path.hpp"
+    #include "../core/String.hpp"
 
-#    include <unordered_set>
+    #include <unordered_set>
 
-constexpr const utf8* USER_STORE_FILENAME = "users.json";
+using namespace OpenRCT2;
+
+constexpr const utf8* kUserStoreFilename = "users.json";
 
 std::unique_ptr<NetworkUser> NetworkUser::FromJson(const json_t& jsonData)
 {
@@ -186,7 +189,7 @@ const NetworkUser* NetworkUserManager::GetUserByName(const std::string& name) co
     for (const auto& kvp : _usersByHash)
     {
         const auto& networkUser = kvp.second;
-        if (String::IEquals(name, networkUser->Name))
+        if (String::iequals(name, networkUser->Name))
         {
             return networkUser.get();
         }
@@ -210,7 +213,7 @@ NetworkUser* NetworkUserManager::GetOrAddUser(const std::string& hash)
 u8string NetworkUserManager::GetStorePath()
 {
     auto env = OpenRCT2::GetContext()->GetPlatformEnvironment();
-    return Path::Combine(env->GetDirectoryPath(OpenRCT2::DIRBASE::USER), USER_STORE_FILENAME);
+    return Path::Combine(env->GetDirectoryPath(OpenRCT2::DIRBASE::USER), kUserStoreFilename);
 }
 
 #endif

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,12 +9,14 @@
 
 #ifndef DISABLE_OPENGL
 
-#    include "OpenGLFramebuffer.h"
+    #include "OpenGLFramebuffer.h"
 
-#    include <SDL_video.h>
-#    include <algorithm>
-#    include <memory>
-#    include <openrct2/common.h>
+    #include <SDL_video.h>
+    #include <algorithm>
+    #include <cassert>
+    #include <memory>
+
+using namespace OpenRCT2::Ui;
 
 constexpr GLuint BACKBUFFER_ID = 0;
 
@@ -103,7 +105,7 @@ void OpenGLFramebuffer::GetPixels(DrawPixelInfo& dpi) const
     {
         std::copy_n(src, _width, dst);
         src -= _width;
-        dst += dpi.width + dpi.pitch;
+        dst += dpi.LineStride();
     }
 }
 

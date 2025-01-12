@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,13 +10,14 @@
 #include "Banner.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../Game.h"
 #include "../GameState.h"
 #include "../core/Memory.hpp"
 #include "../core/String.hpp"
 #include "../interface/Window.h"
 #include "../localisation/Formatter.h"
-#include "../localisation/Localisation.h"
+#include "../localisation/Formatting.h"
 #include "../management/Finance.h"
 #include "../network/network.h"
 #include "../object/BannerSceneryEntry.h"
@@ -24,15 +25,19 @@
 #include "../object/WallSceneryEntry.h"
 #include "../ride/Ride.h"
 #include "../ride/RideData.h"
+#include "../ride/RideManager.hpp"
 #include "../ride/Track.h"
 #include "../windows/Intent.h"
-#include "../world/TileElementsView.h"
 #include "Map.h"
 #include "MapAnimation.h"
 #include "Park.h"
 #include "Scenery.h"
+#include "TileElementsView.h"
+#include "tile_element/BannerElement.h"
+#include "tile_element/TileElement.h"
+#include "tile_element/TrackElement.h"
+#include "tile_element/WallElement.h"
 
-#include <algorithm>
 #include <cstring>
 #include <iterator>
 #include <limits>
@@ -43,7 +48,7 @@ std::string Banner::GetText() const
 {
     Formatter ft;
     FormatTextTo(ft);
-    return FormatStringID(STR_STRINGID, ft.Data());
+    return FormatStringIDLegacy(STR_STRINGID, ft.Data());
 }
 
 void Banner::FormatTextTo(Formatter& ft, bool addColour) const
@@ -51,9 +56,9 @@ void Banner::FormatTextTo(Formatter& ft, bool addColour) const
     if (addColour)
     {
         auto formatToken = FormatTokenFromTextColour(text_colour);
-        auto tokenText = FormatTokenToString(formatToken, true);
+        formattedTextBuffer = FormatTokenToStringWithBraces(formatToken);
         ft.Add<StringId>(STR_STRING_STRINGID);
-        ft.Add<const char*>(tokenText.data());
+        ft.Add<const char*>(formattedTextBuffer.data());
     }
 
     FormatTextTo(ft);
@@ -104,10 +109,10 @@ static RideId BannerGetRideIndexAt(const CoordsXYZ& bannerCoords)
 
         RideId rideIndex = tileElement->AsTrack()->GetRideIndex();
         auto ride = GetRide(rideIndex);
-        if (ride == nullptr || ride->GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_IS_SHOP_OR_FACILITY))
+        if (ride == nullptr || ride->GetRideTypeDescriptor().HasFlag(RtdFlag::isShopOrFacility))
             continue;
 
-        if ((tileElement->GetClearanceZ()) + (4 * COORDS_Z_STEP) <= bannerCoords.z)
+        if ((tileElement->GetClearanceZ()) + (4 * kCoordsZStep) <= bannerCoords.z)
             continue;
 
         resultRideIndex = rideIndex;
@@ -201,14 +206,14 @@ WallElement* BannerGetScrollingWallTileElement(BannerIndex bannerIndex)
 RideId BannerGetClosestRideIndex(const CoordsXYZ& mapPos)
 {
     static constexpr std::array NeighbourCheckOrder = {
-        CoordsXY{ COORDS_XY_STEP, 0 },
-        CoordsXY{ -COORDS_XY_STEP, 0 },
-        CoordsXY{ 0, COORDS_XY_STEP },
-        CoordsXY{ 0, -COORDS_XY_STEP },
-        CoordsXY{ -COORDS_XY_STEP, +COORDS_XY_STEP },
-        CoordsXY{ +COORDS_XY_STEP, -COORDS_XY_STEP },
-        CoordsXY{ +COORDS_XY_STEP, +COORDS_XY_STEP },
-        CoordsXY{ -COORDS_XY_STEP, +COORDS_XY_STEP },
+        CoordsXY{ kCoordsXYStep, 0 },
+        CoordsXY{ -kCoordsXYStep, 0 },
+        CoordsXY{ 0, kCoordsXYStep },
+        CoordsXY{ 0, -kCoordsXYStep },
+        CoordsXY{ -kCoordsXYStep, +kCoordsXYStep },
+        CoordsXY{ +kCoordsXYStep, -kCoordsXYStep },
+        CoordsXY{ +kCoordsXYStep, +kCoordsXYStep },
+        CoordsXY{ -kCoordsXYStep, +kCoordsXYStep },
         CoordsXY{ 0, 0 },
     };
 
@@ -225,7 +230,7 @@ RideId BannerGetClosestRideIndex(const CoordsXYZ& mapPos)
     auto resultDistance = std::numeric_limits<int32_t>::max();
     for (auto& ride : GetRideManager())
     {
-        if (ride.GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_IS_SHOP_OR_FACILITY))
+        if (ride.GetRideTypeDescriptor().HasFlag(RtdFlag::isShopOrFacility))
             continue;
 
         auto rideCoords = ride.overall_view;
@@ -366,57 +371,6 @@ void BannerApplyFixes()
     BannerFixPositions(bannerElements);
 
     BannerDeallocateUnlinked();
-}
-
-Banner* BannerElement::GetBanner() const
-{
-    return ::GetBanner(GetIndex());
-}
-
-const BannerSceneryEntry* BannerElement::GetEntry() const
-{
-    auto banner = GetBanner();
-    if (banner != nullptr)
-    {
-        return OpenRCT2::ObjectManager::GetObjectEntry<BannerSceneryEntry>(banner->type);
-    }
-    return nullptr;
-}
-
-BannerIndex BannerElement::GetIndex() const
-{
-    return index;
-}
-
-void BannerElement::SetIndex(BannerIndex newIndex)
-{
-    index = newIndex;
-}
-
-uint8_t BannerElement::GetPosition() const
-{
-    return position;
-}
-
-void BannerElement::SetPosition(uint8_t newPosition)
-{
-    position = newPosition;
-}
-
-uint8_t BannerElement::GetAllowedEdges() const
-{
-    return AllowedEdges & 0b00001111;
-}
-
-void BannerElement::SetAllowedEdges(uint8_t newEdges)
-{
-    AllowedEdges &= ~0b00001111;
-    AllowedEdges |= (newEdges & 0b00001111);
-}
-
-void BannerElement::ResetAllowedEdges()
-{
-    AllowedEdges |= 0b00001111;
 }
 
 void UnlinkAllRideBanners()

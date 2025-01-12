@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,10 +16,11 @@
 #include "../paint/Paint.h"
 #include "../profiling/Profiling.h"
 #include "../scenario/Scenario.h"
-#include "../util/Util.h"
+#include "../world/tile_element/TrackElement.h"
 #include "EntityRegistry.h"
 
-template<> bool EntityBase::Is<Balloon>() const
+template<>
+bool EntityBase::Is<Balloon>() const
 {
     return Type == EntityType::Balloon;
 }
@@ -141,7 +142,7 @@ bool Balloon::Collides() const
     do
     {
         // the balloon has height so we add some padding to prevent it clipping through things.
-        int32_t balloon_top = z + COORDS_Z_STEP * 2;
+        int32_t balloon_top = z + kCoordsZStep * 2;
         if (balloon_top == tileElement->GetBaseZ())
         {
             return true;

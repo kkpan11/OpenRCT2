@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,23 +8,23 @@
  *****************************************************************************/
 
 #ifdef _WIN32
-#    include <windows.h>
+    #include <cassert>
+    #include <windows.h>
 #endif
 
 #include "../Version.h"
-#include "../common.h"
 #include "Console.hpp"
 #include "Diagnostics.hpp"
 #include "Guard.hpp"
+#include "String.hpp"
 #include "StringBuilder.h"
 
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
-#include <string>
 
-namespace Guard
+namespace OpenRCT2::Guard
 {
     constexpr const utf8* ASSERTION_MESSAGE = "An assertion failed, please report this to the OpenRCT2 developers.";
 
@@ -74,7 +74,7 @@ namespace Guard
         std::string formattedMessage;
         if (message != nullptr)
         {
-            formattedMessage = String::Format_VA(message, args);
+            formattedMessage = String::formatVA(message, args);
             Console::Error::WriteLine(formattedMessage.c_str());
             _lastAssertMessage = std::make_optional(formattedMessage);
         }
@@ -139,17 +139,17 @@ namespace Guard
             sb.Append("\n");
             sb.Append(formattedMessage);
         }
-        return String::ToWideChar({ sb.GetBuffer(), sb.GetLength() });
+        return String::toWideChar({ sb.GetBuffer(), sb.GetLength() });
     }
 
     static void ForceCrash()
     {
-#    ifdef USE_BREAKPAD
+    #ifdef USE_BREAKPAD
         // Force a crash that breakpad will handle allowing us to get a dump
         *((void**)0) = 0;
-#    else
+    #else
         assert(false);
-#    endif
+    #endif
     }
 #endif
-} // namespace Guard
+} // namespace OpenRCT2::Guard

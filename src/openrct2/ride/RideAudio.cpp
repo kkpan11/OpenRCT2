@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,6 +16,7 @@
 #include "../audio/AudioMixer.h"
 #include "../audio/audio.h"
 #include "../config/Config.h"
+#include "../interface/Viewport.h"
 #include "../object/AudioObject.h"
 #include "../object/MusicObject.h"
 #include "../object/ObjectManager.h"
@@ -169,7 +170,7 @@ namespace OpenRCT2::RideAudio
     {
         auto& objManager = GetContext()->GetObjectManager();
         auto ride = GetRide(instance.RideId);
-        auto musicObj = static_cast<MusicObject*>(objManager.GetLoadedObject(ObjectType::Music, ride->music));
+        auto musicObj = objManager.GetLoadedObject<MusicObject>(ride->music);
         if (musicObj != nullptr)
         {
             auto shouldLoop = musicObj->GetTrackCount() == 1;
@@ -187,7 +188,7 @@ namespace OpenRCT2::RideAudio
     void CircusStartRideMusicChannel(const ViewportRideMusicInstance& instance)
     {
         auto& objManager = GetContext()->GetObjectManager();
-        ObjectEntryDescriptor desc(ObjectType::Audio, AudioObjectIdentifiers::RCT2Circus);
+        ObjectEntryDescriptor desc(ObjectType::Audio, AudioObjectIdentifiers::kRCT2Circus);
         auto audioObj = static_cast<AudioObject*>(objManager.GetLoadedObject(desc));
         if (audioObj != nullptr)
         {
@@ -257,7 +258,7 @@ namespace OpenRCT2::RideAudio
             return;
 
         // TODO Allow circus music (CSS24) to play if ride music is disabled (that should be sound)
-        if (gGameSoundsOff || !gConfigSound.RideMusicEnabled)
+        if (gGameSoundsOff || !Config::Get().sound.RideMusicEnabled)
             return;
 
         StopInactiveRideMusicChannels();
@@ -275,7 +276,7 @@ namespace OpenRCT2::RideAudio
     std::pair<size_t, size_t> RideMusicGetTrackOffsetLength_Default(const Ride& ride)
     {
         auto& objManager = GetContext()->GetObjectManager();
-        auto musicObj = static_cast<MusicObject*>(objManager.GetLoadedObject(ObjectType::Music, ride.music));
+        auto musicObj = objManager.GetLoadedObject<MusicObject>(ride.music);
         if (musicObj != nullptr)
         {
             auto numTracks = musicObj->GetTrackCount();
@@ -384,12 +385,12 @@ namespace OpenRCT2::RideAudio
         {
             auto rotatedCoords = Translate3DTo2DWithZ(GetCurrentRotation(), rideCoords);
             auto viewport = g_music_tracking_viewport;
-            auto viewWidth = viewport->view_width;
+            auto viewWidth = viewport->ViewWidth();
             auto viewWidth2 = viewWidth * 2;
             auto viewX = viewport->viewPos.x - viewWidth2;
             auto viewY = viewport->viewPos.y - viewWidth;
-            auto viewX2 = viewWidth2 + viewWidth2 + viewport->view_width + viewX;
-            auto viewY2 = viewWidth + viewWidth + viewport->view_height + viewY;
+            auto viewX2 = viewWidth2 + viewWidth2 + viewport->ViewWidth() + viewX;
+            auto viewY2 = viewWidth + viewWidth + viewport->ViewHeight() + viewY;
             if (viewX >= rotatedCoords.x || viewY >= rotatedCoords.y || viewX2 < rotatedCoords.x || viewY2 < rotatedCoords.y)
             {
                 RideUpdateMusicPosition(ride);

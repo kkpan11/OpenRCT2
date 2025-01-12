@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -13,13 +13,15 @@
 #include "../entity/EntityList.h"
 #include "../rct12/RCT12.h"
 #include "../util/Util.h"
+#include "../world/tile_element/TileElement.h"
+#include "../world/tile_element/TrackElement.h"
 #include "Ride.h"
 #include "RideData.h"
 #include "Track.h"
 #include "Vehicle.h"
 #include "VehicleData.h"
 
-#include <algorithm>
+using namespace OpenRCT2;
 
 Vehicle* CableLiftSegmentCreate(
     Ride& ride, int32_t x, int32_t y, int32_t z, int32_t direction, uint16_t var_44, int32_t remaining_distance, bool head)
@@ -65,7 +67,7 @@ Vehicle* CableLiftSegmentCreate(
     current->TrackSubposition = VehicleTrackSubposition::Default;
     current->Orientation = direction << 3;
 
-    z = z * COORDS_Z_STEP;
+    z = z * kCoordsZStep;
     current->TrackLocation = { x, y, z };
     z += ride.GetRideTypeDescriptor().Heights.VehicleZOffset;
 
@@ -450,7 +452,7 @@ int32_t Vehicle::CableLiftUpdateTrackMotion()
         vehicleCount++;
 
         massTotal += vehicle->mass;
-        accelerationTotal = AddClamp_int32_t(accelerationTotal, vehicle->acceleration);
+        accelerationTotal = AddClamp<int32_t>(accelerationTotal, vehicle->acceleration);
     }
 
     int32_t newAcceleration = (accelerationTotal / vehicleCount) >> 9;

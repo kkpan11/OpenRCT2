@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,13 +11,12 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "../../../Context.h"
-#    include "../../../GameState.h"
-#    include "../../../common.h"
-#    include "../../../core/String.hpp"
-#    include "../../../world/Climate.h"
-#    include "../../Duktape.hpp"
-#    include "../../ScriptEngine.h"
+    #include "../../../Context.h"
+    #include "../../../GameState.h"
+    #include "../../../core/StringTypes.h"
+    #include "../../../world/Climate.h"
+    #include "../../Duktape.hpp"
+    #include "../../ScriptEngine.h"
 
 namespace OpenRCT2::Scripting
 {
@@ -102,20 +101,20 @@ namespace OpenRCT2::Scripting
 
         std::string type_get() const
         {
-            auto& gameState = OpenRCT2::GetGameState();
+            auto& gameState = GetGameState();
             return ClimateTypeToString(gameState.Climate);
         }
 
         std::shared_ptr<ScClimateState> current_get() const
         {
-            auto& gameState = OpenRCT2::GetGameState();
+            auto& gameState = GetGameState();
             std::string weatherType = WeatherTypeToString(gameState.ClimateCurrent.Weather);
             return std::make_shared<ScClimateState>(weatherType, gameState.ClimateCurrent.Temperature);
         }
 
         std::shared_ptr<ScClimateState> future_get() const
         {
-            auto& gameState = OpenRCT2::GetGameState();
+            auto& gameState = GetGameState();
             std::string weatherType = WeatherTypeToString(gameState.ClimateNext.Weather);
             return std::make_shared<ScClimateState>(weatherType, gameState.ClimateNext.Temperature);
         }

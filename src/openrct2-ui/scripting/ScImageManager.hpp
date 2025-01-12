@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,12 +11,12 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "CustomImages.h"
+    #include "CustomImages.h"
 
-#    include <openrct2/Context.h>
-#    include <openrct2/drawing/Image.h>
-#    include <openrct2/scripting/Duktape.hpp>
-#    include <openrct2/sprites.h>
+    #include <openrct2/Context.h>
+    #include <openrct2/drawing/Image.h>
+    #include <openrct2/scripting/Duktape.hpp>
+    #include <openrct2/sprites.h>
 
 namespace OpenRCT2::Scripting
 {
@@ -93,8 +93,8 @@ namespace OpenRCT2::Scripting
 
         void free(const DukValue& dukRange)
         {
-            auto start = dukRange["start"].as_int();
-            auto count = dukRange["count"].as_int();
+            auto start = dukRange["start"].as_uint();
+            auto count = dukRange["count"].as_uint();
 
             ImageList range(start, count);
 

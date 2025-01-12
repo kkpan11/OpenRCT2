@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -22,13 +22,19 @@ class RideObject final : public Object
 private:
     RideObjectEntry _legacyType = {};
     VehicleColourPresetList _presetColours = {};
-    std::vector<int8_t> _peepLoadingPositions[RCT2::ObjectLimits::MaxCarTypesPerRideEntry];
-    std::vector<std::array<CoordsXY, 3>> _peepLoadingWaypoints[RCT2::ObjectLimits::MaxCarTypesPerRideEntry];
+    std::vector<int8_t> _peepLoadingPositions[OpenRCT2::RCT2::ObjectLimits::MaxCarTypesPerRideEntry];
+    std::vector<std::array<CoordsXY, 3>> _peepLoadingWaypoints[OpenRCT2::RCT2::ObjectLimits::MaxCarTypesPerRideEntry];
 
 public:
+    static constexpr ObjectType kObjectType = ObjectType::Ride;
+
     void* GetLegacyData() override
     {
         return &_legacyType;
+    }
+    const RideObjectEntry& GetEntry() const
+    {
+        return _legacyType;
     }
 
     void ReadJson(IReadObjectContext* context, json_t& root) override;

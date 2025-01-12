@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,9 +9,9 @@
 
 #include "Text.h"
 
+#include "../core/UTF8.h"
 #include "../localisation/Formatter.h"
 #include "../localisation/Formatting.h"
-#include "../localisation/Localisation.h"
 #include "Drawing.h"
 
 class StaticLayout
@@ -52,7 +52,7 @@ public:
         for (int32_t line = 0; line < LineCount; ++line)
         {
             DrawText(dpi, lineCoords, tempPaint, buffer);
-            tempPaint.Colour = TEXT_COLOUR_254;
+            tempPaint.Colour = kTextColour254;
             buffer = GetStringEnd(buffer) + 1;
             lineCoords.y += LineHeight;
         }
@@ -140,11 +140,6 @@ void DrawTextEllipsised(
     DrawText(dpi, coords, textPaint, buffer);
 }
 
-void GfxDrawString(DrawPixelInfo& dpi, const ScreenCoordsXY& coords, const_utf8string buffer, TextPaint textPaint)
-{
-    DrawText(dpi, coords, textPaint, buffer);
-}
-
 int32_t DrawTextWrapped(DrawPixelInfo& dpi, const ScreenCoordsXY& coords, int32_t width, StringId format)
 {
     Formatter ft{};
@@ -157,7 +152,7 @@ int32_t DrawTextWrapped(
 {
     const void* args = ft.Data();
 
-    StaticLayout layout(FormatStringID(format, args), textPaint, width);
+    StaticLayout layout(OpenRCT2::FormatStringIDLegacy(format, args), textPaint, width);
 
     if (textPaint.Alignment == TextAlignment::CENTRE)
     {

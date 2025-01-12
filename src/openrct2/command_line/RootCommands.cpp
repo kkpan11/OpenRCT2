@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -31,16 +31,18 @@
 #include <iterator>
 #include <string>
 
+using namespace OpenRCT2;
+
 #ifdef USE_BREAKPAD
-#    define IMPLIES_SILENT_BREAKPAD ", implies --silent-breakpad"
+    #define IMPLIES_SILENT_BREAKPAD ", implies --silent-breakpad"
 #else
-#    define IMPLIES_SILENT_BREAKPAD
+    #define IMPLIES_SILENT_BREAKPAD
 #endif // USE_BREAKPAD
 
 #ifndef DISABLE_NETWORK
 int32_t gNetworkStart = NETWORK_MODE_NONE;
 std::string gNetworkStartHost;
-int32_t gNetworkStartPort = NETWORK_DEFAULT_PORT;
+int32_t gNetworkStartPort = kNetworkDefaultPort;
 std::string gNetworkStartAddress;
 
 static uint32_t _port = 0;
@@ -54,6 +56,7 @@ static bool _all = false;
 static bool _about = false;
 static bool _verbose = false;
 static bool _headless = false;
+static bool _silentReplays = false;
 static u8string _password = {};
 static u8string _userDataPath = {};
 static u8string _openrct2DataPath = {};
@@ -71,10 +74,11 @@ static constexpr CommandLineOptionDefinition StandardOptions[]
     { CMDLINE_TYPE_SWITCH,  &_about,            NAC, "about",              "show information about " OPENRCT2_NAME                      },
     { CMDLINE_TYPE_SWITCH,  &_verbose,          NAC, "verbose",            "log verbose messages"                                       },
     { CMDLINE_TYPE_SWITCH,  &_headless,         NAC, "headless",           "run " OPENRCT2_NAME " headless" IMPLIES_SILENT_BREAKPAD     },
-#ifndef DISABLE_NETWORK                                                    
+    { CMDLINE_TYPE_SWITCH,  &_silentReplays,    NAC, "silent-replays",     "use unobtrusive replays"                                    },
+#ifndef DISABLE_NETWORK
     { CMDLINE_TYPE_INTEGER, &_port,             NAC, "port",               "port to use for hosting or joining a server"                },
     { CMDLINE_TYPE_STRING,  &_address,          NAC, "address",            "address to listen on when hosting a server"                 },
-#endif                                                                     
+#endif
     { CMDLINE_TYPE_STRING,  &_password,         NAC, "password",           "password needed to join the server"                         },
     { CMDLINE_TYPE_STRING,  &_userDataPath,     NAC, "user-data-path",     "path to the user data directory (containing config.ini)"    },
     { CMDLINE_TYPE_STRING,  &_openrct2DataPath, NAC, "openrct2-data-path", "path to the OpenRCT2 data directory (containing languages)" },
@@ -83,7 +87,7 @@ static constexpr CommandLineOptionDefinition StandardOptions[]
 #ifdef USE_BREAKPAD
     { CMDLINE_TYPE_SWITCH,  &_silentBreakpad,  NAC, "silent-breakpad",   "make breakpad crash reporting silent"                       },
 #endif // USE_BREAKPAD
-    OptionTableEnd
+    kOptionTableEnd
 };
 
 static exitcode_t HandleNoCommand(CommandLineArgEnumerator * enumerator);
@@ -142,7 +146,7 @@ const CommandLineCommand CommandLine::RootCommands[]
     DefineSubCommand("sprite",          CommandLine::SpriteCommands           ),
     DefineSubCommand("simulate",        CommandLine::SimulateCommands         ),
     DefineSubCommand("parkinfo",        CommandLine::ParkInfoCommands         ),
-    CommandTableEnd
+    kCommandTableEnd
 };
 
 const CommandLineExample CommandLine::RootExamples[]
@@ -156,7 +160,7 @@ const CommandLineExample CommandLine::RootExamples[]
 #ifndef DISABLE_NETWORK
     { "host ./my_park.sv6 --port 11753 --headless",   "run a headless server for a saved park" },
 #endif
-    ExampleTableEnd
+    kExampleTableEnd
 };
 // clang-format on
 
@@ -173,7 +177,7 @@ exitcode_t CommandLine::HandleCommandDefault()
     {
         if (_verbose)
         {
-            _log_levels[static_cast<uint8_t>(DiagnosticLevel::Verbose)] = true;
+            _log_levels[EnumValue(DiagnosticLevel::Verbose)] = true;
             PrintLaunchInformation();
         }
 
@@ -222,6 +226,11 @@ exitcode_t CommandLine::HandleCommandDefault()
         gCustomPassword = _password;
     }
 
+    if (_silentReplays)
+    {
+        gSilentReplays = _silentReplays;
+    }
+
     return result;
 }
 
@@ -236,7 +245,7 @@ exitcode_t HandleNoCommand(CommandLineArgEnumerator* enumerator)
     const char* parkUri;
     if (enumerator->TryPopString(&parkUri) && parkUri[0] != '-')
     {
-        String::Set(gOpenRCT2StartupActionPath, sizeof(gOpenRCT2StartupActionPath), parkUri);
+        String::set(gOpenRCT2StartupActionPath, sizeof(gOpenRCT2StartupActionPath), parkUri);
         gOpenRCT2StartupAction = StartupAction::Open;
     }
 
@@ -257,7 +266,7 @@ exitcode_t HandleCommandEdit(CommandLineArgEnumerator* enumerator)
         Console::Error::WriteLine("Expected path or URL to a saved park.");
         return EXITCODE_FAIL;
     }
-    String::Set(gOpenRCT2StartupActionPath, sizeof(gOpenRCT2StartupActionPath), parkUri);
+    String::set(gOpenRCT2StartupActionPath, sizeof(gOpenRCT2StartupActionPath), parkUri);
 
     gOpenRCT2StartupAction = StartupAction::Edit;
     return EXITCODE_CONTINUE;
@@ -293,11 +302,11 @@ exitcode_t HandleCommandHost(CommandLineArgEnumerator* enumerator)
     }
 
     gOpenRCT2StartupAction = StartupAction::Open;
-    String::Set(gOpenRCT2StartupActionPath, sizeof(gOpenRCT2StartupActionPath), parkUri);
+    String::set(gOpenRCT2StartupActionPath, sizeof(gOpenRCT2StartupActionPath), parkUri);
 
     gNetworkStart = NETWORK_MODE_SERVER;
     gNetworkStartPort = _port;
-    gNetworkStartAddress = String::ToStd(_address);
+    gNetworkStartAddress = String::toStd(_address);
 
     return EXITCODE_CONTINUE;
 }
@@ -365,10 +374,10 @@ static exitcode_t HandleCommandSetRCT2(CommandLineArgEnumerator* enumerator)
     // Update RCT2 path in config
     auto env = OpenRCT2::CreatePlatformEnvironment();
     auto configPath = env->GetFilePath(OpenRCT2::PATHID::CONFIG);
-    ConfigSetDefaults();
-    ConfigOpen(configPath);
-    gConfigGeneral.RCT2Path = path;
-    if (ConfigSave(configPath))
+    Config::SetDefaults();
+    Config::OpenFromPath(configPath);
+    Config::Get().general.RCT2Path = path;
+    if (Config::SaveToPath(configPath))
     {
         Console::WriteFormat("Updating RCT2 path to '%s'.", path.c_str());
         Console::WriteLine();
@@ -394,7 +403,7 @@ static exitcode_t HandleCommandScanObjects([[maybe_unused]] CommandLineArgEnumer
     auto context = OpenRCT2::CreateContext();
     auto env = context->GetPlatformEnvironment();
     auto objectRepository = CreateObjectRepository(env);
-    objectRepository->Construct(gConfigGeneral.Language);
+    objectRepository->Construct(Config::Get().general.Language);
     return EXITCODE_OK;
 }
 
@@ -430,17 +439,17 @@ static void PrintAbout()
     Console::WriteLine("includes some 3rd party software under different licenses. See the file");
     Console::WriteLine("\"licence.txt\" shipped with the game for details.");
     Console::WriteLine();
-    Console::WriteLine("Website:      https://openrct2.io");
-    Console::WriteLine("GitHub:       https://github.com/OpenRCT2/OpenRCT2");
-    Console::WriteLine("Contributors: https://github.com/OpenRCT2/OpenRCT2/blob/develop/contributors.md");
+    Console::WriteLine("Website:        https://openrct2.io");
+    Console::WriteLine("GitHub:         https://github.com/OpenRCT2/OpenRCT2");
+    Console::WriteLine("Contributors:   https://github.com/OpenRCT2/OpenRCT2/blob/develop/contributors.md");
+    Console::WriteLine("Privacy Policy: https://github.com/OpenRCT2/OpenRCT2/blob/develop/PRIVACY.md");
     Console::WriteLine();
 }
 
 static void PrintVersion()
 {
-    char buffer[256];
-    OpenRCT2WriteFullVersionInfo(buffer, sizeof(buffer));
-    Console::WriteLine(buffer);
+    u8string versionInfo = gVersionInfoFull;
+    Console::WriteLine(versionInfo.c_str());
     Console::WriteFormat("%s (%s)", OPENRCT2_PLATFORM, OPENRCT2_ARCHITECTURE);
     Console::WriteLine();
     Console::WriteFormat("Network version: %s", NetworkGetVersion().c_str());
@@ -472,9 +481,8 @@ static void PrintLaunchInformation()
     struct tm* tmInfo;
 
     // Print name and version information
-    OpenRCT2WriteFullVersionInfo(buffer, sizeof(buffer));
-    Console::WriteFormat("%s", buffer);
-    Console::WriteLine();
+    u8string versionInfo = gVersionInfoFull;
+    Console::WriteLine(versionInfo.c_str());
     Console::WriteFormat("%s (%s)", OPENRCT2_PLATFORM, OPENRCT2_ARCHITECTURE);
     Console::WriteLine();
     Console::WriteLine();

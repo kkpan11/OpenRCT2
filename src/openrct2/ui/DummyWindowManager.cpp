@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -14,7 +14,7 @@ namespace OpenRCT2::Ui
 {
     class DummyWindowManager final : public IWindowManager
     {
-        void Init() override{};
+        void Init() override {};
         WindowBase* OpenWindow(WindowClass /*wc*/) override
         {
             return nullptr;
@@ -27,11 +27,12 @@ namespace OpenRCT2::Ui
         {
             return nullptr;
         }
-        WindowBase* ShowError(StringId /*title*/, StringId /*message*/, const Formatter& /*formatter*/) override
+        WindowBase* ShowError(
+            StringId /*title*/, StringId /*message*/, const Formatter& /*formatter*/, bool /*autoClose*/) override
         {
             return nullptr;
         }
-        WindowBase* ShowError(std::string_view /*title*/, std::string_view /*message*/) override
+        WindowBase* ShowError(std::string_view /*title*/, std::string_view /*message*/, bool /*autoClose*/) override
         {
             return nullptr;
         }
@@ -67,6 +68,26 @@ namespace OpenRCT2::Ui
         WindowBase* GetOwner(const Viewport* viewport) override
         {
             return nullptr;
+        }
+        WindowBase* FindByClass(WindowClass cls) override
+        {
+            return nullptr;
+        }
+        WindowBase* FindByNumber(WindowClass cls, rct_windownumber number) override
+        {
+            return nullptr;
+        }
+        WindowBase* FindByNumber(WindowClass cls, EntityId id) override
+        {
+            return nullptr;
+        }
+        WindowBase* FindFromPoint(const ScreenCoordsXY& screenCoords) override
+        {
+            return nullptr;
+        }
+        WidgetIndex FindWidgetFromPoint(WindowBase& w, const ScreenCoordsXY& screenCoords) override
+        {
+            return -1;
         }
     };
 

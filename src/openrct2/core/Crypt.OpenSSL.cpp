@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,18 +9,18 @@
 
 #if !defined(DISABLE_NETWORK) && !defined(_WIN32)
 
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-#    include "Crypt.h"
+    #include "Crypt.h"
 
-#    include <openssl/evp.h>
-#    include <openssl/pem.h>
-#    include <stdexcept>
-#    include <string>
-#    include <vector>
+    #include <openssl/evp.h>
+    #include <openssl/pem.h>
+    #include <stdexcept>
+    #include <string>
+    #include <vector>
 
-using namespace Crypt;
+using namespace OpenRCT2::Crypt;
 
 static void OpenSSLThrowOnBadStatus(std::string_view name, int status)
 {
@@ -40,7 +40,8 @@ static void OpenSSLInitialise()
     }
 }
 
-template<typename TBase> class OpenSSLHashAlgorithm final : public TBase
+template<typename TBase>
+class OpenSSLHashAlgorithm final : public TBase
 {
 private:
     const EVP_MD* _type;
@@ -326,7 +327,7 @@ public:
     }
 };
 
-namespace Crypt
+namespace OpenRCT2::Crypt
 {
     std::unique_ptr<Sha1Algorithm> CreateSHA1()
     {
@@ -351,8 +352,8 @@ namespace Crypt
         OpenSSLInitialise();
         return std::make_unique<OpenSSLRsaKey>();
     }
-} // namespace Crypt
+} // namespace OpenRCT2::Crypt
 
-#    pragma GCC diagnostic pop
+    #pragma GCC diagnostic pop
 
 #endif // DISABLE_NETWORK

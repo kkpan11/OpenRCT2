@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,8 +16,10 @@
 
 #include <chrono>
 
+using namespace OpenRCT2;
+
 #ifdef OPENRCT2_BUILD_INFO_HEADER
-#    include OPENRCT2_BUILD_INFO_HEADER
+    #include OPENRCT2_BUILD_INFO_HEADER
 #endif
 
 const char gVersionInfoTag[] =
@@ -36,16 +38,16 @@ const char gVersionInfoFull[] = OPENRCT2_NAME ", "
 #endif
 #if defined(OPENRCT2_BRANCH) || defined(OPENRCT2_COMMIT_SHA1_SHORT) || !defined(NDEBUG)
                                               " ("
-#    if defined(OPENRCT2_BRANCH) && defined(OPENRCT2_COMMIT_SHA1_SHORT)
+    #if defined(OPENRCT2_BRANCH) && defined(OPENRCT2_COMMIT_SHA1_SHORT)
     OPENRCT2_COMMIT_SHA1_SHORT " on " OPENRCT2_BRANCH
-#    elif defined(OPENRCT2_COMMIT_SHA1_SHORT)
+    #elif defined(OPENRCT2_COMMIT_SHA1_SHORT)
     OPENRCT2_COMMIT_SHA1_SHORT
-#    elif defined(OPENRCT2_BRANCH)
+    #elif defined(OPENRCT2_BRANCH)
     OPENRCT2_BRANCH
-#    endif
-#    ifndef NDEBUG
+    #endif
+    #ifndef NDEBUG
                                               ", DEBUG"
-#    endif
+    #endif
                                               ")"
 #endif
 #ifdef OPENRCT2_BUILD_SERVER
@@ -61,8 +63,10 @@ NewVersionInfo GetLatestVersion()
     NewVersionInfo verinfo{ tag, "", "", "" };
 #ifndef DISABLE_HTTP
     auto now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    auto then = gConfigGeneral.LastVersionCheckTime;
-    if (then < now - 24 * 60 * 60)
+    auto then = Config::Get().general.LastVersionCheckTime;
+    using namespace std::chrono_literals;
+
+    if (then < now - std::chrono::seconds(24h).count())
     {
         Http::Request request;
         request.url = "https://api.github.com/repos/OpenRCT2/OpenRCT2/releases/latest";
@@ -88,8 +92,8 @@ NewVersionInfo GetLatestVersion()
         verinfo.changelog = Json::GetString(root["body"]);
         verinfo.url = Json::GetString(root["html_url"]);
 
-        gConfigGeneral.LastVersionCheckTime = now;
-        ConfigSaveDefault();
+        Config::Get().general.LastVersionCheckTime = now;
+        Config::Save();
     }
 #endif
     return verinfo;

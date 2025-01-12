@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,8 +10,8 @@
 #pragma once
 
 #include "../Identifiers.h"
-#include "../common.h"
-#include "../core/String.hpp"
+#include "../core/StringTypes.h"
+#include "../localisation/StringIdType.h"
 
 #include <algorithm>
 #include <array>
@@ -22,7 +22,7 @@
 struct CoordsXYZ;
 class Formatter;
 
-namespace News
+namespace OpenRCT2::News
 {
     enum class ItemType : uint8_t
     {
@@ -120,7 +120,8 @@ namespace News
     constexpr int32_t MaxItemsArchive = 50;
     constexpr int32_t MaxItems = News::ItemHistoryStart + News::MaxItemsArchive;
 
-    template<std::size_t N> class ItemQueue
+    template<std::size_t N>
+    class ItemQueue
     {
     public:
         static_assert(N > 0, "Cannot instantiate News::ItemQueue with size=0");
@@ -264,7 +265,8 @@ namespace News
             return Archived;
         }
 
-        template<typename Predicate> void ForeachRecentNews(Predicate&& p)
+        template<typename Predicate>
+        void ForeachRecentNews(Predicate&& p)
         {
             for (auto& newsItem : Recent)
             {
@@ -272,7 +274,8 @@ namespace News
             }
         }
 
-        template<typename Predicate> void ForeachArchivedNews(Predicate&& p)
+        template<typename Predicate>
+        void ForeachArchivedNews(Predicate&& p)
         {
             for (auto& newsItem : Archived)
             {
@@ -312,4 +315,4 @@ namespace News
 
     void AddItemToQueue(News::Item* newNewsItem);
     void RemoveItem(int32_t index);
-} // namespace News
+} // namespace OpenRCT2::News

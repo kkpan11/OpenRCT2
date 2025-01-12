@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -18,7 +18,8 @@
 /**
  * Bi-directional map for converting between strings and enums / numbers.
  */
-template<typename T> class EnumMap
+template<typename T>
+class EnumMap
 {
 private:
     std::vector<std::pair<std::string_view, T>> _map;
@@ -62,7 +63,7 @@ public:
     {
         std::sort(_map.begin(), _map.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
 
-        if constexpr (ValueIndexable())
+        if (ValueIndexable() && _map.size() > 1)
         {
             _continiousValueIndex = true;
             T cur{};

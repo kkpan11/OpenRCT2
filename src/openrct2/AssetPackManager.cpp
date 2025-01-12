@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,6 +11,7 @@
 
 #include "AssetPack.h"
 #include "Context.h"
+#include "Diagnostic.h"
 #include "PlatformEnvironment.h"
 #include "config/Config.h"
 #include "core/Console.hpp"
@@ -19,6 +20,7 @@
 #include "core/String.hpp"
 #include "object/AudioSampleTable.h"
 
+#include <algorithm>
 #include <cstdio>
 
 using namespace OpenRCT2;
@@ -85,7 +87,7 @@ void AssetPackManager::Scan(const fs::path& directory)
         if (!entry.is_directory())
         {
             auto path = entry.path().u8string();
-            if (String::EndsWith(path, ".parkap", true))
+            if (String::endsWith(path, ".parkap", true))
             {
                 AddAssetPack(path);
             }
@@ -141,7 +143,8 @@ void AssetPackManager::AddAssetPack(const fs::path& path)
     }
 }
 
-template<typename TFunc> static void EnumerateCommaSeparatedList(std::string_view csl, TFunc func)
+template<typename TFunc>
+static void EnumerateCommaSeparatedList(std::string_view csl, TFunc func)
 {
     size_t elStart = 0;
     for (size_t i = 0; i <= csl.size(); i++)
@@ -160,7 +163,7 @@ void AssetPackManager::LoadEnabledAssetPacks()
 {
     // Re-order asset packs
     std::vector<std::unique_ptr<AssetPack>> newAssetPacks;
-    EnumerateCommaSeparatedList(gConfigGeneral.AssetPackOrder, [&](std::string_view id) {
+    EnumerateCommaSeparatedList(Config::Get().general.AssetPackOrder, [&](std::string_view id) {
         auto index = GetAssetPackIndex(id);
         if (index != std::numeric_limits<size_t>::max())
         {
@@ -177,7 +180,7 @@ void AssetPackManager::LoadEnabledAssetPacks()
     _assetPacks = std::move(newAssetPacks);
 
     // Set which asset packs are enabled
-    EnumerateCommaSeparatedList(gConfigGeneral.EnabledAssetPacks, [&](std::string_view id) {
+    EnumerateCommaSeparatedList(Config::Get().general.EnabledAssetPacks, [&](std::string_view id) {
         auto assetPack = GetAssetPack(id);
         if (assetPack != nullptr)
         {
@@ -204,7 +207,7 @@ void AssetPackManager::SaveEnabledAssetPacks()
         orderList.pop_back();
     if (enabledList.size() > 0)
         enabledList.pop_back();
-    gConfigGeneral.AssetPackOrder = orderList;
-    gConfigGeneral.EnabledAssetPacks = enabledList;
-    ConfigSaveDefault();
+    Config::Get().general.AssetPackOrder = orderList;
+    Config::Get().general.EnabledAssetPacks = enabledList;
+    Config::Save();
 }

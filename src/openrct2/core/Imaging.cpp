@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,6 +11,7 @@
 
 #include "Imaging.h"
 
+#include "../Diagnostic.h"
 #include "../Version.h"
 #include "../drawing/Drawing.h"
 #include "FileSystem.hpp"
@@ -25,7 +26,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-namespace Imaging
+namespace OpenRCT2::Imaging
 {
     constexpr auto EXCEPTION_IMAGE_FORMAT_UNKNOWN = "Unknown image format.";
 
@@ -188,7 +189,7 @@ namespace Imaging
 
             if (image.Depth == 8)
             {
-                if (image.Palette == nullptr)
+                if (!image.Palette.has_value())
                 {
                     throw std::runtime_error("Expected a palette for 8-bit image.");
                 }
@@ -201,7 +202,7 @@ namespace Imaging
                 }
                 for (size_t i = 0; i < PNG_MAX_PALETTE_LENGTH; i++)
                 {
-                    const auto& entry = (*image.Palette)[static_cast<uint16_t>(i)];
+                    const auto& entry = (*image.Palette)[i];
                     png_palette[i].blue = entry.Blue;
                     png_palette[i].green = entry.Green;
                     png_palette[i].red = entry.Red;
@@ -254,12 +255,12 @@ namespace Imaging
 
     IMAGE_FORMAT GetImageFormatFromPath(std::string_view path)
     {
-        if (String::EndsWith(path, ".png", true))
+        if (String::endsWith(path, ".png", true))
         {
             return IMAGE_FORMAT::PNG;
         }
 
-        if (String::EndsWith(path, ".bmp", true))
+        if (String::endsWith(path, ".bmp", true))
         {
             return IMAGE_FORMAT::BITMAP;
         }
@@ -341,4 +342,4 @@ namespace Imaging
                 throw std::runtime_error(EXCEPTION_IMAGE_FORMAT_UNKNOWN);
         }
     }
-} // namespace Imaging
+} // namespace OpenRCT2::Imaging

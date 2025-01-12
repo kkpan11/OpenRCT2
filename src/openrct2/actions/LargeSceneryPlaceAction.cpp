@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,8 @@
 
 #include "LargeSceneryPlaceAction.h"
 
+#include "../Diagnostic.h"
+#include "../GameState.h"
 #include "../OpenRCT2.h"
 #include "../management/Finance.h"
 #include "../object/LargeSceneryEntry.h"
@@ -18,8 +20,15 @@
 #include "../ride/RideConstruction.h"
 #include "../world/Banner.h"
 #include "../world/ConstructionClearance.h"
+#include "../world/Footpath.h"
 #include "../world/MapAnimation.h"
-#include "../world/Surface.h"
+#include "../world/QuarterTile.h"
+#include "../world/Wall.h"
+#include "../world/tile_element/LargeSceneryElement.h"
+#include "../world/tile_element/Slope.h"
+#include "../world/tile_element/SurfaceElement.h"
+
+using namespace OpenRCT2;
 
 LargeSceneryPlaceAction::LargeSceneryPlaceAction(
     const CoordsXYZD& loc, ObjectEntryIndex sceneryType, uint8_t primaryColour, uint8_t secondaryColour, uint8_t tertiaryColour)
@@ -65,31 +74,41 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
 
     auto resultData = LargeSceneryPlaceActionResult{};
 
+    auto& gameState = GetGameState();
+
     money64 supportsCost = 0;
 
-    if (_primaryColour >= COLOUR_COUNT || _secondaryColour >= COLOUR_COUNT || _tertiaryColour >= COLOUR_COUNT)
+    if (_primaryColour >= COLOUR_COUNT)
     {
-        LOG_ERROR(
-            "Invalid game command for scenery placement, primaryColour = %u, secondaryColour = %u", _primaryColour,
-            _secondaryColour);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_NONE);
+        LOG_ERROR("Invalid primary colour %u", _primaryColour);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_ERR_INVALID_COLOUR);
+    }
+    else if (_secondaryColour >= COLOUR_COUNT)
+    {
+        LOG_ERROR("Invalid secondary colour %u", _secondaryColour);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_ERR_INVALID_COLOUR);
+    }
+    else if (_tertiaryColour >= COLOUR_COUNT)
+    {
+        LOG_ERROR("Invalid tertiary colour %u", _tertiaryColour);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_ERR_INVALID_COLOUR);
+    }
+    else if (_sceneryType >= kMaxLargeSceneryObjects)
+    {
+        LOG_ERROR("Invalid sceneryType %u", _sceneryType);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_ERR_VALUE_OUT_OF_RANGE);
     }
 
-    if (_sceneryType >= MAX_LARGE_SCENERY_OBJECTS)
-    {
-        LOG_ERROR("Invalid game command for scenery placement, sceneryType = %u", _sceneryType);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_NONE);
-    }
-
-    auto* sceneryEntry = OpenRCT2::ObjectManager::GetObjectEntry<LargeSceneryEntry>(_sceneryType);
+    auto* sceneryEntry = ObjectManager::GetObjectEntry<LargeSceneryEntry>(_sceneryType);
     if (sceneryEntry == nullptr)
     {
-        LOG_ERROR("Invalid game command for scenery placement, sceneryType = %u", _sceneryType);
+        LOG_ERROR("Large scenery entry not found for sceneryType %u", _sceneryType);
         return GameActions::Result(
             GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_UNKNOWN_OBJECT_TYPE);
     }
 
-    uint32_t totalNumTiles = GetTotalNumTiles(sceneryEntry->tiles);
+    const auto totalNumTiles = sceneryEntry->tiles.size();
     int16_t maxHeight = GetMaxSurfaceHeight(sceneryEntry->tiles);
 
     if (_loc.z != 0)
@@ -109,21 +128,20 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
         }
     }
 
-    uint8_t tileNum = 0;
-    for (LargeSceneryTile* tile = sceneryEntry->tiles; tile->x_offset != -1; tile++, tileNum++)
+    for (auto& tile : sceneryEntry->tiles)
     {
-        auto curTile = CoordsXY{ tile->x_offset, tile->y_offset }.Rotate(_loc.direction);
+        auto curTile = CoordsXY{ tile.offset }.Rotate(_loc.direction);
 
         curTile.x += _loc.x;
         curTile.y += _loc.y;
 
-        int32_t zLow = tile->z_offset + maxHeight;
-        int32_t zHigh = tile->z_clearance + zLow;
+        int32_t zLow = tile.offset.z + maxHeight;
+        int32_t zHigh = tile.zClearance + zLow;
 
-        QuarterTile quarterTile = QuarterTile{ static_cast<uint8_t>(tile->flags >> 12), 0 }.Rotate(_loc.direction);
+        QuarterTile quarterTile = QuarterTile{ tile.corners, 0 }.Rotate(_loc.direction);
         const auto isTree = (sceneryEntry->flags & LARGE_SCENERY_FLAG_IS_TREE) != 0;
         auto canBuild = MapCanConstructWithClearAt(
-            { curTile, zLow, zHigh }, &MapPlaceSceneryClearFunc, quarterTile, GetFlags(), CREATE_CROSSING_MODE_NONE, isTree);
+            { curTile, zLow, zHigh }, &MapPlaceSceneryClearFunc, quarterTile, GetFlags(), CreateCrossingMode::none, isTree);
         if (canBuild.Error != GameActions::Status::Ok)
         {
             canBuild.ErrorTitle = STR_CANT_POSITION_THIS_HERE;
@@ -134,7 +152,7 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
 
         const auto clearanceData = canBuild.GetData<ConstructClearResult>();
         int32_t tempSceneryGroundFlags = clearanceData.GroundFlags & (ELEMENT_IS_ABOVE_GROUND | ELEMENT_IS_UNDERGROUND);
-        if (!gCheatsDisableClearanceChecks)
+        if (!gameState.Cheats.disableClearanceChecks)
         {
             if ((clearanceData.GroundFlags & ELEMENT_IS_UNDERWATER) || (clearanceData.GroundFlags & ELEMENT_IS_UNDERGROUND))
             {
@@ -156,7 +174,8 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
             return GameActions::Result(GameActions::Status::Disallowed, STR_CANT_POSITION_THIS_HERE, STR_OFF_EDGE_OF_MAP);
         }
 
-        if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !MapIsLocationOwned({ curTile, zLow }) && !gCheatsSandboxMode)
+        if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !MapIsLocationOwned({ curTile, zLow })
+            && !gameState.Cheats.sandboxMode)
         {
             return GameActions::Result(
                 GameActions::Status::Disallowed, STR_CANT_POSITION_THIS_HERE, STR_LAND_NOT_OWNED_BY_PARK);
@@ -194,15 +213,15 @@ GameActions::Result LargeSceneryPlaceAction::Execute() const
 
     money64 supportsCost = 0;
 
-    auto* sceneryEntry = OpenRCT2::ObjectManager::GetObjectEntry<LargeSceneryEntry>(_sceneryType);
+    auto* sceneryEntry = ObjectManager::GetObjectEntry<LargeSceneryEntry>(_sceneryType);
     if (sceneryEntry == nullptr)
     {
-        LOG_ERROR("Invalid game command for scenery placement, sceneryType = %u", _sceneryType);
+        LOG_ERROR("Large scenery entry not found for sceneryType = %u", _sceneryType);
         return GameActions::Result(
             GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_UNKNOWN_OBJECT_TYPE);
     }
 
-    if (sceneryEntry->tiles == nullptr)
+    if (sceneryEntry->tiles.empty())
     {
         LOG_ERROR("Invalid large scenery object, sceneryType = %u", _sceneryType);
         return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_NONE);
@@ -246,21 +265,20 @@ GameActions::Result LargeSceneryPlaceAction::Execute() const
         resultData.bannerId = banner->id;
     }
 
-    uint8_t tileNum = 0;
-    for (LargeSceneryTile* tile = sceneryEntry->tiles; tile->x_offset != -1; tile++, tileNum++)
+    for (auto& tile : sceneryEntry->tiles)
     {
-        auto curTile = CoordsXY{ tile->x_offset, tile->y_offset }.Rotate(_loc.direction);
+        auto curTile = CoordsXY{ tile.offset }.Rotate(_loc.direction);
 
         curTile.x += _loc.x;
         curTile.y += _loc.y;
 
-        int32_t zLow = tile->z_offset + maxHeight;
-        int32_t zHigh = tile->z_clearance + zLow;
+        int32_t zLow = tile.offset.z + maxHeight;
+        int32_t zHigh = tile.zClearance + zLow;
 
-        QuarterTile quarterTile = QuarterTile{ static_cast<uint8_t>(tile->flags >> 12), 0 }.Rotate(_loc.direction);
+        QuarterTile quarterTile = QuarterTile{ tile.corners, 0 }.Rotate(_loc.direction);
         const auto isTree = (sceneryEntry->flags & LARGE_SCENERY_FLAG_IS_TREE) != 0;
         auto canBuild = MapCanConstructWithClearAt(
-            { curTile, zLow, zHigh }, &MapPlaceSceneryClearFunc, quarterTile, GetFlags(), CREATE_CROSSING_MODE_NONE, isTree);
+            { curTile, zLow, zHigh }, &MapPlaceSceneryClearFunc, quarterTile, GetFlags(), CreateCrossingMode::none, isTree);
         if (canBuild.Error != GameActions::Status::Ok)
         {
             if (banner != nullptr)
@@ -279,7 +297,7 @@ GameActions::Result LargeSceneryPlaceAction::Execute() const
         if (!(GetFlags() & GAME_COMMAND_FLAG_GHOST))
         {
             FootpathRemoveLitter({ curTile, zLow });
-            if (!gCheatsDisableClearanceChecks)
+            if (!GetGameState().Cheats.disableClearanceChecks)
             {
                 WallRemoveAt({ curTile, zLow, zHigh });
             }
@@ -290,7 +308,7 @@ GameActions::Result LargeSceneryPlaceAction::Execute() const
         Guard::Assert(newSceneryElement != nullptr);
         newSceneryElement->SetClearanceZ(zHigh);
 
-        SetNewLargeSceneryElement(*newSceneryElement, tileNum);
+        SetNewLargeSceneryElement(*newSceneryElement, tile.index);
         if (banner != nullptr)
         {
             newSceneryElement->SetBannerIndex(banner->id);
@@ -299,7 +317,7 @@ GameActions::Result LargeSceneryPlaceAction::Execute() const
         MapAnimationCreate(MAP_ANIMATION_TYPE_LARGE_SCENERY, { curTile, zLow });
         MapInvalidateTileFull(curTile);
 
-        if (tileNum == 0)
+        if (tile.index == 0)
         {
             resultData.firstTileHeight = zLow;
         }
@@ -314,21 +332,11 @@ GameActions::Result LargeSceneryPlaceAction::Execute() const
     return res;
 }
 
-int16_t LargeSceneryPlaceAction::GetTotalNumTiles(LargeSceneryTile* tiles) const
+bool LargeSceneryPlaceAction::CheckMapCapacity(std::span<const LargeSceneryTile> tiles, size_t numTiles) const
 {
-    uint32_t totalNumTiles = 0;
-    for (LargeSceneryTile* tile = tiles; tile->x_offset != -1; tile++)
+    for (auto& tile : tiles)
     {
-        totalNumTiles++;
-    }
-    return totalNumTiles;
-}
-
-bool LargeSceneryPlaceAction::CheckMapCapacity(LargeSceneryTile* tiles, int16_t numTiles) const
-{
-    for (LargeSceneryTile* tile = tiles; tile->x_offset != -1; tile++)
-    {
-        auto curTile = CoordsXY{ tile->x_offset, tile->y_offset }.Rotate(_loc.direction);
+        auto curTile = CoordsXY{ tile.offset }.Rotate(_loc.direction);
 
         curTile.x += _loc.x;
         curTile.y += _loc.y;
@@ -340,12 +348,12 @@ bool LargeSceneryPlaceAction::CheckMapCapacity(LargeSceneryTile* tiles, int16_t 
     return true;
 }
 
-int16_t LargeSceneryPlaceAction::GetMaxSurfaceHeight(LargeSceneryTile* tiles) const
+int16_t LargeSceneryPlaceAction::GetMaxSurfaceHeight(std::span<const LargeSceneryTile> tiles) const
 {
     int16_t maxHeight = -1;
-    for (LargeSceneryTile* tile = tiles; tile->x_offset != -1; tile++)
+    for (auto& tile : tiles)
     {
-        auto curTile = CoordsXY{ tile->x_offset, tile->y_offset }.Rotate(_loc.direction);
+        auto curTile = CoordsXY{ tile.offset }.Rotate(_loc.direction);
 
         curTile.x += _loc.x;
         curTile.y += _loc.y;
@@ -362,10 +370,10 @@ int16_t LargeSceneryPlaceAction::GetMaxSurfaceHeight(LargeSceneryTile* tiles) co
         int32_t baseZ = surfaceElement->GetBaseZ();
         int32_t slope = surfaceElement->GetSlope();
 
-        if ((slope & TILE_ELEMENT_SLOPE_ALL_CORNERS_UP) != TILE_ELEMENT_SLOPE_FLAT)
+        if ((slope & kTileSlopeRaisedCornersMask) != kTileSlopeFlat)
         {
             baseZ += LAND_HEIGHT_STEP;
-            if (slope & TILE_ELEMENT_SLOPE_DOUBLE_HEIGHT)
+            if (slope & kTileSlopeDiagonalFlag)
             {
                 baseZ += LAND_HEIGHT_STEP;
             }

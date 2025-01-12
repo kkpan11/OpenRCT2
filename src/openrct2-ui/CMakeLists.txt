@@ -1,5 +1,6 @@
 # CMAKE project for openrct2-ui (UI build of OpenRCT2)
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.10)
+
 if (CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(FATAL_ERROR "Building in-source is not supported! Create a build dir and remove ${CMAKE_SOURCE_DIR}/CMakeCache.txt")
 endif ()
@@ -157,7 +158,7 @@ endif ()
 # Only valid for Clang for now:
 # - GCC 8 does not support -Wno-pragma-once-outside-header
 # - Other compilers status unknown
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+if (ENABLE_HEADERS_CHECK AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(OPENRCT2_HEADERS_CHECK ${OPENRCT2_UI_HEADERS})
     # OpenGLAPIProc.h is not meant to be included directly.
     list(REMOVE_ITEM OPENRCT2_HEADERS_CHECK "${CMAKE_CURRENT_LIST_DIR}/drawing/engines/opengl/OpenGLAPIProc.h")
@@ -183,6 +184,7 @@ if(MACOS_BUNDLE)
         PUBLIC ${ROOT_DIR}/distribution/readme.txt
         PUBLIC ${ROOT_DIR}/distribution/changelog.txt
         PUBLIC ${ROOT_DIR}/contributors.md
+        PUBLIC ${ROOT_DIR}/PRIVACY.md
         PUBLIC ${ROOT_DIR}/resources/mac/openrct2.icns
         )
 
@@ -191,6 +193,7 @@ if(MACOS_BUNDLE)
         ${ROOT_DIR}/distribution/readme.txt
         ${ROOT_DIR}/distribution/changelog.txt
         ${ROOT_DIR}/contributors.md
+        ${ROOT_DIR}/PRIVACY.md
         ${ROOT_DIR}/resources/mac/openrct2.icns
         )
 
@@ -214,11 +217,12 @@ if(MACOS_BUNDLE)
     set(MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
     set(PRODUCT_NAME "${OUTPUT_NAME}")
 
-    # copy data
+    # Copy data
     file(COPY ${SOURCE_DATA_DIR}/language DESTINATION "${BUNDLE_RESOURCE_DIR}")
+    file(COPY ${SOURCE_DATA_DIR}/scenario_patches DESTINATION "${BUNDLE_RESOURCE_DIR}")
     file(COPY ${SOURCE_DATA_DIR}/shaders DESTINATION "${BUNDLE_RESOURCE_DIR}")
 
-    # download objects and sequences
+    # Download objects and sequences
     set(OBJECTS_DIR ${CMAKE_BINARY_DIR}/object)
     set(TITLE_SEQUENCE_DIR ${CMAKE_BINARY_DIR}/sequence)
     download_openrct2_zip(
@@ -235,7 +239,8 @@ if(MACOS_BUNDLE)
         SHA1 ${TITLE_SEQUENCE_SHA1}
     )
 
-    # download opensfx and openmsx
+    # Download opensfx and openmsx
+    set(ASSET_PACK_DIR ${CMAKE_BINARY_DIR}/assetpack)
     download_openrct2_zip(
         ZIP_VERSION ${OPENSFX_VERSION}
         DOWNLOAD_DIR ${CMAKE_BINARY_DIR}
@@ -249,8 +254,10 @@ if(MACOS_BUNDLE)
         SHA1 ${OPENMSX_SHA1}
     )
 
+    # Copy downloaded data
     file(COPY ${OBJECTS_DIR} DESTINATION "${BUNDLE_RESOURCE_DIR}")
     file(COPY ${TITLE_SEQUENCE_DIR} DESTINATION "${BUNDLE_RESOURCE_DIR}")
+    file(COPY ${ASSET_PACK_DIR} DESTINATION "${BUNDLE_RESOURCE_DIR}")
 
     # Create as a bundle
     set_target_properties(${PROJECT_NAME} PROPERTIES

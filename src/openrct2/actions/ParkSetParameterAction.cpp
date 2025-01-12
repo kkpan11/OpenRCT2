@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,10 +9,11 @@
 
 #include "ParkSetParameterAction.h"
 
+#include "../Diagnostic.h"
 #include "../GameState.h"
+#include "../core/EnumUtils.hpp"
 #include "../interface/Window.h"
 #include "../ride/ShopItem.h"
-#include "../util/Util.h"
 #include "../world/Park.h"
 
 using namespace OpenRCT2;
@@ -44,6 +45,7 @@ GameActions::Result ParkSetParameterAction::Query() const
 {
     if (_parameter >= ParkParameter::Count)
     {
+        LOG_ERROR("Invalid park parameter %d", _parameter);
         return GameActions::Result(
             GameActions::Status::InvalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_VALUE_OUT_OF_RANGE);
     }
@@ -59,24 +61,25 @@ GameActions::Result ParkSetParameterAction::Execute() const
     switch (_parameter)
     {
         case ParkParameter::Close:
-            if (gameState.ParkFlags & PARK_FLAGS_PARK_OPEN)
+            if (gameState.Park.Flags & PARK_FLAGS_PARK_OPEN)
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_PARK_OPEN;
+                gameState.Park.Flags &= ~PARK_FLAGS_PARK_OPEN;
                 WindowInvalidateByClass(WindowClass::ParkInformation);
             }
             break;
         case ParkParameter::Open:
-            if (!(gameState.ParkFlags & PARK_FLAGS_PARK_OPEN))
+            if (!(gameState.Park.Flags & PARK_FLAGS_PARK_OPEN))
             {
-                gameState.ParkFlags |= PARK_FLAGS_PARK_OPEN;
+                gameState.Park.Flags |= PARK_FLAGS_PARK_OPEN;
                 WindowInvalidateByClass(WindowClass::ParkInformation);
             }
             break;
         case ParkParameter::SamePriceInPark:
-            gSamePriceThroughoutPark = _value;
+            gameState.SamePriceThroughoutPark = _value;
             WindowInvalidateByClass(WindowClass::Ride);
             break;
         default:
+            LOG_ERROR("Invalid park parameter %d", _parameter);
             return GameActions::Result(
                 GameActions::Status::InvalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_VALUE_OUT_OF_RANGE);
     }

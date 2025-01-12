@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,11 +7,18 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
-#include <algorithm>
+#include "MouseInput.h"
+
+#include "../UiStringIds.h"
+
+#include <cassert>
 #include <cmath>
 #include <iterator>
+#include <openrct2-ui/UiContext.h>
+#include <openrct2-ui/input/InputManager.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Viewport.h>
+#include <openrct2-ui/interface/ViewportInteraction.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Window.h>
@@ -23,16 +30,20 @@
 #include <openrct2/config/Config.h>
 #include <openrct2/interface/Chat.h>
 #include <openrct2/interface/Cursors.h>
-#include <openrct2/interface/InteractiveConsole.h>
 #include <openrct2/localisation/Formatter.h>
-#include <openrct2/localisation/Localisation.h>
 #include <openrct2/platform/Platform.h>
 #include <openrct2/ride/RideData.h>
 #include <openrct2/scenario/Scenario.h>
+#include <openrct2/ui/UiContext.h>
+#include <openrct2/ui/WindowManager.h>
 #include <openrct2/world/Banner.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/Scenery.h>
 #include <optional>
+
+using namespace OpenRCT2;
+using namespace OpenRCT2::Ui;
+using namespace OpenRCT2::Ui::Windows;
 
 struct RCTMouseData
 {
@@ -204,8 +215,8 @@ static void InputScrollDragContinue(const ScreenCoordsXY& screenCoords, WindowBa
         int16_t size = widget.width() - 1;
         if (scroll.flags & VSCROLLBAR_VISIBLE)
             size -= 11;
-        size = std::max(0, scroll.h_right - size);
-        scroll.h_left = std::min<uint16_t>(std::max(0, scroll.h_left + differentialCoords.x), size);
+        size = std::max(0, scroll.contentWidth - size);
+        scroll.contentOffsetX = std::min<uint16_t>(std::max(0, scroll.contentOffsetX + differentialCoords.x), size);
     }
 
     if (scroll.flags & VSCROLLBAR_VISIBLE)
@@ -213,15 +224,17 @@ static void InputScrollDragContinue(const ScreenCoordsXY& screenCoords, WindowBa
         int16_t size = widget.height() - 1;
         if (scroll.flags & HSCROLLBAR_VISIBLE)
             size -= 11;
-        size = std::max(0, scroll.v_bottom - size);
-        scroll.v_top = std::min<uint16_t>(std::max(0, scroll.v_top + differentialCoords.y), size);
+        size = std::max(0, scroll.contentHeight - size);
+        scroll.contentOffsetY = std::min<uint16_t>(std::max(0, scroll.contentOffsetY + differentialCoords.y), size);
     }
 
     WidgetScrollUpdateThumbs(*w, widgetIndex);
     WindowInvalidateByNumber(w->classification, w->number);
 
-    ScreenCoordsXY fixedCursorPosition = { static_cast<int32_t>(std::ceil(gInputDragLast.x * gConfigGeneral.WindowScale)),
-                                           static_cast<int32_t>(std::ceil(gInputDragLast.y * gConfigGeneral.WindowScale)) };
+    ScreenCoordsXY fixedCursorPosition = {
+        static_cast<int32_t>(std::ceil(gInputDragLast.x * Config::Get().general.WindowScale)),
+        static_cast<int32_t>(std::ceil(gInputDragLast.y * Config::Get().general.WindowScale))
+    };
 
     ContextSetCursorPosition(fixedCursorPosition);
 }
@@ -232,7 +245,8 @@ static void InputScrollDragContinue(const ScreenCoordsXY& screenCoords, WindowBa
  */
 static void InputScrollRight(const ScreenCoordsXY& screenCoords, MouseState state)
 {
-    WindowBase* w = WindowFindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    WindowBase* w = windowMgr->FindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
     if (w == nullptr)
     {
         ContextShowCursor();
@@ -271,9 +285,11 @@ static void GameHandleInputMouse(const ScreenCoordsXY& screenCoords, MouseState 
     Widget* widget;
     WidgetIndex widgetIndex;
 
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+
     // Get window and widget under cursor position
-    w = WindowFindFromPoint(screenCoords);
-    widgetIndex = w == nullptr ? -1 : WindowFindWidgetFromPoint(*w, screenCoords);
+    w = windowMgr->FindFromPoint(screenCoords);
+    widgetIndex = w == nullptr ? -1 : windowMgr->FindWidgetFromPoint(*w, screenCoords);
     widget = widgetIndex == -1 ? nullptr : &w->widgets[widgetIndex];
 
     switch (_inputState)
@@ -326,7 +342,7 @@ static void GameHandleInputMouse(const ScreenCoordsXY& screenCoords, MouseState 
             InputStateWidgetPressed(screenCoords, state, widgetIndex, w, widget);
             break;
         case InputState::PositioningWindow:
-            w = WindowFindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
+            w = windowMgr->FindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
             if (w == nullptr)
             {
                 _inputState = InputState::Reset;
@@ -359,7 +375,7 @@ static void GameHandleInputMouse(const ScreenCoordsXY& screenCoords, MouseState 
             InputStateWidgetPressed(screenCoords, state, widgetIndex, w, widget);
             break;
         case InputState::ViewportLeft:
-            w = WindowFindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
+            w = windowMgr->FindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
             if (w == nullptr)
             {
                 _inputState = InputState::Reset;
@@ -384,13 +400,13 @@ static void GameHandleInputMouse(const ScreenCoordsXY& screenCoords, MouseState 
                         break;
                     }
 
-                    w = WindowFindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
+                    w = windowMgr->FindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
                     if (w == nullptr)
                     {
                         break;
                     }
 
-                    WindowEventToolDragCall(w, gCurrentToolWidget.widget_index, screenCoords);
+                    w->OnToolDrag(gCurrentToolWidget.widget_index, screenCoords);
                     break;
                 case MouseState::LeftRelease:
                     _inputState = InputState::Reset;
@@ -398,10 +414,11 @@ static void GameHandleInputMouse(const ScreenCoordsXY& screenCoords, MouseState 
                     {
                         if ((_inputFlags & INPUT_FLAG_TOOL_ACTIVE))
                         {
-                            w = WindowFindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
+                            w = windowMgr->FindByNumber(
+                                gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
                             if (w != nullptr)
                             {
-                                WindowEventToolUpCall(w, gCurrentToolWidget.widget_index, screenCoords);
+                                w->OnToolUp(gCurrentToolWidget.widget_index, screenCoords);
                             }
                         }
                         else if (!(_inputFlags & INPUT_FLAG_4))
@@ -434,7 +451,7 @@ static void GameHandleInputMouse(const ScreenCoordsXY& screenCoords, MouseState 
             }
             break;
         case InputState::Resizing:
-            w = WindowFindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
+            w = windowMgr->FindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
             if (w == nullptr)
             {
                 _inputState = InputState::Reset;
@@ -473,7 +490,7 @@ static void InputWindowPositionContinue(
 {
     int32_t snapProximity;
 
-    snapProximity = (w.flags & WF_NO_SNAPPING) ? 0 : gConfigGeneral.WindowSnapProximity;
+    snapProximity = (w.flags & WF_NO_SNAPPING) ? 0 : Config::Get().general.WindowSnapProximity;
     WindowMoveAndSnap(w, newScreenCoords - lastScreenCoords, snapProximity);
 }
 
@@ -482,7 +499,7 @@ static void InputWindowPositionEnd(WindowBase& w, const ScreenCoordsXY& screenCo
     _inputState = InputState::Normal;
     gTooltipCloseTimeout = 0;
     gTooltipWidget = _dragWidget;
-    WindowEventMovedCall(&w, screenCoords);
+    w.OnMoved(screenCoords);
 }
 
 static void InputWindowResizeBegin(WindowBase& w, WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords)
@@ -528,7 +545,7 @@ static void InputViewportDragBegin(WindowBase& w)
     _ticksSinceDragStart = gCurrentRealTimeTicks;
     auto cursorPosition = ContextGetCursorPosition();
     gInputDragLast = cursorPosition;
-    if (!gConfigGeneral.InvertViewportDrag)
+    if (!Config::Get().general.InvertViewportDrag)
     {
         ContextHideCursor();
     }
@@ -548,7 +565,8 @@ static void InputViewportDragContinue()
     if (differentialCoords.x == 0 && differentialCoords.y == 0)
         return;
 
-    w = WindowFindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    w = windowMgr->FindByNumber(_dragWidget.window_classification, _dragWidget.window_number);
 
     // #3294: Window can be closed during a drag session, so just finish
     //        the session if the window no longer exists
@@ -574,9 +592,15 @@ static void InputViewportDragContinue()
             // As the user moved the mouse, don't interpret it as right click in any case.
             _ticksSinceDragStart = std::nullopt;
 
-            differentialCoords.x = (viewport->zoom + 1).ApplyTo(differentialCoords.x);
-            differentialCoords.y = (viewport->zoom + 1).ApplyTo(differentialCoords.y);
-            if (gConfigGeneral.InvertViewportDrag)
+            // applying the zoom only with negative values avoids a "deadzone" effect where small positive value round to zero.
+            const bool posX = differentialCoords.x > 0;
+            const bool posY = differentialCoords.y > 0;
+            differentialCoords.x = (viewport->zoom + 1).ApplyTo(-std::abs(differentialCoords.x));
+            differentialCoords.y = (viewport->zoom + 1).ApplyTo(-std::abs(differentialCoords.y));
+            differentialCoords.x = posX ? -differentialCoords.x : differentialCoords.x;
+            differentialCoords.y = posY ? -differentialCoords.y : differentialCoords.y;
+
+            if (Config::Get().general.InvertViewportDrag)
             {
                 w->savedViewPos -= differentialCoords;
             }
@@ -588,7 +612,7 @@ static void InputViewportDragContinue()
     }
 
     const CursorState* cursorState = ContextGetCursorState();
-    if (cursorState->touch || gConfigGeneral.InvertViewportDrag)
+    if (cursorState->touch || Config::Get().general.InvertViewportDrag)
     {
         gInputDragLast = newDragCoords;
     }
@@ -625,10 +649,10 @@ static void InputScrollBegin(WindowBase& w, WidgetIndex widgetIndex, const Scree
 
     _currentScrollArea = scroll_area;
     _currentScrollIndex = scroll_id;
-    WindowEventScrollSelectCall(&w, scroll_id, scroll_area);
+    w.OnScrollSelect(scroll_id, scroll_area);
     if (scroll_area == SCROLL_PART_VIEW)
     {
-        WindowEventScrollMousedownCall(&w, scroll_id, scrollCoords);
+        w.OnScrollMouseDown(scroll_id, scrollCoords);
         return;
     }
 
@@ -637,39 +661,39 @@ static void InputScrollBegin(WindowBase& w, WidgetIndex widgetIndex, const Scree
 
     int32_t widget_width = widg.width() - 1;
     if (scroll.flags & VSCROLLBAR_VISIBLE)
-        widget_width -= SCROLLBAR_WIDTH + 1;
-    int32_t widget_content_width = std::max(scroll.h_right - widget_width, 0);
+        widget_width -= kScrollBarWidth + 1;
+    int32_t widget_content_width = std::max(scroll.contentWidth - widget_width, 0);
 
     int32_t widget_height = widg.bottom - widg.top - 1;
     if (scroll.flags & HSCROLLBAR_VISIBLE)
-        widget_height -= SCROLLBAR_WIDTH + 1;
-    int32_t widget_content_height = std::max(scroll.v_bottom - widget_height, 0);
+        widget_height -= kScrollBarWidth + 1;
+    int32_t widget_content_height = std::max(scroll.contentHeight - widget_height, 0);
 
     switch (scroll_area)
     {
         case SCROLL_PART_HSCROLLBAR_LEFT:
-            scroll.h_left = std::max(scroll.h_left - 3, 0);
+            scroll.contentOffsetX = std::max(scroll.contentOffsetX - 3, 0);
             break;
         case SCROLL_PART_HSCROLLBAR_RIGHT:
-            scroll.h_left = std::min(scroll.h_left + 3, widget_content_width);
+            scroll.contentOffsetX = std::min(scroll.contentOffsetX + 3, widget_content_width);
             break;
         case SCROLL_PART_HSCROLLBAR_LEFT_TROUGH:
-            scroll.h_left = std::max(scroll.h_left - widget_width, 0);
+            scroll.contentOffsetX = std::max(scroll.contentOffsetX - widget_width, 0);
             break;
         case SCROLL_PART_HSCROLLBAR_RIGHT_TROUGH:
-            scroll.h_left = std::min(scroll.h_left + widget_width, widget_content_width);
+            scroll.contentOffsetX = std::min(scroll.contentOffsetX + widget_width, widget_content_width);
             break;
         case SCROLL_PART_VSCROLLBAR_TOP:
-            scroll.v_top = std::max(scroll.v_top - 3, 0);
+            scroll.contentOffsetY = std::max(scroll.contentOffsetY - 3, 0);
             break;
         case SCROLL_PART_VSCROLLBAR_BOTTOM:
-            scroll.v_top = std::min(scroll.v_top + 3, widget_content_height);
+            scroll.contentOffsetY = std::min(scroll.contentOffsetY + 3, widget_content_height);
             break;
         case SCROLL_PART_VSCROLLBAR_TOP_TROUGH:
-            scroll.v_top = std::max(scroll.v_top - widget_height, 0);
+            scroll.contentOffsetY = std::max(scroll.contentOffsetY - widget_height, 0);
             break;
         case SCROLL_PART_VSCROLLBAR_BOTTOM_TROUGH:
-            scroll.v_top = std::min(scroll.v_top + widget_height, widget_content_height);
+            scroll.contentOffsetY = std::min(scroll.contentOffsetY + widget_height, widget_content_height);
             break;
         default:
             break;
@@ -718,7 +742,7 @@ static void InputScrollContinue(WindowBase& w, WidgetIndex widgetIndex, const Sc
     switch (scroll_part)
     {
         case SCROLL_PART_VIEW:
-            WindowEventScrollMousedragCall(&w, scroll_id, newScreenCoords);
+            w.OnScrollMouseDrag(scroll_id, newScreenCoords);
             break;
         case SCROLL_PART_HSCROLLBAR_LEFT:
             InputScrollPartUpdateHLeft(w, widgetIndex, scroll_id);
@@ -750,31 +774,32 @@ static void InputScrollPartUpdateHThumb(WindowBase& w, WidgetIndex widgetIndex, 
     const auto& widget = w.widgets[widgetIndex];
     auto& scroll = w.scrolls[scroll_id];
 
-    if (WindowFindByNumber(w.classification, w.number) != nullptr)
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    if (windowMgr->FindByNumber(w.classification, w.number) != nullptr)
     {
         int32_t newLeft;
-        newLeft = scroll.h_right;
+        newLeft = scroll.contentWidth;
         newLeft *= x;
         x = widget.width() - 21;
         if (scroll.flags & VSCROLLBAR_VISIBLE)
-            x -= SCROLLBAR_WIDTH + 1;
+            x -= kScrollBarWidth + 1;
         newLeft /= x;
         x = newLeft;
         scroll.flags |= HSCROLLBAR_THUMB_PRESSED;
-        newLeft = scroll.h_left;
+        newLeft = scroll.contentOffsetX;
         newLeft += x;
         if (newLeft < 0)
             newLeft = 0;
         x = widget.width() - 1;
         if (scroll.flags & VSCROLLBAR_VISIBLE)
-            x -= SCROLLBAR_WIDTH + 1;
+            x -= kScrollBarWidth + 1;
         x *= -1;
-        x += scroll.h_right;
+        x += scroll.contentWidth;
         if (x < 0)
             x = 0;
         if (newLeft > x)
             newLeft = x;
-        scroll.h_left = newLeft;
+        scroll.contentOffsetX = newLeft;
         WidgetScrollUpdateThumbs(w, widgetIndex);
         WidgetInvalidateByNumber(w.classification, w.number, widgetIndex);
     }
@@ -789,31 +814,32 @@ static void InputScrollPartUpdateVThumb(WindowBase& w, WidgetIndex widgetIndex, 
     const auto& widget = w.widgets[widgetIndex];
     auto& scroll = w.scrolls[scroll_id];
 
-    if (WindowFindByNumber(w.classification, w.number) != nullptr)
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    if (windowMgr->FindByNumber(w.classification, w.number) != nullptr)
     {
         int32_t newTop;
-        newTop = scroll.v_bottom;
+        newTop = scroll.contentHeight;
         newTop *= y;
         y = widget.height() - 21;
         if (scroll.flags & HSCROLLBAR_VISIBLE)
-            y -= SCROLLBAR_WIDTH + 1;
+            y -= kScrollBarWidth + 1;
         newTop /= y;
         y = newTop;
         scroll.flags |= VSCROLLBAR_THUMB_PRESSED;
-        newTop = scroll.v_top;
+        newTop = scroll.contentOffsetY;
         newTop += y;
         if (newTop < 0)
             newTop = 0;
         y = widget.height() - 1;
         if (scroll.flags & HSCROLLBAR_VISIBLE)
-            y -= SCROLLBAR_WIDTH + 1;
+            y -= kScrollBarWidth + 1;
         y *= -1;
-        y += scroll.v_bottom;
+        y += scroll.contentHeight;
         if (y < 0)
             y = 0;
         if (newTop > y)
             newTop = y;
-        scroll.v_top = newTop;
+        scroll.contentOffsetY = newTop;
         WidgetScrollUpdateThumbs(w, widgetIndex);
         WidgetInvalidateByNumber(w.classification, w.number, widgetIndex);
     }
@@ -825,12 +851,13 @@ static void InputScrollPartUpdateVThumb(WindowBase& w, WidgetIndex widgetIndex, 
  */
 static void InputScrollPartUpdateHLeft(WindowBase& w, WidgetIndex widgetIndex, int32_t scroll_id)
 {
-    if (WindowFindByNumber(w.classification, w.number) != nullptr)
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    if (windowMgr->FindByNumber(w.classification, w.number) != nullptr)
     {
         auto& scroll = w.scrolls[scroll_id];
         scroll.flags |= HSCROLLBAR_LEFT_PRESSED;
-        if (scroll.h_left >= 3)
-            scroll.h_left -= 3;
+        if (scroll.contentOffsetX >= 3)
+            scroll.contentOffsetX -= 3;
         WidgetScrollUpdateThumbs(w, widgetIndex);
         WidgetInvalidateByNumber(w.classification, w.number, widgetIndex);
     }
@@ -843,20 +870,22 @@ static void InputScrollPartUpdateHLeft(WindowBase& w, WidgetIndex widgetIndex, i
 static void InputScrollPartUpdateHRight(WindowBase& w, WidgetIndex widgetIndex, int32_t scroll_id)
 {
     const auto& widget = w.widgets[widgetIndex];
-    if (WindowFindByNumber(w.classification, w.number) != nullptr)
+
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    if (windowMgr->FindByNumber(w.classification, w.number) != nullptr)
     {
         auto& scroll = w.scrolls[scroll_id];
         scroll.flags |= HSCROLLBAR_RIGHT_PRESSED;
-        scroll.h_left += 3;
+        scroll.contentOffsetX += 3;
         int32_t newLeft = widget.width() - 1;
         if (scroll.flags & VSCROLLBAR_VISIBLE)
-            newLeft -= SCROLLBAR_WIDTH + 1;
+            newLeft -= kScrollBarWidth + 1;
         newLeft *= -1;
-        newLeft += scroll.h_right;
+        newLeft += scroll.contentWidth;
         if (newLeft < 0)
             newLeft = 0;
-        if (scroll.h_left > newLeft)
-            scroll.h_left = newLeft;
+        if (scroll.contentOffsetX > newLeft)
+            scroll.contentOffsetX = newLeft;
         WidgetScrollUpdateThumbs(w, widgetIndex);
         WidgetInvalidateByNumber(w.classification, w.number, widgetIndex);
     }
@@ -868,12 +897,13 @@ static void InputScrollPartUpdateHRight(WindowBase& w, WidgetIndex widgetIndex, 
  */
 static void InputScrollPartUpdateVTop(WindowBase& w, WidgetIndex widgetIndex, int32_t scroll_id)
 {
-    if (WindowFindByNumber(w.classification, w.number) != nullptr)
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    if (windowMgr->FindByNumber(w.classification, w.number) != nullptr)
     {
         auto& scroll = w.scrolls[scroll_id];
         scroll.flags |= VSCROLLBAR_UP_PRESSED;
-        if (scroll.v_top >= 3)
-            scroll.v_top -= 3;
+        if (scroll.contentOffsetY >= 3)
+            scroll.contentOffsetY -= 3;
         WidgetScrollUpdateThumbs(w, widgetIndex);
         WidgetInvalidateByNumber(w.classification, w.number, widgetIndex);
     }
@@ -886,20 +916,22 @@ static void InputScrollPartUpdateVTop(WindowBase& w, WidgetIndex widgetIndex, in
 static void InputScrollPartUpdateVBottom(WindowBase& w, WidgetIndex widgetIndex, int32_t scroll_id)
 {
     const auto& widget = w.widgets[widgetIndex];
-    if (WindowFindByNumber(w.classification, w.number) != nullptr)
+
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    if (windowMgr->FindByNumber(w.classification, w.number) != nullptr)
     {
         auto& scroll = w.scrolls[scroll_id];
         scroll.flags |= VSCROLLBAR_DOWN_PRESSED;
-        scroll.v_top += 3;
+        scroll.contentOffsetY += 3;
         int32_t newTop = widget.height() - 1;
         if (scroll.flags & HSCROLLBAR_VISIBLE)
-            newTop -= SCROLLBAR_WIDTH + 1;
+            newTop -= kScrollBarWidth + 1;
         newTop *= -1;
-        newTop += scroll.v_bottom;
+        newTop += scroll.contentHeight;
         if (newTop < 0)
             newTop = 0;
-        if (scroll.v_top > newTop)
-            scroll.v_top = newTop;
+        if (scroll.contentOffsetY > newTop)
+            scroll.contentOffsetY = newTop;
         WidgetScrollUpdateThumbs(w, widgetIndex);
         WidgetInvalidateByNumber(w.classification, w.number, widgetIndex);
     }
@@ -938,7 +970,7 @@ static void InputWidgetOver(const ScreenCoordsXY& screenCoords, WindowBase* w, W
             WindowTooltipClose();
         else
         {
-            WindowEventScrollMouseoverCall(w, scrollId, newScreenCoords);
+            w->OnScrollMouseOver(scrollId, newScreenCoords);
             InputUpdateTooltip(w, widgetIndex, screenCoords);
         }
     }
@@ -982,10 +1014,11 @@ static void InputWidgetOverChangeCheck(WindowClass windowClass, rct_windownumber
  */
 static void InputWidgetOverFlatbuttonInvalidate()
 {
-    WindowBase* w = WindowFindByNumber(gHoverWidget.window_classification, gHoverWidget.window_number);
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    WindowBase* w = windowMgr->FindByNumber(gHoverWidget.window_classification, gHoverWidget.window_number);
     if (w != nullptr)
     {
-        WindowEventOnPrepareDrawCall(w);
+        w->OnPrepareDraw();
         if (w->widgets[gHoverWidget.widget_index].type == WindowWidgetType::FlatBtn)
         {
             WidgetInvalidateByNumber(gHoverWidget.window_classification, gHoverWidget.window_number, gHoverWidget.widget_index);
@@ -1012,7 +1045,8 @@ static void InputWidgetLeft(const ScreenCoordsXY& screenCoords, WindowBase* w, W
     WindowCloseByClass(WindowClass::Tooltip);
 
     // Window might have changed position in the list, therefore find it again
-    w = WindowFindByNumber(windowClass, windowNumber);
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    w = windowMgr->FindByNumber(windowClass, windowNumber);
     if (w == nullptr)
         return;
 
@@ -1020,8 +1054,8 @@ static void InputWidgetLeft(const ScreenCoordsXY& screenCoords, WindowBase* w, W
     if (widgetIndex == -1)
         return;
 
-    if (windowClass != gCurrentTextBox.window.classification || windowNumber != gCurrentTextBox.window.number
-        || widgetIndex != gCurrentTextBox.widget_index)
+    if (windowClass != GetCurrentTextBox().window.classification || windowNumber != GetCurrentTextBox().window.number
+        || widgetIndex != GetCurrentTextBox().widget_index)
     {
         WindowCancelTextbox();
     }
@@ -1043,11 +1077,11 @@ static void InputWidgetLeft(const ScreenCoordsXY& screenCoords, WindowBase* w, W
             _dragWidget.window_number = windowNumber;
             if (_inputFlags & INPUT_FLAG_TOOL_ACTIVE)
             {
-                w = WindowFindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
+                w = windowMgr->FindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
                 if (w != nullptr)
                 {
                     InputSetFlag(INPUT_FLAG_4, true);
-                    WindowEventToolDownCall(w, gCurrentToolWidget.widget_index, screenCoords);
+                    w->OnToolDown(gCurrentToolWidget.widget_index, screenCoords);
                 }
             }
             break;
@@ -1061,6 +1095,7 @@ static void InputWidgetLeft(const ScreenCoordsXY& screenCoords, WindowBase* w, W
         case WindowWidgetType::LabelCentred:
         case WindowWidgetType::Label:
         case WindowWidgetType::Groupbox:
+        case WindowWidgetType::ProgressBar:
         case WindowWidgetType::Placeholder:
         case WindowWidgetType::Last:
             // Non-interactive widget type
@@ -1091,13 +1126,11 @@ static void InputWidgetLeft(const ScreenCoordsXY& screenCoords, WindowBase* w, W
                 _clickRepeatTicks = gCurrentRealTimeTicks;
 
                 WidgetInvalidateByNumber(windowClass, windowNumber, widgetIndex);
-                WindowEventMouseDownCall(w, widgetIndex);
+                w->OnMouseDown(widgetIndex);
             }
             break;
     }
 }
-
-#pragma endregion
 
 /**
  *
@@ -1105,17 +1138,17 @@ static void InputWidgetLeft(const ScreenCoordsXY& screenCoords, WindowBase* w, W
  */
 void ProcessMouseOver(const ScreenCoordsXY& screenCoords)
 {
-    WindowBase* window;
-
     CursorID cursorId = CursorID::Arrow;
     auto ft = Formatter();
     ft.Add<StringId>(STR_NONE);
     SetMapTooltip(ft);
-    window = WindowFindFromPoint(screenCoords);
+
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    WindowBase* window = windowMgr->FindFromPoint(screenCoords);
 
     if (window != nullptr)
     {
-        WidgetIndex widgetId = WindowFindWidgetFromPoint(*window, screenCoords);
+        WidgetIndex widgetId = windowMgr->FindWidgetFromPoint(*window, screenCoords);
         if (widgetId != -1)
         {
             switch (window->widgets[widgetId].type)
@@ -1162,13 +1195,13 @@ void ProcessMouseOver(const ScreenCoordsXY& screenCoords)
                         break;
                     }
                     // Same as default but with scroll_x/y
-                    cursorId = WindowEventCursorCall(window, widgetId, scrollCoords);
+                    cursorId = window->OnCursor(widgetId, scrollCoords, CursorID::Arrow);
                     if (cursorId == CursorID::Undefined)
                         cursorId = CursorID::Arrow;
                     break;
                 }
                 default:
-                    cursorId = WindowEventCursorCall(window, widgetId, screenCoords);
+                    cursorId = window->OnCursor(widgetId, screenCoords, CursorID::Arrow);
                     if (cursorId == CursorID::Undefined)
                         cursorId = CursorID::Arrow;
                     break;
@@ -1188,12 +1221,13 @@ void ProcessMouseTool(const ScreenCoordsXY& screenCoords)
 {
     if (_inputFlags & INPUT_FLAG_TOOL_ACTIVE)
     {
-        WindowBase* w = WindowFindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
+        auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+        WindowBase* w = windowMgr->FindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
 
         if (w == nullptr)
             ToolCancel();
         else if (InputGetState() != InputState::ViewportRight)
-            WindowEventToolUpdateCall(w, gCurrentToolWidget.widget_index, screenCoords);
+            w->OnToolUpdate(gCurrentToolWidget.widget_index, screenCoords);
     }
 }
 
@@ -1269,7 +1303,8 @@ void InputStateWidgetPressed(
     cursor_w_number = gPressedWidget.window_number;
     WidgetIndex cursor_widgetIndex = gPressedWidget.widget_index;
 
-    WindowBase* cursor_w = WindowFindByNumber(cursor_w_class, cursor_w_number);
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    WindowBase* cursor_w = windowMgr->FindByNumber(cursor_w_class, cursor_w_number);
     if (cursor_w == nullptr)
     {
         _inputState = InputState::Reset;
@@ -1281,13 +1316,14 @@ void InputStateWidgetPressed(
         if (w->widgets[widgetIndex].type == WindowWidgetType::CloseBox && cursor_w_class == w->classification
             && cursor_w_number == w->number && widgetIndex == cursor_widgetIndex)
         {
-            if (gInputPlaceObjectModifier & PLACE_OBJECT_MODIFIER_SHIFT_Z)
+            auto& im = GetInputManager();
+            if (im.IsModifierKeyPressed(ModifierKey::shift))
             {
                 gLastCloseModifier.window.number = w->number;
                 gLastCloseModifier.window.classification = w->classification;
                 gLastCloseModifier.modifier = CloseWindowModifier::Shift;
             }
-            else if (gInputPlaceObjectModifier & PLACE_OBJECT_MODIFIER_COPY_Z)
+            else if (im.IsModifierKeyPressed(ModifierKey::ctrl))
             {
                 gLastCloseModifier.window.number = w->number;
                 gLastCloseModifier.window.classification = w->classification;
@@ -1323,7 +1359,7 @@ void InputStateWidgetPressed(
                 {
                     if (WidgetIsHoldable(*w, widgetIndex))
                     {
-                        WindowEventMouseDownCall(w, widgetIndex);
+                        w->OnMouseDown(widgetIndex);
                     }
 
                     // Subtract initial delay from here on we want the event each third tick.
@@ -1389,11 +1425,11 @@ void InputStateWidgetPressed(
                     if (dropdownCleanup)
                     {
                         // Update w as it will be invalid after closing the dropdown window
-                        w = WindowFindByNumber(wClass, wNumber);
+                        w = windowMgr->FindByNumber(wClass, wNumber);
                     }
                     else
                     {
-                        cursor_w = WindowFindByNumber(cursor_w_class, cursor_w_number);
+                        cursor_w = windowMgr->FindByNumber(cursor_w_class, cursor_w_number);
                         if (_inputFlags & INPUT_FLAG_WIDGET_PRESSED)
                         {
                             _inputFlags &= ~INPUT_FLAG_WIDGET_PRESSED;
@@ -1413,7 +1449,7 @@ void InputStateWidgetPressed(
                                 dropdown_index = gDropdownDefaultIndex;
                             }
                         }
-                        WindowEventDropdownCall(cursor_w, cursor_widgetIndex, dropdown_index);
+                        cursor_w->OnDropdown(cursor_widgetIndex, dropdown_index);
                     }
                 }
             }
@@ -1445,7 +1481,7 @@ void InputStateWidgetPressed(
                 break;
 
             WidgetInvalidateByNumber(cursor_w_class, cursor_w_number, widgetIndex);
-            WindowEventMouseUpCall(w, widgetIndex);
+            w->OnMouseUp(widgetIndex);
             return;
 
         default:
@@ -1553,29 +1589,6 @@ static void InputUpdateTooltip(WindowBase* w, WidgetIndex widgetIndex, const Scr
 
 #pragma endregion
 
-#pragma region Keyboard input
-
-/**
- *
- *  rct2: 0x00406CD2
- */
-int32_t GetNextKey()
-{
-    uint8_t* keysPressed = const_cast<uint8_t*>(ContextGetKeysPressed());
-    for (int32_t i = 0; i < 221; i++)
-    {
-        if (keysPressed[i])
-        {
-            keysPressed[i] = 0;
-            return i;
-        }
-    }
-
-    return 0;
-}
-
-#pragma endregion
-
 /**
  *
  *  rct2: 0x006ED990
@@ -1596,7 +1609,8 @@ void SetCursor(CursorID cursor_id)
  */
 void InvalidateScroll()
 {
-    WindowBase* w = WindowFindByNumber(gPressedWidget.window_classification, gPressedWidget.window_number);
+    auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+    WindowBase* w = windowMgr->FindByNumber(gPressedWidget.window_classification, gPressedWidget.window_number);
     if (w != nullptr)
     {
         // Reset to basic scroll
@@ -1659,11 +1673,6 @@ void GameHandleEdgeScroll()
     InputScrollViewport(ScreenCoordsXY(scrollX, scrollY));
 }
 
-bool InputTestPlaceObjectModifier(PLACE_OBJECT_MODIFIER modifier)
-{
-    return gInputPlaceObjectModifier & modifier;
-}
-
 void InputScrollViewport(const ScreenCoordsXY& scrollScreenCoords)
 {
     WindowBase* mainWindow = WindowGetMain();
@@ -1674,7 +1683,7 @@ void InputScrollViewport(const ScreenCoordsXY& scrollScreenCoords)
     if (viewport == nullptr)
         return;
 
-    const int32_t speed = gConfigGeneral.EdgeScrollingSpeed;
+    const int32_t speed = Config::Get().general.EdgeScrollingSpeed;
 
     int32_t multiplier = viewport->zoom.ApplyTo(speed);
     int32_t dx = scrollScreenCoords.x * multiplier;
@@ -1684,22 +1693,22 @@ void InputScrollViewport(const ScreenCoordsXY& scrollScreenCoords)
     {
         // Speed up scrolling horizontally when at the edge of the map
         // so that the speed is consistent with vertical edge scrolling.
-        int32_t x = mainWindow->savedViewPos.x + viewport->view_width / 2 + dx;
-        int32_t y = mainWindow->savedViewPos.y + viewport->view_height / 2;
-        int32_t y_dy = mainWindow->savedViewPos.y + viewport->view_height / 2 + dy;
+        int32_t x = mainWindow->savedViewPos.x + viewport->ViewWidth() / 2 + dx;
+        int32_t y = mainWindow->savedViewPos.y + viewport->ViewHeight() / 2;
+        int32_t y_dy = mainWindow->savedViewPos.y + viewport->ViewHeight() / 2 + dy;
 
-        auto mapCoord = ViewportPosToMapPos({ x, y }, 0);
-        auto mapCoord_dy = ViewportPosToMapPos({ x, y_dy }, 0);
+        auto mapCoord = ViewportPosToMapPos({ x, y }, 0, viewport->rotation);
+        auto mapCoord_dy = ViewportPosToMapPos({ x, y_dy }, 0, viewport->rotation);
 
         // Check if we're crossing the boundary
         // Clamp to the map minimum value
         int32_t at_map_edge = 0;
         int32_t at_map_edge_dy = 0;
-        if (mapCoord.x < MAP_MINIMUM_X_Y || mapCoord.y < MAP_MINIMUM_X_Y)
+        if (mapCoord.x < kMapMinimumXY || mapCoord.y < kMapMinimumXY)
         {
             at_map_edge = 1;
         }
-        if (mapCoord_dy.x < MAP_MINIMUM_X_Y || mapCoord_dy.y < MAP_MINIMUM_X_Y)
+        if (mapCoord_dy.x < kMapMinimumXY || mapCoord_dy.y < kMapMinimumXY)
         {
             at_map_edge_dy = 1;
         }

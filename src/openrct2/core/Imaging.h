@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include "../common.h"
 #include "../drawing/Drawing.h"
 
 #include <functional>
 #include <istream>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -38,13 +38,13 @@ struct Image
 
     // Data
     std::vector<uint8_t> Pixels;
-    std::unique_ptr<GamePalette> Palette;
+    std::optional<OpenRCT2::Drawing::GamePalette> Palette;
     uint32_t Stride{};
 };
 
 using ImageReaderFunc = std::function<Image(std::istream&, IMAGE_FORMAT)>;
 
-namespace Imaging
+namespace OpenRCT2::Imaging
 {
     IMAGE_FORMAT GetImageFormatFromPath(std::string_view path);
     Image ReadFromFile(std::string_view path, IMAGE_FORMAT format = IMAGE_FORMAT::AUTOMATIC);
@@ -52,4 +52,4 @@ namespace Imaging
     void WriteToFile(std::string_view path, const Image& image, IMAGE_FORMAT format = IMAGE_FORMAT::AUTOMATIC);
 
     void SetReader(IMAGE_FORMAT format, ImageReaderFunc impl);
-} // namespace Imaging
+} // namespace OpenRCT2::Imaging

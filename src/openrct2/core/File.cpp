@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,20 +8,20 @@
  *****************************************************************************/
 
 #ifdef _WIN32
-#    include <windows.h>
+    #include <windows.h>
 #else
-#    include <sys/stat.h>
+    #include <sys/stat.h>
 #endif
 
+#include "../Diagnostic.h"
 #include "../platform/Platform.h"
-#include "../util/Util.h"
 #include "File.h"
 #include "FileStream.h"
 #include "String.hpp"
 
 #include <fstream>
 
-namespace File
+namespace OpenRCT2::File
 {
     bool Exists(u8string_view path)
     {
@@ -71,7 +71,7 @@ namespace File
         auto fsize = Platform::GetFileSize(path);
         if (fsize > SIZE_MAX)
         {
-            u8string message = String::StdFormat(
+            u8string message = String::stdFormat(
                 "'%s' exceeds maximum length of %lld bytes.", u8string(path).c_str(), SIZE_MAX);
             throw IOException(message);
         }
@@ -137,4 +137,4 @@ namespace File
     {
         return Platform::GetFileSize(path);
     }
-} // namespace File
+} // namespace OpenRCT2::File

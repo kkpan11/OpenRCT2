@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,7 +10,6 @@
 #pragma once
 
 #include "Object.h"
-#include "ObjectLimits.h"
 
 #include <vector>
 
@@ -26,7 +25,8 @@ public:
     const ObjectEntryDescriptor& GetObject(ObjectType type, ObjectEntryIndex index) const;
     void SetObject(ObjectEntryIndex index, const ObjectEntryDescriptor& entry);
     void SetObject(ObjectType type, ObjectEntryIndex index, std::string_view identifier);
-    ObjectEntryIndex Find(ObjectType type, std::string_view identifier);
+    ObjectEntryIndex Find(ObjectType type, std::string_view identifier) const;
+    ObjectEntryIndex FindLegacy(ObjectType type, std::string_view identifier) const;
 
     struct const_iterator
     {
@@ -51,3 +51,6 @@ public:
 };
 
 void ObjectGetTypeEntryIndex(size_t index, ObjectType* outObjectType, ObjectEntryIndex* outEntryIndex);
+
+size_t getObjectEntryGroupCount(ObjectType objectType);
+size_t getObjectTypeLimit(ObjectType type);

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,15 +10,16 @@
 #include "SurfaceSetStyleAction.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../GameState.h"
 #include "../OpenRCT2.h"
 #include "../management/Finance.h"
 #include "../object/ObjectManager.h"
 #include "../object/TerrainEdgeObject.h"
 #include "../object/TerrainSurfaceObject.h"
+#include "../world/Footpath.h"
 #include "../world/Park.h"
-#include "../world/Surface.h"
-#include "../world/TileElement.h"
+#include "../world/tile_element/SurfaceElement.h"
 
 using namespace OpenRCT2;
 
@@ -58,7 +59,7 @@ GameActions::Result SurfaceSetStyleAction::Query() const
 
         if (surfaceObj == nullptr)
         {
-            LOG_ERROR("Invalid surface style.");
+            LOG_ERROR("Invalid surface style %u", _surfaceStyle);
             return GameActions::Result(
                 GameActions::Status::InvalidParameters, STR_CANT_CHANGE_LAND_TYPE, STR_UNKNOWN_OBJECT_TYPE);
         }
@@ -66,11 +67,11 @@ GameActions::Result SurfaceSetStyleAction::Query() const
 
     if (_edgeStyle != OBJECT_ENTRY_INDEX_NULL)
     {
-        const auto edgeObj = static_cast<TerrainEdgeObject*>(objManager.GetLoadedObject(ObjectType::TerrainEdge, _edgeStyle));
+        const auto edgeObj = objManager.GetLoadedObject<TerrainEdgeObject>(_edgeStyle);
 
         if (edgeObj == nullptr)
         {
-            LOG_ERROR("Invalid edge style.");
+            LOG_ERROR("Invalid edge style %u", _edgeStyle);
             return GameActions::Result(
                 GameActions::Status::InvalidParameters, STR_CANT_CHANGE_LAND_TYPE, STR_UNKNOWN_OBJECT_TYPE);
         }
@@ -84,9 +85,11 @@ GameActions::Result SurfaceSetStyleAction::Query() const
     res.Position.y = yMid;
     res.Position.z = heightMid;
 
+    auto& gameState = GetGameState();
+
     // Do nothing if not in editor, sandbox mode or landscaping is forbidden
-    if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !gCheatsSandboxMode
-        && (GetGameState().ParkFlags & PARK_FLAGS_FORBID_LANDSCAPE_CHANGES))
+    if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !gameState.Cheats.sandboxMode
+        && (gameState.Park.Flags & PARK_FLAGS_FORBID_LANDSCAPE_CHANGES))
     {
         return GameActions::Result(
             GameActions::Status::Disallowed, STR_CANT_CHANGE_LAND_TYPE, STR_FORBIDDEN_BY_THE_LOCAL_AUTHORITY);
@@ -95,14 +98,14 @@ GameActions::Result SurfaceSetStyleAction::Query() const
     money64 surfaceCost = 0;
     money64 edgeCost = 0;
     for (CoordsXY coords = { validRange.GetLeft(), validRange.GetTop() }; coords.x <= validRange.GetRight();
-         coords.x += COORDS_XY_STEP)
+         coords.x += kCoordsXYStep)
     {
-        for (coords.y = validRange.GetTop(); coords.y <= validRange.GetBottom(); coords.y += COORDS_XY_STEP)
+        for (coords.y = validRange.GetTop(); coords.y <= validRange.GetBottom(); coords.y += kCoordsXYStep)
         {
             if (!LocationValid(coords))
                 continue;
 
-            if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !gCheatsSandboxMode)
+            if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !gameState.Cheats.sandboxMode)
             {
                 if (!MapIsLocationInPark(coords))
                     continue;
@@ -163,14 +166,14 @@ GameActions::Result SurfaceSetStyleAction::Execute() const
     money64 surfaceCost = 0;
     money64 edgeCost = 0;
     for (CoordsXY coords = { validRange.GetLeft(), validRange.GetTop() }; coords.x <= validRange.GetRight();
-         coords.x += COORDS_XY_STEP)
+         coords.x += kCoordsXYStep)
     {
-        for (coords.y = validRange.GetTop(); coords.y <= validRange.GetBottom(); coords.y += COORDS_XY_STEP)
+        for (coords.y = validRange.GetTop(); coords.y <= validRange.GetBottom(); coords.y += kCoordsXYStep)
         {
             if (!LocationValid(coords))
                 continue;
 
-            if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !gCheatsSandboxMode)
+            if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !GetGameState().Cheats.sandboxMode)
             {
                 if (!MapIsLocationInPark(coords))
                     continue;

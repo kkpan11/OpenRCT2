@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,10 +11,10 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "../../../ride/Ride.h"
-#    include "ScEntity.hpp"
+    #include "../../../ride/Ride.h"
+    #include "ScEntity.hpp"
 
-#    include <optional>
+    #include <optional>
 
 namespace OpenRCT2::Scripting
 {
@@ -67,8 +67,10 @@ namespace OpenRCT2::Scripting
         uint8_t bankRotation_get() const;
         void bankRotation_set(uint8_t value);
 
-        bool isReversed_get() const;
-        void isReversed_set(bool value);
+        template<uint32_t flag>
+        bool flag_get() const;
+        template<uint32_t flag>
+        void flag_set(bool value);
 
         DukValue colours_get() const;
         void colours_set(const DukValue& value);
@@ -90,6 +92,9 @@ namespace OpenRCT2::Scripting
 
         std::string status_get() const;
         void status_set(const std::string& value);
+
+        uint8_t spin_get() const;
+        void spin_set(uint8_t value);
 
         std::vector<DukValue> guests_get() const;
 

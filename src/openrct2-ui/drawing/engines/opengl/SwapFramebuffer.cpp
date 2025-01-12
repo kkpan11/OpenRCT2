@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,9 +9,11 @@
 
 #ifndef DISABLE_OPENGL
 
-#    include "SwapFramebuffer.h"
+    #include "SwapFramebuffer.h"
 
-#    include "OpenGLFramebuffer.h"
+    #include "OpenGLFramebuffer.h"
+
+using namespace OpenRCT2::Ui;
 
 constexpr GLfloat depthValue[1] = { 1.0f };
 constexpr GLfloat depthValueTransparent[1] = { 0.0f };

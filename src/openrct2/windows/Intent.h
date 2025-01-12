@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,12 +9,13 @@
 
 #pragma once
 
-#include "../common.h"
 #include "../core/Identifier.hpp"
 #include "../interface/Window.h"
 
 #include <map>
+#include <sfl/static_vector.hpp>
 #include <string>
+#include <variant>
 
 enum IntentAction
 {
@@ -43,62 +44,58 @@ enum IntentAction
     INTENT_ACTION_UPDATE_CASH,
     INTENT_ACTION_UPDATE_BANNER,
     INTENT_ACTION_UPDATE_RESEARCH,
-    INTENT_ACTION_TRACK_DESIGN_REMOVE_PROVISIONAL,
-    INTENT_ACTION_TRACK_DESIGN_RESTORE_PROVISIONAL,
+    INTENT_ACTION_UPDATE_VEHICLE_SOUNDS,
     INTENT_ACTION_SET_MAP_TOOLTIP,
     INTENT_ACTION_NEW_SCENERY,
     INTENT_ACTION_TILE_MODIFY,
+    INTENT_ACTION_PROGRESS_OPEN,
+    INTENT_ACTION_PROGRESS_SET,
+    INTENT_ACTION_PROGRESS_CLOSE,
+    INTENT_ACTION_REMOVE_PROVISIONAL_ELEMENTS,
+    INTENT_ACTION_RESTORE_PROVISIONAL_ELEMENTS,
+    INTENT_ACTION_REMOVE_PROVISIONAL_FOOTPATH,
+    INTENT_ACTION_REMOVE_PROVISIONAL_TRACK_PIECE,
 
     INTENT_ACTION_NULL = 255,
 };
 
-struct IntentData
-{
-    enum class DataType
-    {
-        Int,
-        String,
-        Pointer,
-        CloseCallback
-    } type;
+// The maximum amount of data the Intent can hold, 8 should be sufficient, raise this if needed.
+static constexpr size_t kIntentMaxDataSlots = 8;
 
-    union
-    {
-        uint32_t unsignedInt;
-        int32_t signedInt;
-    } intVal;
-    std::string stringVal;
-    close_callback closeCallbackVal;
-    void* pointerVal;
-};
+using IntentData = std::variant<int64_t, std::string, CloseCallback, void*>;
+using IntentDataEntry = std::pair<uint32_t, IntentData>;
+using IntentDataStorage = sfl::static_vector<IntentDataEntry, kIntentMaxDataSlots>;
 
 class Intent
 {
-private:
     WindowClass _Class{ WindowClass::Null };
     WindowDetail _WindowDetail{ WD_NULL };
     IntentAction _Action{ INTENT_ACTION_NULL };
-    std::map<uint32_t, IntentData> _Data;
+    IntentDataStorage _Data;
 
 public:
     explicit Intent(WindowClass windowClass);
     explicit Intent(WindowDetail windowDetail);
     explicit Intent(IntentAction windowclass);
+
     WindowClass GetWindowClass() const;
     WindowDetail GetWindowDetail() const;
     IntentAction GetAction() const;
+
     void* GetPointerExtra(uint32_t key) const;
     std::string GetStringExtra(uint32_t key) const;
     uint32_t GetUIntExtra(uint32_t key) const;
     int32_t GetSIntExtra(uint32_t key) const;
-    close_callback GetCloseCallbackExtra(uint32_t key) const;
+    CloseCallback GetCloseCallbackExtra(uint32_t key) const;
+
     Intent* PutExtra(uint32_t key, uint32_t value);
     Intent* PutExtra(uint32_t key, void* value);
     Intent* PutExtra(uint32_t key, int32_t value);
     Intent* PutExtra(uint32_t key, std::string value);
-    Intent* PutExtra(uint32_t key, close_callback value);
+    Intent* PutExtra(uint32_t key, CloseCallback value);
 
-    template<typename T, T TNull, typename TTag> Intent* PutExtra(uint32_t key, const TIdentifier<T, TNull, TTag>& value)
+    template<typename T, T TNull, typename TTag>
+    Intent* PutExtra(uint32_t key, const TIdentifier<T, TNull, TTag>& value)
     {
         const auto val = value.ToUnderlying();
         return PutExtra(key, static_cast<uint32_t>(val));
@@ -125,4 +122,7 @@ enum
     INTENT_EXTRA_BANNER_INDEX,
     INTENT_EXTRA_FORMATTER,
     INTENT_EXTRA_SCENERY_GROUP_ENTRY_INDEX,
+    INTENT_EXTRA_PROGRESS_OFFSET,
+    INTENT_EXTRA_PROGRESS_TOTAL,
+    INTENT_EXTRA_STRING_ID,
 };

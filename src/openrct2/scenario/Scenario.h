@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include "../common.h"
 #include "../core/Random.hpp"
 #include "../entity/EntityList.h"
 #include "../management/Finance.h"
@@ -23,7 +22,7 @@
 
 struct ResultWithMessage;
 
-using random_engine_t = Random::RCT2::Engine;
+using random_engine_t = OpenRCT2::Random::RCT2::Engine;
 
 namespace OpenRCT2
 {
@@ -42,9 +41,6 @@ enum
     S6_TYPE_SAVEDGAME,
     S6_TYPE_SCENARIO
 };
-
-#define S6_RCT2_VERSION 120001
-#define S6_MAGIC_NUMBER 0x00031144
 
 enum SCENARIO_CATEGORY
 {
@@ -151,8 +147,8 @@ enum
     AUTOSAVE_NEVER
 };
 
-#define AUTOSAVE_PAUSE 0
-#define DEFAULT_NUM_AUTOSAVES_TO_KEEP 10
+constexpr uint8_t kAutosavePause = 0;
+constexpr uint8_t kDefaultNumAutosavesToKeep = 10;
 
 static constexpr money64 COMPANY_VALUE_ON_FAILED_OBJECTIVE = 0x8000000000000001;
 
@@ -163,8 +159,6 @@ extern bool gAllowEarlyCompletionInNetworkPlay;
 extern std::string gScenarioSavePath;
 extern bool gFirstTimeSaving;
 extern uint32_t gLastAutoSaveUpdate;
-
-extern std::string gScenarioFileName;
 
 void ScenarioBegin(OpenRCT2::GameState_t& gameState);
 void ScenarioReset(OpenRCT2::GameState_t& gameState);

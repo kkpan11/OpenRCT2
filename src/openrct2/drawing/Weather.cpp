@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -54,7 +54,7 @@ const DrawWeatherFunc DrawSnowFunctions[] = {
  */
 void DrawWeather(DrawPixelInfo& dpi, IWeatherDrawer* weatherDrawer)
 {
-    if (gConfigGeneral.RenderWeatherEffects)
+    if (Config::Get().general.RenderWeatherEffects)
     {
         uint32_t viewFlags = 0;
 
@@ -66,10 +66,10 @@ void DrawWeather(DrawPixelInfo& dpi, IWeatherDrawer* weatherDrawer)
         auto weatherLevel = GetGameState().ClimateCurrent.Level;
         if (weatherLevel != WeatherLevel::None && !gTrackDesignSaveMode && !(viewFlags & VIEWPORT_FLAG_HIGHLIGHT_PATH_ISSUES))
         {
-            auto drawFunc = DrawRainFunctions[static_cast<int8_t>(weatherLevel)];
+            auto drawFunc = DrawRainFunctions[EnumValue(weatherLevel)];
             if (ClimateIsSnowing())
             {
-                drawFunc = DrawSnowFunctions[static_cast<int8_t>(weatherLevel)];
+                drawFunc = DrawSnowFunctions[EnumValue(weatherLevel)];
             }
             auto uiContext = GetContext()->GetUiContext();
             uiContext->DrawWeatherAnimation(weatherDrawer, dpi, drawFunc);

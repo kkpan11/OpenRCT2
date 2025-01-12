@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,13 +12,13 @@
 #include <gtest/gtest.h>
 #include <openrct2/Cheats.h>
 #include <openrct2/Context.h>
+#include <openrct2/Diagnostic.h>
 #include <openrct2/Game.h>
 #include <openrct2/GameState.h>
 #include <openrct2/GameStateSnapshots.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/ParkImporter.h>
 #include <openrct2/audio/AudioContext.h>
-#include <openrct2/config/Config.h>
 #include <openrct2/core/Crypt.h>
 #include <openrct2/core/File.h>
 #include <openrct2/core/MemoryStream.h>
@@ -65,7 +65,6 @@ static void GameInit(bool retainSpatialIndices)
         ResetEntitySpatialIndices();
 
     ResetAllSpriteQuadrantPlacements();
-    ScenerySetDefaultPlacementConfiguration();
     LoadPalette();
     EntityTweener::Get().Reset();
     MapAnimationAutoCreate();
@@ -138,10 +137,9 @@ static void RecordGameStateSnapshot(std::unique_ptr<IContext>& context, MemorySt
 
 static void AdvanceGameTicks(uint32_t ticks, std::unique_ptr<IContext>& context)
 {
-    auto* gameState = context->GetGameState();
     for (uint32_t i = 0; i < ticks; i++)
     {
-        gameState->UpdateLogic();
+        gameStateUpdateLogic();
     }
 }
 

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,23 +9,23 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "ScTile.hpp"
+    #include "ScTile.hpp"
 
-#    include "../../../Context.h"
-#    include "../../../common.h"
-#    include "../../../core/Guard.hpp"
-#    include "../../../entity/EntityRegistry.h"
-#    include "../../../ride/Track.h"
-#    include "../../../world/Footpath.h"
-#    include "../../../world/Scenery.h"
-#    include "../../../world/Surface.h"
-#    include "../../Duktape.hpp"
-#    include "../../ScriptEngine.h"
-#    include "ScTileElement.hpp"
+    #include "../../../Context.h"
+    #include "../../../core/Guard.hpp"
+    #include "../../../entity/EntityRegistry.h"
+    #include "../../../object/LargeSceneryEntry.h"
+    #include "../../../ride/Track.h"
+    #include "../../../world/Footpath.h"
+    #include "../../../world/Scenery.h"
+    #include "../../../world/tile_element/LargeSceneryElement.h"
+    #include "../../Duktape.hpp"
+    #include "../../ScriptEngine.h"
+    #include "ScTileElement.hpp"
 
-#    include <cstdio>
-#    include <cstring>
-#    include <utility>
+    #include <cstdio>
+    #include <cstring>
+    #include <utility>
 
 namespace OpenRCT2::Scripting
 {
@@ -36,12 +36,12 @@ namespace OpenRCT2::Scripting
 
     int32_t ScTile::x_get() const
     {
-        return _coords.x / COORDS_XY_STEP;
+        return _coords.x / kCoordsXYStep;
     }
 
     int32_t ScTile::y_get() const
     {
-        return _coords.y / COORDS_XY_STEP;
+        return _coords.y / kCoordsXYStep;
     }
 
     uint32_t ScTile::numElements_get() const
@@ -195,6 +195,13 @@ namespace OpenRCT2::Scripting
         auto first = GetFirstElement();
         if (index < GetNumElements(first))
         {
+            auto element = &first[index];
+            if (element->GetType() != TileElementType::LargeScenery
+                || element->AsLargeScenery()->GetEntry()->scrolling_mode == SCROLLING_MODE_NONE
+                || ScTileElement::GetOtherLargeSceneryElement(_coords, element->AsLargeScenery()) == nullptr)
+            {
+                element->RemoveBannerEntry();
+            }
             TileElementRemove(&first[index]);
             MapInvalidateTileFull(_coords);
         }

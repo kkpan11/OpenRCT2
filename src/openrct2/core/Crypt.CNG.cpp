@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,16 +9,19 @@
 
 #if !defined(DISABLE_NETWORK) && defined(_WIN32)
 
-#    include "Crypt.h"
+    #include "Crypt.h"
 
-#    include "../platform/Platform.h"
-#    include "IStream.hpp"
+    #include "../platform/Platform.h"
+    #include "IStream.hpp"
 
-#    include <iomanip>
-#    include <sstream>
-#    include <stdexcept>
-#    include <string>
-#    include <tuple>
+    #include <cstdint>
+    #include <cstring>
+    #include <iomanip>
+    #include <limits>
+    #include <sstream>
+    #include <stdexcept>
+    #include <string>
+    #include <tuple>
 
 // clang-format off
 // CNG: Cryptography API: Next Generation (CNG)
@@ -29,7 +32,7 @@
 constexpr bool NT_SUCCESS(NTSTATUS status) {return status >= 0;}
 // clang-format on
 
-using namespace Crypt;
+using namespace OpenRCT2::Crypt;
 
 static void CngThrowOnBadStatus(std::string_view name, NTSTATUS status)
 {
@@ -49,7 +52,8 @@ static void ThrowBadAllocOnNull(const void* ptr)
     }
 }
 
-template<typename TBase> class CngHashAlgorithm final : public TBase
+template<typename TBase>
+class CngHashAlgorithm final : public TBase
 {
 private:
     const wchar_t* _algName;
@@ -63,7 +67,7 @@ public:
     {
         // BCRYPT_HASH_REUSABLE_FLAG only available from Windows 8
         _algName = algName;
-        _reusable = Platform::IsOSVersionAtLeast(6, 2, 0);
+        _reusable = OpenRCT2::Platform::IsOSVersionAtLeast(6, 2, 0);
         Initialise();
     }
 
@@ -140,14 +144,16 @@ class DerReader
 private:
     ivstream<uint8_t> _stream;
 
-    template<typename T> T Read(std::istream& stream)
+    template<typename T>
+    T Read(std::istream& stream)
     {
         T value;
         stream.read(reinterpret_cast<char*>(&value), sizeof(T));
         return value;
     }
 
-    template<typename T> std::vector<T> Read(std::istream& stream, size_t count)
+    template<typename T>
+    std::vector<T> Read(std::istream& stream, size_t count)
     {
         std::vector<T> values(count);
         stream.read(reinterpret_cast<char*>(values.data()), sizeof(T) * count);
@@ -653,7 +659,7 @@ public:
 private:
     static std::tuple<DWORD, PBYTE> HashData(const void* data, size_t dataLen)
     {
-        auto hash = Crypt::SHA256(data, dataLen);
+        auto hash = OpenRCT2::Crypt::SHA256(data, dataLen);
         return ToHeap(hash.data(), hash.size());
     }
 
@@ -667,7 +673,7 @@ private:
     }
 };
 
-namespace Crypt
+namespace OpenRCT2::Crypt
 {
     std::unique_ptr<Sha1Algorithm> CreateSHA1()
     {
@@ -688,6 +694,6 @@ namespace Crypt
     {
         return std::make_unique<CngRsaKey>();
     }
-} // namespace Crypt
+} // namespace OpenRCT2::Crypt
 
 #endif

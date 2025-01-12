@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,10 +9,15 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "ScGuest.hpp"
+    #include "ScGuest.hpp"
 
-#    include "../../../entity/Guest.h"
-#    include "../../../localisation/Localisation.h"
+    #include "../../../GameState.h"
+    #include "../../../entity/Guest.h"
+    #include "../../../localisation/Formatting.h"
+    #include "../../../object/ObjectManager.h"
+    #include "../../../object/PeepAnimationsObject.h"
+    #include "../../../peep/PeepAnimations.h"
+    #include "../../../ride/RideEntry.h"
 
 namespace OpenRCT2::Scripting
 {
@@ -172,8 +177,14 @@ namespace OpenRCT2::Scripting
         dukglue_register_property(ctx, &ScGuest::isInPark_get, nullptr, "isInPark");
         dukglue_register_property(ctx, &ScGuest::isLost_get, nullptr, "isLost");
         dukglue_register_property(ctx, &ScGuest::lostCountdown_get, &ScGuest::lostCountdown_set, "lostCountdown");
+        dukglue_register_property(ctx, &ScGuest::favouriteRide_get, &ScGuest::favouriteRide_set, "favouriteRide");
         dukglue_register_property(ctx, &ScGuest::thoughts_get, nullptr, "thoughts");
         dukglue_register_property(ctx, &ScGuest::items_get, nullptr, "items");
+        dukglue_register_property(ctx, &ScGuest::availableAnimations_get, nullptr, "availableAnimations");
+        dukglue_register_property(ctx, &ScGuest::animation_get, &ScGuest::animation_set, "animation");
+        dukglue_register_property(ctx, &ScGuest::animationOffset_get, &ScGuest::animationOffset_set, "animationOffset");
+        dukglue_register_property(ctx, &ScGuest::animationLength_get, nullptr, "animationLength");
+        dukglue_register_method(ctx, &ScGuest::getAnimationSpriteIds, "getAnimationSpriteIds");
         dukglue_register_method(ctx, &ScGuest::has_item, "hasItem");
         dukglue_register_method(ctx, &ScGuest::give_item, "giveItem");
         dukglue_register_method(ctx, &ScGuest::remove_item, "removeItem");
@@ -472,6 +483,48 @@ namespace OpenRCT2::Scripting
         }
     }
 
+    DukValue ScGuest::favouriteRide_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetGuest();
+        if (peep != nullptr)
+        {
+            if (peep->FavouriteRide != RideId::GetNull())
+            {
+                duk_push_int(ctx, peep->FavouriteRide.ToUnderlying());
+            }
+            else
+            {
+                duk_push_null(ctx);
+            }
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
+    }
+
+    void ScGuest::favouriteRide_set(const DukValue& value)
+    {
+        ThrowIfGameStateNotMutable();
+        auto peep = GetGuest();
+        if (peep != nullptr)
+        {
+            auto& gameState = GetGameState();
+            if (value.type() == DukValue::Type::NUMBER && value.as_uint() < gameState.Rides.size()
+                && gameState.Rides[value.as_uint()].type != RIDE_TYPE_NULL)
+            {
+                peep->FavouriteRide = RideId::FromUnderlying(value.as_uint());
+            }
+            else
+            {
+                peep->FavouriteRide = RideId::GetNull();
+            }
+        }
+    }
+
     DukValue ScGuest::thoughts_get() const
     {
         auto ctx = GetContext()->GetScriptEngine().GetContext();
@@ -765,7 +818,7 @@ namespace OpenRCT2::Scripting
         }
 
         peep->GiveItem(*shopItem);
-        peep->UpdateSpriteType();
+        peep->UpdateAnimationGroup();
     }
 
     void ScGuest::remove_item(const DukValue& item) const
@@ -776,7 +829,7 @@ namespace OpenRCT2::Scripting
             // Since guests can only have one item of a type and this item matches, remove it.
             auto peep = GetGuest();
             peep->RemoveItem(ShopItemMap[item["type"].as_string()]);
-            peep->UpdateSpriteType();
+            peep->UpdateAnimationGroup();
         }
     }
 
@@ -787,8 +840,150 @@ namespace OpenRCT2::Scripting
         if (peep != nullptr)
         {
             peep->RemoveAllItems();
-            peep->UpdateSpriteType();
+            peep->UpdateAnimationGroup();
         }
+    }
+
+    std::vector<std::string> ScGuest::availableAnimations_get() const
+    {
+        std::vector<std::string> availableAnimations{};
+        for (auto& animation : getAnimationsByPeepType(AnimationPeepType::Guest))
+        {
+            availableAnimations.push_back(std::string(animation.first));
+        }
+        return availableAnimations;
+    }
+
+    std::vector<uint32_t> ScGuest::getAnimationSpriteIds(std::string groupKey, uint8_t rotation) const
+    {
+        std::vector<uint32_t> spriteIds{};
+
+        auto& availableGuestAnimations = getAnimationsByPeepType(AnimationPeepType::Guest);
+        auto animationType = availableGuestAnimations.TryGet(groupKey);
+        if (animationType == std::nullopt)
+        {
+            return spriteIds;
+        }
+
+        auto peep = GetPeep();
+        if (peep != nullptr)
+        {
+            auto& objManager = GetContext()->GetObjectManager();
+            auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+            const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, *animationType);
+            for (auto frameOffset : animationGroup.frame_offsets)
+            {
+                auto imageId = animationGroup.base_image;
+                if (animationType != PeepAnimationType::Hanging)
+                    imageId += rotation + frameOffset * 4;
+                else
+                    imageId += frameOffset;
+
+                spriteIds.push_back(imageId);
+            }
+        }
+        return spriteIds;
+    }
+
+    std::string ScGuest::animation_get() const
+    {
+        auto* peep = GetGuest();
+        if (peep == nullptr)
+        {
+            return nullptr;
+        }
+
+        auto& availableGuestAnimations = getAnimationsByPeepType(AnimationPeepType::Guest);
+        std::string_view action = availableGuestAnimations[peep->AnimationType];
+
+        // Special consideration for sitting peeps
+        // TODO: something funky going on in the state machine
+        if (peep->AnimationType == PeepAnimationType::Walking && peep->State == PeepState::Sitting)
+            action = availableGuestAnimations[PeepAnimationType::SittingIdle];
+
+        return std::string(action);
+    }
+
+    void ScGuest::animation_set(std::string groupKey)
+    {
+        ThrowIfGameStateNotMutable();
+
+        auto& availableGuestAnimations = getAnimationsByPeepType(AnimationPeepType::Guest);
+        auto newType = availableGuestAnimations.TryGet(groupKey);
+        if (newType == std::nullopt)
+        {
+            throw DukException() << "Invalid animation for this guest (" << groupKey << ")";
+        }
+
+        auto* peep = GetGuest();
+        peep->AnimationType = peep->NextAnimationType = *newType;
+
+        auto offset = 0;
+        if (peep->IsActionWalking())
+            peep->WalkingAnimationFrameNum = offset;
+        else
+            peep->AnimationFrameNum = offset;
+
+        auto& objManager = GetContext()->GetObjectManager();
+        auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+        const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, peep->AnimationType);
+        peep->AnimationImageIdOffset = animationGroup.frame_offsets[offset];
+        peep->Invalidate();
+        peep->UpdateSpriteBoundingBox();
+        peep->Invalidate();
+    }
+
+    uint8_t ScGuest::animationOffset_get() const
+    {
+        auto* peep = GetGuest();
+        if (peep == nullptr)
+        {
+            return 0;
+        }
+
+        if (peep->IsActionWalking())
+            return peep->WalkingAnimationFrameNum;
+        else
+            return peep->AnimationFrameNum;
+    }
+
+    void ScGuest::animationOffset_set(uint8_t offset)
+    {
+        ThrowIfGameStateNotMutable();
+
+        auto* peep = GetGuest();
+
+        auto& objManager = GetContext()->GetObjectManager();
+        auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+        const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, peep->AnimationType);
+        auto length = animationGroup.frame_offsets.size();
+        offset %= length;
+
+        if (peep->IsActionWalking())
+            peep->WalkingAnimationFrameNum = offset;
+        else
+            peep->AnimationFrameNum = offset;
+
+        peep->AnimationImageIdOffset = animationGroup.frame_offsets[offset];
+        peep->UpdateSpriteBoundingBox();
+    }
+
+    uint8_t ScGuest::animationLength_get() const
+    {
+        auto* peep = GetGuest();
+        if (peep == nullptr)
+        {
+            return 0;
+        }
+
+        auto& objManager = GetContext()->GetObjectManager();
+        auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+        const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, peep->AnimationType);
+        return static_cast<uint8_t>(animationGroup.frame_offsets.size());
     }
 
     ScThought::ScThought(PeepThought backing)
@@ -830,7 +1025,7 @@ namespace OpenRCT2::Scripting
         // format string with arguments
         auto ft = Formatter();
         PeepThoughtSetFormatArgs(&_backing, ft);
-        return FormatStringID(STR_STRINGID, ft.Data());
+        return FormatStringIDLegacy(STR_STRINGID, ft.Data());
     }
 
 } // namespace OpenRCT2::Scripting

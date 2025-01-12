@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -17,22 +17,27 @@
 #include "../../interface/Viewport.h"
 #include "../../localisation/Formatter.h"
 #include "../../localisation/Formatting.h"
-#include "../../localisation/Localisation.h"
 #include "../../object/EntranceObject.h"
 #include "../../object/ObjectManager.h"
 #include "../../object/StationObject.h"
 #include "../../profiling/Profiling.h"
 #include "../../ride/RideData.h"
 #include "../../ride/TrackDesign.h"
+#include "../../sprites.h"
 #include "../../world/Banner.h"
 #include "../../world/Entrance.h"
 #include "../../world/Footpath.h"
 #include "../../world/Park.h"
 #include "../../world/TileInspector.h"
+#include "../../world/tile_element/EntranceElement.h"
 #include "../support/WoodenSupports.h"
 #include "Paint.TileElement.h"
+#include "Segment.h"
 
 using namespace OpenRCT2;
+using namespace OpenRCT2::Drawing;
+
+using OpenRCT2::Drawing::LightFx::LightType;
 
 static void PaintRideEntranceExitScrollingText(
     PaintSession& session, const EntranceElement& entranceEl, const StationObject& stationObj, Direction direction,
@@ -62,7 +67,7 @@ static void PaintRideEntranceExitScrollingText(
     }
 
     char text[256];
-    if (gConfigGeneral.UpperCaseBanners)
+    if (Config::Get().general.UpperCaseBanners)
     {
         FormatStringToUpper(text, sizeof(text), STR_BANNER_TEXT_FORMAT, ft.Data());
     }
@@ -82,26 +87,26 @@ static void PaintRideEntranceExitLightEffects(PaintSession& session, int32_t hei
 {
     PROFILED_FUNCTION();
 
-    if (LightFXIsAvailable())
+    if (LightFx::IsAvailable())
     {
         if (entranceEl.GetEntranceType() == ENTRANCE_TYPE_RIDE_ENTRANCE)
         {
-            LightFXAdd3DLightMagicFromDrawingTile(session.MapPosition, 0, 0, height + 45, LightType::Lantern3);
+            LightFx::Add3DLightMagicFromDrawingTile(session.MapPosition, 0, 0, height + 45, LightType::Lantern3);
         }
 
         switch (entranceEl.GetDirection())
         {
             case 0:
-                LightFXAdd3DLightMagicFromDrawingTile(session.MapPosition, 16, 0, height + 16, LightType::Lantern2);
+                LightFx::Add3DLightMagicFromDrawingTile(session.MapPosition, 16, 0, height + 16, LightType::Lantern2);
                 break;
             case 1:
-                LightFXAdd3DLightMagicFromDrawingTile(session.MapPosition, 0, -16, height + 16, LightType::Lantern2);
+                LightFx::Add3DLightMagicFromDrawingTile(session.MapPosition, 0, -16, height + 16, LightType::Lantern2);
                 break;
             case 2:
-                LightFXAdd3DLightMagicFromDrawingTile(session.MapPosition, -16, 0, height + 16, LightType::Lantern2);
+                LightFx::Add3DLightMagicFromDrawingTile(session.MapPosition, -16, 0, height + 16, LightType::Lantern2);
                 break;
             case 3:
-                LightFXAdd3DLightMagicFromDrawingTile(session.MapPosition, 0, 16, height + 16, LightType::Lantern2);
+                LightFx::Add3DLightMagicFromDrawingTile(session.MapPosition, 0, 16, height + 16, LightType::Lantern2);
                 break;
         }
     }
@@ -189,7 +194,7 @@ static void PaintRideEntranceExit(PaintSession& session, uint8_t direction, int3
             { { (direction & 1) ? 28 : 2, (direction & 1) ? 2 : 28, height }, boundBoxLength });
     }
 
-    PaintUtilPushTunnelRotated(session, direction, height, TUNNEL_SQUARE_FLAT);
+    PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
 
     if (!entranceEl.IsGhost())
         PaintRideEntranceExitScrollingText(session, entranceEl, *stationObj, direction, height);
@@ -203,8 +208,8 @@ static void PaintRideEntranceExit(PaintSession& session, uint8_t direction, int3
         session, WoodenSupportType::Truss, WoodenSupportSubType::NeSw, direction, height, supportsImageTemplate);
 
     height += isExit ? 40 : 56;
-    PaintUtilSetSegmentSupportHeight(session, SEGMENTS_ALL, 0xFFFF, 0);
-    PaintUtilSetGeneralSupportHeight(session, height, 0x20);
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height);
 }
 
 static void PaintParkEntranceScrollingText(
@@ -220,9 +225,10 @@ static void PaintParkEntranceScrollingText(
         return;
 
     auto ft = Formatter();
-    if (GetGameState().ParkFlags & PARK_FLAGS_PARK_OPEN)
+    auto& gameState = GetGameState();
+    if (gameState.Park.Flags & PARK_FLAGS_PARK_OPEN)
     {
-        const auto& park = OpenRCT2::GetContext()->GetGameState()->GetPark();
+        const auto& park = gameState.Park;
         auto name = park.Name.c_str();
         ft.Add<StringId>(STR_STRING);
         ft.Add<const char*>(name);
@@ -234,7 +240,7 @@ static void PaintParkEntranceScrollingText(
     }
 
     char text[256];
-    if (gConfigGeneral.UpperCaseBanners)
+    if (Config::Get().general.UpperCaseBanners)
     {
         FormatStringToUpper(text, sizeof(text), STR_BANNER_TEXT_FORMAT, ft.Data());
     }
@@ -244,7 +250,7 @@ static void PaintParkEntranceScrollingText(
     }
 
     auto stringWidth = GfxGetStringWidth(text, FontStyle::Tiny);
-    auto scroll = stringWidth > 0 ? (GetGameState().CurrentTicks / 2) % stringWidth : 0;
+    auto scroll = stringWidth > 0 ? (gameState.CurrentTicks / 2) % stringWidth : 0;
     auto imageIndex = ScrollingTextSetup(
         session, STR_BANNER_TEXT_FORMAT, ft, scroll, scrollingMode + direction / 2, COLOUR_BLACK);
     auto textHeight = height + entrance.GetTextHeight();
@@ -255,9 +261,9 @@ static void PaintParkEntranceLightEffects(PaintSession& session)
 {
     PROFILED_FUNCTION();
 
-    if (LightFXIsAvailable())
+    if (LightFx::IsAvailable())
     {
-        LightFXAdd3DLightMagicFromDrawingTile(session.MapPosition, 0, 0, 155, LightType::Lantern3);
+        LightFx::Add3DLightMagicFromDrawingTile(session.MapPosition, 0, 0, 155, LightType::Lantern3);
     }
 }
 
@@ -284,7 +290,8 @@ static void PaintParkEntrance(PaintSession& session, uint8_t direction, int32_t 
     }
 
     auto& objManager = GetContext()->GetObjectManager();
-    auto entrance = reinterpret_cast<EntranceObject*>(objManager.GetLoadedObject(ObjectType::ParkEntrance, 0));
+    auto entrance = reinterpret_cast<EntranceObject*>(
+        objManager.GetLoadedObject(ObjectType::ParkEntrance, entranceEl.getEntryIndex()));
     auto sequence = entranceEl.GetSequenceIndex();
     switch (sequence)
     {
@@ -331,8 +338,8 @@ static void PaintParkEntrance(PaintSession& session, uint8_t direction, int32_t 
     WoodenASupportsPaintSetupRotated(
         session, WoodenSupportType::Truss, WoodenSupportSubType::NeSw, direction, height, supportsImageTemplate);
 
-    PaintUtilSetSegmentSupportHeight(session, SEGMENTS_ALL, 0xFFFF, 0);
-    PaintUtilSetGeneralSupportHeight(session, height + 80, 0x20);
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height + 80);
 }
 
 static void PaintHeightMarkers(PaintSession& session, const EntranceElement& entranceEl, int32_t height)

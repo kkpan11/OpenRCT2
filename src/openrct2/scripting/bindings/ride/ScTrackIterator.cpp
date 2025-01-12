@@ -9,13 +9,14 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "ScTrackIterator.h"
+    #include "ScTrackIterator.h"
 
-#    include "../../../Context.h"
-#    include "../../../ride/Ride.h"
-#    include "../../../ride/TrackData.h"
-#    include "../../ScriptEngine.h"
-#    include "ScTrackSegment.h"
+    #include "../../../Context.h"
+    #include "../../../ride/Ride.h"
+    #include "../../../ride/TrackData.h"
+    #include "../../../world/tile_element/TrackElement.h"
+    #include "../../ScriptEngine.h"
+    #include "ScTrackSegment.h"
 
 using namespace OpenRCT2::Scripting;
 using namespace OpenRCT2::TrackMetaData;
@@ -23,6 +24,8 @@ using namespace OpenRCT2::TrackMetaData;
 std::shared_ptr<ScTrackIterator> ScTrackIterator::FromElement(const CoordsXY& position, int32_t elementIndex)
 {
     auto el = MapGetNthElementAt(position, elementIndex);
+    if (el == nullptr)
+        return nullptr;
     auto origin = GetTrackSegmentOrigin(CoordsXYE(position, el));
     if (!origin)
         return nullptr;
@@ -31,7 +34,7 @@ std::shared_ptr<ScTrackIterator> ScTrackIterator::FromElement(const CoordsXY& po
     return std::make_shared<ScTrackIterator>(*origin, trackEl->GetTrackType(), trackEl->GetRideIndex());
 }
 
-ScTrackIterator::ScTrackIterator(const CoordsXYZD& position, track_type_t type, RideId ride)
+ScTrackIterator::ScTrackIterator(const CoordsXYZD& position, OpenRCT2::TrackElemType type, RideId ride)
     : _position(position)
     , _type(type)
     , _ride(ride)
@@ -72,8 +75,8 @@ DukValue ScTrackIterator::previousPosition_get() const
     auto ctx = scriptEngine.GetContext();
 
     auto& ted = GetTrackElementDescriptor(_type);
-    auto& seq0 = ted.Block;
-    auto pos = _position + CoordsXYZ(seq0->x, seq0->y, seq0->z);
+    const auto& seq0 = ted.sequences[0].clearance;
+    auto pos = _position + CoordsXYZ(seq0.x, seq0.y, seq0.z);
 
     auto el = MapGetTrackElementAtOfTypeSeq(pos, _type, 0);
     if (el == nullptr)
@@ -92,8 +95,8 @@ DukValue ScTrackIterator::nextPosition_get() const
     auto ctx = scriptEngine.GetContext();
 
     auto& ted = GetTrackElementDescriptor(_type);
-    auto& seq0 = ted.Block;
-    auto pos = _position + CoordsXYZ(seq0->x, seq0->y, seq0->z);
+    const auto& seq0 = ted.sequences[0].clearance;
+    auto pos = _position + CoordsXYZ(seq0.x, seq0.y, seq0.z);
 
     auto el = MapGetTrackElementAtOfTypeSeq(pos, _type, 0);
     if (el == nullptr)
@@ -111,8 +114,8 @@ DukValue ScTrackIterator::nextPosition_get() const
 bool ScTrackIterator::previous()
 {
     auto& ted = GetTrackElementDescriptor(_type);
-    auto& seq0 = ted.Block;
-    auto pos = _position + CoordsXYZ(seq0->x, seq0->y, seq0->z);
+    const auto& seq0 = ted.sequences[0].clearance;
+    auto pos = _position + CoordsXYZ(seq0.x, seq0.y, seq0.z);
 
     auto el = MapGetTrackElementAtOfTypeSeq(pos, _type, 0);
     if (el == nullptr)
@@ -137,8 +140,8 @@ bool ScTrackIterator::previous()
 bool ScTrackIterator::next()
 {
     auto& ted = GetTrackElementDescriptor(_type);
-    auto& seq0 = ted.Block;
-    auto pos = _position + CoordsXYZ(seq0->x, seq0->y, seq0->z);
+    const auto& seq0 = ted.sequences[0].clearance;
+    auto pos = _position + CoordsXYZ(seq0.x, seq0.y, seq0.z);
 
     auto el = MapGetTrackElementAtOfTypeSeq(pos, _type, 0);
     if (el == nullptr)

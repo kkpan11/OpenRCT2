@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -17,6 +17,7 @@
 #include "../core/IStream.hpp"
 #include "../core/Json.hpp"
 #include "../core/Memory.hpp"
+#include "../core/Numerics.hpp"
 #include "../core/String.hpp"
 #include "../drawing/Drawing.h"
 #include "../entity/Yaw.hpp"
@@ -31,12 +32,12 @@
 #include "../ride/Vehicle.h"
 #include "ObjectRepository.h"
 
-#include <algorithm>
 #include <iterator>
 #include <unordered_map>
 
 using namespace OpenRCT2;
 using namespace OpenRCT2::Entity::Yaw;
+using namespace OpenRCT2::Numerics;
 
 /*
  * The number of sprites in the sprite group is the specified precision multiplied by this number. General rule is any slope or
@@ -108,12 +109,12 @@ static LegacyAnimationParameters GetDefaultAnimationParameters(uint8_t legacyAni
     return VehicleEntryDefaultAnimation[legacyAnimationType];
 }
 
-static constexpr SpritePrecision PrecisionFromNumFrames(uint8_t numRotationFrames)
+static constexpr SpritePrecision PrecisionFromNumFrames(uint32_t numRotationFrames)
 {
     if (numRotationFrames == 0)
         return SpritePrecision::None;
     else
-        return static_cast<SpritePrecision>(UtilBitScanForward(numRotationFrames) + 1);
+        return static_cast<SpritePrecision>(Numerics::bitScanForward(numRotationFrames) + 1);
 }
 
 static void RideObjectUpdateRideType(RideObjectEntry& rideEntry)
@@ -266,8 +267,6 @@ void RideObject::ReadLegacy(IReadObjectContext* context, IStream* stream)
 
 void RideObject::Load()
 {
-    _legacyType.obj = this;
-
     GetStringTable().Sort();
     _legacyType.naming.Name = LanguageAllocateObjectString(GetName());
     _legacyType.naming.Description = LanguageAllocateObjectString(GetDescription());
@@ -529,7 +528,7 @@ void RideObject::ReadJson(IReadObjectContext* context, json_t& root)
 
         for (size_t i = 0; i < RCT2::ObjectLimits::MaxRideTypesPerRideEntry; i++)
         {
-            ObjectEntryIndex rideType = RIDE_TYPE_NULL;
+            auto rideType = RIDE_TYPE_NULL;
 
             if (i < numRideTypes)
             {
@@ -640,7 +639,6 @@ void RideObject::ReadJson(IReadObjectContext* context, json_t& root)
             });
     }
 
-    RideObjectUpdateRideType(_legacyType);
     PopulateTablesFromJson(context, root);
 }
 
@@ -714,7 +712,7 @@ CarEntry RideObject::ReadJsonCar([[maybe_unused]] IReadObjectContext* context, j
     car.num_seats = Json::GetNumber<uint8_t>(jCar["numSeats"]);
     if (Json::GetBoolean(jCar["seatsInPairs"], true) && car.num_seats > 1)
     {
-        car.num_seats |= VEHICLE_SEAT_PAIR_FLAG;
+        car.num_seats |= kVehicleSeatPairFlag;
     }
 
     car.sprite_width = Json::GetNumber<uint8_t>(jCar["spriteWidth"]);
@@ -818,7 +816,7 @@ CarEntry RideObject::ReadJsonCar([[maybe_unused]] IReadObjectContext* context, j
             { "isReverserPassengerCar", CAR_ENTRY_FLAG_REVERSER_PASSENGER_CAR },
             { "hasInvertedSpriteSet", CAR_ENTRY_FLAG_HAS_INVERTED_SPRITE_SET },
             { "hasDodgemInUseLights", CAR_ENTRY_FLAG_DODGEM_INUSE_LIGHTS },
-            { "hasAdditionalColour2", CAR_ENTRY_FLAG_ENABLE_TERNARY_COLOUR },
+            { "hasAdditionalColour2", CAR_ENTRY_FLAG_ENABLE_TERTIARY_COLOUR },
             { "recalculateSpriteBounds", CAR_ENTRY_FLAG_RECALCULATE_SPRITE_BOUNDS },
             { "overrideNumberOfVerticalFrames", CAR_ENTRY_FLAG_OVERRIDE_NUM_VERTICAL_FRAMES },
             { "spriteBoundsIncludeInvertedSet", CAR_ENTRY_FLAG_SPRITE_BOUNDS_INCLUDE_INVERTED_SET },
@@ -881,7 +879,7 @@ CarEntry RideObject::ReadJsonCar([[maybe_unused]] IReadObjectContext* context, j
             auto numRotationFrames = Json::GetNumber<uint8_t>(jRotationCount[SpriteGroupNames[i]], 0);
             if (numRotationFrames != 0)
             {
-                if (!IsPowerOf2(numRotationFrames))
+                if (!std::has_single_bit(numRotationFrames))
                 {
                     context->LogError(ObjectError::InvalidProperty, "spriteGroups values must be powers of 2");
                     continue;
@@ -966,7 +964,7 @@ std::vector<VehicleColour> RideObject::ReadJsonColourConfiguration(json_t& jColo
 
 bool RideObject::IsRideTypeShopOrFacility(ride_type_t rideType)
 {
-    return GetRideTypeDescriptor(rideType).HasFlag(RIDE_TYPE_FLAG_IS_SHOP_OR_FACILITY);
+    return GetRideTypeDescriptor(rideType).HasFlag(RtdFlag::isShopOrFacility);
 }
 
 ride_type_t RideObject::ParseRideType(const std::string& s)

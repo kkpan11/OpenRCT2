@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,10 +10,12 @@
 #include "ImageTable.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../OpenRCT2.h"
 #include "../PlatformEnvironment.h"
 #include "../core/File.h"
 #include "../core/FileScanner.h"
+#include "../core/Guard.hpp"
 #include "../core/IStream.hpp"
 #include "../core/Json.hpp"
 #include "../core/Path.hpp"
@@ -23,7 +25,6 @@
 #include "Object.h"
 #include "ObjectFactory.h"
 
-#include <algorithm>
 #include <memory>
 #include <stdexcept>
 
@@ -89,11 +90,14 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::ParseImages(
     {
         result.push_back(std::make_unique<RequiredImage>());
     }
-    else if (String::StartsWith(s, "$CSG"))
+    else if (String::startsWith(s, "$CSG"))
     {
-        auto range = ParseRange(s.substr(4));
-        if (!range.empty())
+        auto rangeStart = s.find('[');
+        auto rangeEnd = s.find(']');
+        if (rangeStart != std::string::npos && rangeEnd != std::string::npos)
         {
+            auto rangeString = s.substr(rangeStart, rangeEnd - rangeStart + 1);
+            auto range = ParseRange(rangeString);
             if (IsCsgLoaded())
             {
                 for (auto i : range)
@@ -115,11 +119,14 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::ParseImages(
             }
         }
     }
-    else if (String::StartsWith(s, "$G1"))
+    else if (String::startsWith(s, "$G1"))
     {
-        auto range = ParseRange(s.substr(3));
-        if (!range.empty())
+        auto rangeStart = s.find('[');
+        auto rangeEnd = s.find(']');
+        if (rangeStart != std::string::npos && rangeEnd != std::string::npos)
         {
+            auto rangeString = s.substr(rangeStart, rangeEnd - rangeStart + 1);
+            auto range = ParseRange(rangeString);
             for (auto i : range)
             {
                 result.push_back(std::make_unique<RequiredImage>(
@@ -127,26 +134,28 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::ParseImages(
             }
         }
     }
-    else if (String::StartsWith(s, "$RCT2:OBJDATA/"))
+    else if (String::startsWith(s, "$RCT2:OBJDATA/"))
     {
         auto name = s.substr(14);
         auto rangeStart = name.find('[');
-        if (rangeStart != std::string::npos)
+        auto rangeEnd = name.find(']');
+        if (rangeStart != std::string::npos && rangeEnd != std::string::npos)
         {
-            auto rangeString = name.substr(rangeStart);
-            auto range = ParseRange(name.substr(rangeStart));
+            auto rangeString = name.substr(rangeStart, rangeEnd - rangeStart + 1);
+            auto range = ParseRange(rangeString);
             name = name.substr(0, rangeStart);
             result = LoadObjectImages(context, name, range);
         }
     }
-    else if (String::StartsWith(s, "$LGX:"))
+    else if (String::startsWith(s, "$LGX:"))
     {
         auto name = s.substr(5);
         auto rangeStart = name.find('[');
-        if (rangeStart != std::string::npos)
+        auto rangeEnd = name.find(']');
+        if (rangeStart != std::string::npos && rangeEnd != std::string::npos)
         {
-            auto rangeString = name.substr(rangeStart);
-            auto range = ParseRange(name.substr(rangeStart));
+            auto rangeString = name.substr(rangeStart, rangeEnd - rangeStart + 1);
+            auto range = ParseRange(rangeString);
             name = name.substr(0, rangeStart);
             result = LoadImageArchiveImages(context, name, range);
         }
@@ -161,15 +170,16 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::ParseImages(
         {
             auto imageData = context->GetData(s);
             auto image = Imaging::ReadFromBuffer(imageData);
+            auto meta = ImageImportMeta{};
 
             ImageImporter importer;
-            auto importResult = importer.Import(image, 0, 0, ImageImporter::Palette::OpenRCT2, ImageImporter::ImportFlags::RLE);
+            auto importResult = importer.Import(image, meta);
 
             result.push_back(std::make_unique<RequiredImage>(importResult.Element));
         }
         catch (const std::exception& e)
         {
-            auto msg = String::StdFormat("Unable to load image '%s': %s", s.c_str(), e.what());
+            auto msg = String::stdFormat("Unable to load image '%s': %s", s.c_str(), e.what());
             context->LogWarning(ObjectError::BadImageTable, msg.c_str());
             result.push_back(std::make_unique<RequiredImage>());
         }
@@ -183,30 +193,11 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::ParseImages(
     Guard::Assert(el.is_object(), "ImageTable::ParseImages expects parameter el to be object");
 
     auto path = Json::GetString(el["path"]);
-    auto x = Json::GetNumber<int16_t>(el["x"]);
-    auto y = Json::GetNumber<int16_t>(el["y"]);
-    auto srcX = Json::GetNumber<int16_t>(el["srcX"]);
-    auto srcY = Json::GetNumber<int16_t>(el["srcY"]);
-    auto srcWidth = Json::GetNumber<int16_t>(el["srcWidth"]);
-    auto srcHeight = Json::GetNumber<int16_t>(el["srcHeight"]);
-    auto raw = Json::GetString(el["format"]) == "raw";
-    auto keepPalette = Json::GetString(el["palette"]) == "keep";
-    auto zoomOffset = Json::GetNumber<int32_t>(el["zoom"]);
+    auto meta = createImageImportMetaFromJson(el);
 
     std::vector<std::unique_ptr<RequiredImage>> result;
     try
     {
-        auto flags = ImageImporter::ImportFlags::None;
-        auto palette = ImageImporter::Palette::OpenRCT2;
-        if (!raw)
-        {
-            flags = static_cast<ImageImporter::ImportFlags>(flags | ImageImporter::ImportFlags::RLE);
-        }
-        if (keepPalette)
-        {
-            palette = ImageImporter::Palette::KeepIndices;
-        }
-
         auto itSource = std::find_if(
             imageSources.begin(), imageSources.end(),
             [&path](const std::pair<std::string, Image>& item) { return item.first == path; });
@@ -216,21 +207,14 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::ParseImages(
         }
         auto& image = itSource->second;
 
-        if (srcWidth == 0)
-            srcWidth = image.Width;
-
-        if (srcHeight == 0)
-            srcHeight = image.Height;
-
         ImageImporter importer;
-        auto importResult = importer.Import(image, srcX, srcY, srcWidth, srcHeight, x, y, palette, flags);
+        auto importResult = importer.Import(image, meta);
         auto g1element = importResult.Element;
-        g1element.zoomed_offset = zoomOffset;
         result.push_back(std::make_unique<RequiredImage>(g1element));
     }
     catch (const std::exception& e)
     {
-        auto msg = String::StdFormat("Unable to load image '%s': %s", path.c_str(), e.what());
+        auto msg = String::stdFormat("Unable to load image '%s': %s", path.c_str(), e.what());
         context->LogWarning(ObjectError::BadImageTable, msg.c_str());
         result.push_back(std::make_unique<RequiredImage>());
     }
@@ -248,7 +232,14 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::LoadImageArc
         // Fix entry data offsets
         for (uint32_t i = 0; i < gxData->header.num_entries; i++)
         {
-            gxData->elements[i].offset += reinterpret_cast<uintptr_t>(gxData->data.get());
+            if (gxData->elements[i].offset == nullptr)
+            {
+                gxData->elements[i].offset = gxData->data.get();
+            }
+            else
+            {
+                gxData->elements[i].offset += reinterpret_cast<uintptr_t>(gxData->data.get());
+            }
         }
 
         if (range.size() > 0)
@@ -282,7 +273,7 @@ std::vector<std::unique_ptr<ImageTable::RequiredImage>> ImageTable::LoadImageArc
     }
     else
     {
-        auto msg = String::StdFormat("Unable to load Gx '%s'", path.c_str());
+        auto msg = String::stdFormat("Unable to load Gx '%s'", path.c_str());
         context->LogWarning(ObjectError::BadImageTable, msg.c_str());
         for (size_t i = 0; i < range.size(); i++)
         {
@@ -358,7 +349,7 @@ std::vector<int32_t> ImageTable::ParseRange(std::string s)
     if (s.length() >= 3 && s[0] == '[' && s[s.length() - 1] == ']')
     {
         s = s.substr(1, s.length() - 2);
-        auto parts = String::Split(s, "..");
+        auto parts = String::split(s, "..");
         if (parts.size() == 1)
         {
             result.push_back(std::stoi(parts[0]));
@@ -416,7 +407,7 @@ std::string ImageTable::FindLegacyObject(const std::string& name)
         while (scanner->Next())
         {
             auto currentName = Path::GetFileName(scanner->GetPathRelative());
-            if (String::IEquals(currentName, name) || String::IEquals(currentName, altName))
+            if (String::iequals(currentName, name) || String::iequals(currentName, altName))
             {
                 objectPath = scanner->GetPath();
                 break;
@@ -511,7 +502,7 @@ std::vector<std::pair<std::string, Image>> ImageTable::GetImageSources(IReadObje
     std::vector<std::pair<std::string, Image>> result;
     for (auto& jsonImage : jsonImages)
     {
-        if (jsonImage.is_object())
+        if (jsonImage.is_object() && jsonImage.contains("path"))
         {
             auto path = Json::GetString(jsonImage["path"]);
             auto keepPalette = Json::GetString(jsonImage["palette"]) == "keep";
@@ -561,9 +552,36 @@ bool ImageTable::ReadJson(IReadObjectContext* context, json_t& root)
             }
             else if (jsonImage.is_object())
             {
-                auto images = ParseImages(context, imageSources, jsonImage);
-                allImages.insert(
-                    allImages.end(), std::make_move_iterator(images.begin()), std::make_move_iterator(images.end()));
+                if (jsonImage.contains("gx"))
+                {
+                    auto xOverride = Json::GetNumber<int16_t>(jsonImage["x"], std::numeric_limits<int16_t>::max());
+                    auto yOverride = Json::GetNumber<int16_t>(jsonImage["y"], std::numeric_limits<int16_t>::max());
+                    const bool hasXOverride = xOverride != std::numeric_limits<int16_t>::max();
+                    const bool hasYOverride = yOverride != std::numeric_limits<int16_t>::max();
+
+                    auto strImage = jsonImage["gx"].get<std::string>();
+                    auto images = ParseImages(context, strImage);
+
+                    if (hasXOverride || hasYOverride)
+                    {
+                        for (auto& image : images)
+                        {
+                            if (hasXOverride)
+                                image->g1.x_offset = xOverride;
+                            if (hasYOverride)
+                                image->g1.y_offset = yOverride;
+                        }
+                    }
+
+                    allImages.insert(
+                        allImages.end(), std::make_move_iterator(images.begin()), std::make_move_iterator(images.end()));
+                }
+                else
+                {
+                    auto images = ParseImages(context, imageSources, jsonImage);
+                    allImages.insert(
+                        allImages.end(), std::make_move_iterator(images.begin()), std::make_move_iterator(images.end()));
+                }
             }
         }
 

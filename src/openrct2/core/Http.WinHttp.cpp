@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,25 +9,25 @@
 
 #if !defined(DISABLE_HTTP) && defined(_WIN32)
 
-#    include "Http.h"
+    #include "Http.h"
 
-#    include "../Version.h"
-#    include "../core/Console.hpp"
-#    include "String.hpp"
+    #include "../Version.h"
+    #include "../core/Console.hpp"
+    #include "String.hpp"
 
-#    include <cstdio>
-#    include <stdexcept>
-#    include <windows.h>
-#    include <winhttp.h>
+    #include <cstdio>
+    #include <stdexcept>
+    #include <windows.h>
+    #include <winhttp.h>
 
-namespace Http
+namespace OpenRCT2::Http
 {
     static constexpr char OPENRCT2_USER_AGENT[] = "OpenRCT2/" OPENRCT2_VERSION;
 
     static void ThrowWin32Exception(const char* methodName)
     {
         auto errorCode = GetLastError();
-        auto msg = String::StdFormat("%s failed, error: %d.", methodName, errorCode);
+        auto msg = String::stdFormat("%s failed, error: %d.", methodName, errorCode);
         throw std::runtime_error(msg);
     }
 
@@ -88,8 +88,8 @@ namespace Http
                 // we don't really count as a header.
                 if (index != 0 && wKey.size() != 0)
                 {
-                    auto key = String::ToUtf8(wKey);
-                    auto value = String::ToUtf8(wValue);
+                    auto key = String::toUtf8(wKey);
+                    auto value = String::toUtf8(wValue);
                     headers[key] = std::move(value);
                 }
                 wKey.clear();
@@ -162,11 +162,11 @@ namespace Http
             url.dwUrlPathLength = static_cast<DWORD>(-1);
             url.dwExtraInfoLength = static_cast<DWORD>(-1);
 
-            auto wUrl = String::ToWideChar(req.url);
+            auto wUrl = String::toWideChar(req.url);
             if (!WinHttpCrackUrl(wUrl.c_str(), 0, 0, &url))
                 throw std::invalid_argument("Unable to parse URI.");
 
-            auto userAgent = String::ToWideChar(OPENRCT2_USER_AGENT);
+            auto userAgent = String::toWideChar(OPENRCT2_USER_AGENT);
             hSession = WinHttpOpen(
                 userAgent.c_str(), WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
             if (hSession == nullptr)
@@ -192,7 +192,7 @@ namespace Http
 
             for (auto header : req.header)
             {
-                auto fullHeader = String::ToWideChar(header.first) + L": " + String::ToWideChar(header.second);
+                auto fullHeader = String::toWideChar(header.first) + L": " + String::toWideChar(header.second);
                 if (!WinHttpAddRequestHeaders(hRequest, fullHeader.c_str(), static_cast<ULONG>(-1L), WINHTTP_ADDREQ_FLAG_ADD))
                     ThrowWin32Exception("WinHttpAddRequestHeaders");
             }
@@ -226,15 +226,15 @@ namespace Http
         }
         catch ([[maybe_unused]] const std::exception& e)
         {
-#    ifdef DEBUG
+    #ifdef DEBUG
             Console::Error::WriteLine("HTTP request failed: %s", e.what());
-#    endif
+    #endif
             WinHttpCloseHandle(hSession);
             WinHttpCloseHandle(hConnect);
             WinHttpCloseHandle(hRequest);
             throw;
         }
     }
-} // namespace Http
+} // namespace OpenRCT2::Http
 
 #endif

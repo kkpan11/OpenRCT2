@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,7 @@
 
 #include "InGameConsole.h"
 
+#include "../UiStringIds.h"
 #include "Theme.h"
 
 #include <algorithm>
@@ -16,19 +17,21 @@
 #include <openrct2/Context.h>
 #include <openrct2/Version.h>
 #include <openrct2/config/Config.h>
+#include <openrct2/core/UTF8.h>
 #include <openrct2/drawing/Drawing.h>
 #include <openrct2/interface/Colour.h>
 #include <openrct2/interface/Window.h>
 #include <openrct2/localisation/Language.h>
 #include <openrct2/localisation/LocalisationService.h>
 
+using namespace OpenRCT2;
 using namespace OpenRCT2::Ui;
 
 static InGameConsole _inGameConsole;
 
 static FontStyle InGameConsoleGetFontStyle()
 {
-    return (gConfigInterface.ConsoleSmallFont ? FontStyle::Small : FontStyle::Medium);
+    return (Config::Get().interface.ConsoleSmallFont ? FontStyle::Small : FontStyle::Medium);
 }
 
 static int32_t InGameConsoleGetLineHeight()
@@ -36,10 +39,10 @@ static int32_t InGameConsoleGetLineHeight()
     return FontGetLineHeight(InGameConsoleGetFontStyle());
 }
 
-InGameConsole::InGameConsole()
+void InGameConsole::WriteInitial()
 {
     InteractiveConsole::WriteLine(OPENRCT2_NAME " " OPENRCT2_VERSION);
-    InteractiveConsole::WriteLine("Type 'help' for a list of available commands. Type 'hide' to hide the console.");
+    InteractiveConsole::WriteLine(LanguageGetString(STR_CONSOLE_HELPER_TEXT));
     InteractiveConsole::WriteLine("");
     WritePrompt();
 }
@@ -51,6 +54,12 @@ void InGameConsole::WritePrompt()
 
 void InGameConsole::Input(ConsoleInput input)
 {
+    if (_isCommandAwaitingCompletion)
+    {
+        // Do not process input while a command is running
+        return;
+    }
+
     switch (input)
     {
         case ConsoleInput::LineClear:
@@ -63,10 +72,17 @@ void InGameConsole::Input(ConsoleInput input)
                 HistoryAdd(_consoleCurrentLine);
 
                 // Append text we are executing to prompt line
-                _consoleLines.back().append(_consoleCurrentLine);
+                _consoleLines.back().first.append(_consoleCurrentLine);
 
                 Execute(_consoleCurrentLine);
-                WritePrompt();
+                if (IsExecuting())
+                {
+                    _isCommandAwaitingCompletion = true;
+                }
+                else
+                {
+                    WritePrompt();
+                }
                 ClearInput();
                 RefreshCaret();
             }
@@ -176,6 +192,12 @@ void InGameConsole::ClearLine()
 
 void InGameConsole::Open()
 {
+    if (!_isInitialised)
+    {
+        WriteInitial();
+        _isInitialised = true;
+    }
+
     _isOpen = true;
     ScrollToEnd();
     RefreshCaret();
@@ -209,12 +231,6 @@ void InGameConsole::Toggle()
 
 void InGameConsole::WriteLine(const std::string& input, FormatToken colourFormat)
 {
-    // Include text colour format only for special cases
-    // The draw function handles the default text colour differently
-    auto colourCodepoint = "";
-    if (colourFormat != FormatToken::ColourWindow2)
-        colourCodepoint = "{WINDOW_COLOUR_2}";
-
     std::string line;
     std::size_t splitPos = 0;
     std::size_t stringOffset = 0;
@@ -222,7 +238,7 @@ void InGameConsole::WriteLine(const std::string& input, FormatToken colourFormat
     {
         splitPos = input.find('\n', stringOffset);
         line = input.substr(stringOffset, splitPos - stringOffset);
-        _consoleLines.emplace_back(colourCodepoint + line);
+        _consoleLines.emplace_back(line, colourFormat);
         stringOffset = splitPos + 1;
     }
 
@@ -262,6 +278,12 @@ void InGameConsole::Update()
         }
     }
 
+    if (_isCommandAwaitingCompletion && !IsExecuting())
+    {
+        WritePrompt();
+        _isCommandAwaitingCompletion = false;
+    }
+
     // Flash the caret
     _consoleCaretTicks = (_consoleCaretTicks + 1) % 30;
 }
@@ -272,23 +294,15 @@ void InGameConsole::Draw(DrawPixelInfo& dpi) const
         return;
 
     // Set font
-    uint8_t textColour = NOT_TRANSLUCENT(ThemeGetColour(WindowClass::Console, 1));
+    ColourWithFlags textColour = { ThemeGetColour(WindowClass::Console, 1).colour, 0 };
+    const FontStyle style = InGameConsoleGetFontStyle();
     const int32_t lineHeight = InGameConsoleGetLineHeight();
     const int32_t maxLines = GetNumVisibleLines();
-
-    // This is something of a hack to ensure the text is actually black
-    // as opposed to a desaturated grey
-    thread_local std::string _colourFormatStr;
-    _colourFormatStr.clear();
-    if (textColour == COLOUR_BLACK)
-    {
-        _colourFormatStr = "{BLACK}";
-    }
 
     // TTF looks far better without the outlines
     if (!LocalisationService_UseTrueTypeFont())
     {
-        textColour |= COLOUR_FLAG_OUTLINE;
+        textColour.setFlag(ColourFlag::withOutline, true);
     }
 
     Invalidate();
@@ -302,7 +316,7 @@ void InGameConsole::Draw(DrawPixelInfo& dpi) const
         FilterPaletteID::Palette51);
 
     // Paint background colour.
-    uint8_t backgroundColour = ThemeGetColour(WindowClass::Console, 0);
+    auto backgroundColour = ThemeGetColour(WindowClass::Console, 0);
     GfxFillRectInset(dpi, { _consoleTopLeft, _consoleBottomRight }, backgroundColour, INSET_RECT_FLAG_FILL_NONE);
     GfxFillRectInset(
         dpi, { _consoleTopLeft + ScreenCoordsXY{ 1, 1 }, _consoleBottomRight - ScreenCoordsXY{ 1, 1 } }, backgroundColour,
@@ -315,28 +329,54 @@ void InGameConsole::Draw(DrawPixelInfo& dpi) const
     for (std::size_t i = 0; i < _consoleLines.size() && i < static_cast<size_t>(maxLines); i++)
     {
         const size_t index = i + _consoleScrollPos;
-        lineBuffer = _colourFormatStr + _consoleLines[index];
-        GfxDrawString(dpi, screenCoords, lineBuffer.c_str(), { textColour, InGameConsoleGetFontStyle() });
+        if (_consoleLines[index].second == FormatToken::ColourWindow2)
+        {
+            // This is something of a hack to ensure the text is actually black
+            // as opposed to a desaturated grey
+            if (textColour.colour == COLOUR_BLACK)
+            {
+                DrawText(dpi, screenCoords, { textColour, style }, "{BLACK}");
+                DrawText(dpi, screenCoords, { kTextColour255, style }, _consoleLines[index].first.c_str(), true);
+            }
+            else
+            {
+                DrawText(dpi, screenCoords, { textColour, style }, _consoleLines[index].first.c_str(), true);
+            }
+        }
+        else
+        {
+            std::string lineColour = FormatTokenToStringWithBraces(_consoleLines[index].second);
+            DrawText(dpi, screenCoords, { textColour, style }, lineColour.c_str());
+            DrawText(dpi, screenCoords, { kTextColour255, style }, _consoleLines[index].first.c_str(), true);
+        }
+
         screenCoords.y += lineHeight;
     }
 
     screenCoords.y = _consoleBottomRight.y - lineHeight - CONSOLE_EDGE_PADDING - 1;
 
     // Draw current line
-    lineBuffer = _colourFormatStr + _consoleCurrentLine;
-    DrawText(dpi, screenCoords, { TEXT_COLOUR_255, InGameConsoleGetFontStyle() }, lineBuffer.c_str(), true);
+    if (textColour.colour == COLOUR_BLACK)
+    {
+        DrawText(dpi, screenCoords, { textColour, style }, "{BLACK}");
+        DrawText(dpi, screenCoords, { kTextColour255, style }, _consoleCurrentLine.c_str(), true);
+    }
+    else
+    {
+        DrawText(dpi, screenCoords, { textColour, style }, _consoleCurrentLine.c_str(), true);
+    }
 
     // Draw caret
     if (_consoleCaretTicks < CONSOLE_CARET_FLASH_THRESHOLD)
     {
         auto caret = screenCoords + ScreenCoordsXY{ _caretScreenPosX, lineHeight };
-        uint8_t caretColour = ColourMapA[BASE_COLOUR(textColour)].lightest;
+        uint8_t caretColour = ColourMapA[textColour.colour].lightest;
         GfxFillRect(dpi, { caret, caret + ScreenCoordsXY{ CONSOLE_CARET_WIDTH, 1 } }, caretColour);
     }
 
     // What about border colours?
-    uint8_t borderColour1 = ColourMapA[BASE_COLOUR(backgroundColour)].light;
-    uint8_t borderColour2 = ColourMapA[BASE_COLOUR(backgroundColour)].mid_dark;
+    uint8_t borderColour1 = ColourMapA[backgroundColour.colour].light;
+    uint8_t borderColour2 = ColourMapA[backgroundColour.colour].mid_dark;
 
     // Input area top border
     GfxFillRect(

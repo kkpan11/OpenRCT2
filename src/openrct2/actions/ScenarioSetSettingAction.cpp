@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,16 +9,14 @@
 
 #include "ScenarioSetSettingAction.h"
 
+#include "../Diagnostic.h"
 #include "../GameState.h"
 #include "../OpenRCT2.h"
 #include "../entity/Peep.h"
 #include "../interface/Window.h"
 #include "../management/Finance.h"
 #include "../scenario/Scenario.h"
-#include "../util/Util.h"
 #include "../world/Park.h"
-
-#include <algorithm>
 
 using namespace OpenRCT2;
 
@@ -39,7 +37,7 @@ GameActions::Result ScenarioSetSettingAction::Query() const
 {
     if (_setting >= ScenarioSetSetting::Count)
     {
-        LOG_ERROR("Invalid setting: %u", _setting);
+        LOG_ERROR("Invalid scenario setting: %u", _setting);
         return GameActions::Result(
             GameActions::Status::InvalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_VALUE_OUT_OF_RANGE);
     }
@@ -57,22 +55,22 @@ GameActions::Result ScenarioSetSettingAction::Execute() const
             {
                 if (_value != 0)
                 {
-                    gameState.ParkFlags |= PARK_FLAGS_NO_MONEY;
+                    gameState.Park.Flags |= PARK_FLAGS_NO_MONEY;
                 }
                 else
                 {
-                    gameState.ParkFlags &= ~PARK_FLAGS_NO_MONEY;
+                    gameState.Park.Flags &= ~PARK_FLAGS_NO_MONEY;
                 }
             }
             else
             {
                 if (_value != 0)
                 {
-                    gameState.ParkFlags |= PARK_FLAGS_NO_MONEY;
+                    gameState.Park.Flags |= PARK_FLAGS_NO_MONEY;
                 }
                 else
                 {
-                    gameState.ParkFlags &= ~PARK_FLAGS_NO_MONEY;
+                    gameState.Park.Flags &= ~PARK_FLAGS_NO_MONEY;
                 }
                 // Invalidate all windows that have anything to do with finance
                 WindowInvalidateByClass(WindowClass::Ride);
@@ -106,11 +104,11 @@ GameActions::Result ScenarioSetSettingAction::Execute() const
         case ScenarioSetSetting::ForbidMarketingCampaigns:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_FORBID_MARKETING_CAMPAIGN;
+                gameState.Park.Flags |= PARK_FLAGS_FORBID_MARKETING_CAMPAIGN;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_FORBID_MARKETING_CAMPAIGN;
+                gameState.Park.Flags &= ~PARK_FLAGS_FORBID_MARKETING_CAMPAIGN;
             }
             break;
         case ScenarioSetSetting::AverageCashPerGuest:
@@ -128,124 +126,124 @@ GameActions::Result ScenarioSetSettingAction::Execute() const
         case ScenarioSetSetting::GuestsPreferLessIntenseRides:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_PREF_LESS_INTENSE_RIDES;
+                gameState.Park.Flags |= PARK_FLAGS_PREF_LESS_INTENSE_RIDES;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_PREF_LESS_INTENSE_RIDES;
+                gameState.Park.Flags &= ~PARK_FLAGS_PREF_LESS_INTENSE_RIDES;
             }
             break;
         case ScenarioSetSetting::GuestsPreferMoreIntenseRides:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_PREF_MORE_INTENSE_RIDES;
+                gameState.Park.Flags |= PARK_FLAGS_PREF_MORE_INTENSE_RIDES;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_PREF_MORE_INTENSE_RIDES;
+                gameState.Park.Flags &= ~PARK_FLAGS_PREF_MORE_INTENSE_RIDES;
             }
             break;
         case ScenarioSetSetting::CostToBuyLand:
-            gLandPrice = std::clamp<money64>(_value, 5.00_GBP, 200.00_GBP);
+            gameState.LandPrice = std::clamp<money64>(_value, 5.00_GBP, 200.00_GBP);
             break;
         case ScenarioSetSetting::CostToBuyConstructionRights:
-            gConstructionRightsPrice = std::clamp<money64>(_value, 5.00_GBP, 200.00_GBP);
+            gameState.ConstructionRightsPrice = std::clamp<money64>(_value, 5.00_GBP, 200.00_GBP);
             break;
         case ScenarioSetSetting::ParkChargeMethod:
             if (gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR)
             {
                 if (_value == 0)
                 {
-                    gameState.ParkFlags |= PARK_FLAGS_PARK_FREE_ENTRY;
-                    gameState.ParkFlags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
-                    gameState.ParkEntranceFee = 0.00_GBP;
+                    gameState.Park.Flags |= PARK_FLAGS_PARK_FREE_ENTRY;
+                    gameState.Park.Flags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
+                    gameState.Park.EntranceFee = 0.00_GBP;
                 }
                 else if (_value == 1)
                 {
-                    gameState.ParkFlags &= ~PARK_FLAGS_PARK_FREE_ENTRY;
-                    gameState.ParkFlags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
-                    gameState.ParkEntranceFee = 10.00_GBP;
+                    gameState.Park.Flags &= ~PARK_FLAGS_PARK_FREE_ENTRY;
+                    gameState.Park.Flags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
+                    gameState.Park.EntranceFee = 10.00_GBP;
                 }
                 else
                 {
-                    gameState.ParkFlags |= PARK_FLAGS_PARK_FREE_ENTRY;
-                    gameState.ParkFlags |= PARK_FLAGS_UNLOCK_ALL_PRICES;
-                    gameState.ParkEntranceFee = 10.00_GBP;
+                    gameState.Park.Flags |= PARK_FLAGS_PARK_FREE_ENTRY;
+                    gameState.Park.Flags |= PARK_FLAGS_UNLOCK_ALL_PRICES;
+                    gameState.Park.EntranceFee = 10.00_GBP;
                 }
             }
             else
             {
                 if (_value == 0)
                 {
-                    gameState.ParkFlags |= PARK_FLAGS_PARK_FREE_ENTRY;
-                    gameState.ParkFlags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
+                    gameState.Park.Flags |= PARK_FLAGS_PARK_FREE_ENTRY;
+                    gameState.Park.Flags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
                 }
                 else if (_value == 1)
                 {
-                    gameState.ParkFlags &= ~PARK_FLAGS_PARK_FREE_ENTRY;
-                    gameState.ParkFlags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
+                    gameState.Park.Flags &= ~PARK_FLAGS_PARK_FREE_ENTRY;
+                    gameState.Park.Flags &= ~PARK_FLAGS_UNLOCK_ALL_PRICES;
                 }
                 else
                 {
-                    gameState.ParkFlags |= PARK_FLAGS_PARK_FREE_ENTRY;
-                    gameState.ParkFlags |= PARK_FLAGS_UNLOCK_ALL_PRICES;
+                    gameState.Park.Flags |= PARK_FLAGS_PARK_FREE_ENTRY;
+                    gameState.Park.Flags |= PARK_FLAGS_UNLOCK_ALL_PRICES;
                 }
                 WindowInvalidateByClass(WindowClass::ParkInformation);
                 WindowInvalidateByClass(WindowClass::Ride);
             }
             break;
         case ScenarioSetSetting::ParkChargeEntryFee:
-            gameState.ParkEntranceFee = std::clamp<money64>(_value, 0.00_GBP, MAX_ENTRANCE_FEE);
+            gameState.Park.EntranceFee = std::clamp<money64>(_value, 0.00_GBP, MAX_ENTRANCE_FEE);
             WindowInvalidateByClass(WindowClass::ParkInformation);
             break;
         case ScenarioSetSetting::ForbidTreeRemoval:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_FORBID_TREE_REMOVAL;
+                gameState.Park.Flags |= PARK_FLAGS_FORBID_TREE_REMOVAL;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_FORBID_TREE_REMOVAL;
+                gameState.Park.Flags &= ~PARK_FLAGS_FORBID_TREE_REMOVAL;
             }
             break;
         case ScenarioSetSetting::ForbidLandscapeChanges:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_FORBID_LANDSCAPE_CHANGES;
+                gameState.Park.Flags |= PARK_FLAGS_FORBID_LANDSCAPE_CHANGES;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_FORBID_LANDSCAPE_CHANGES;
+                gameState.Park.Flags &= ~PARK_FLAGS_FORBID_LANDSCAPE_CHANGES;
             }
             break;
         case ScenarioSetSetting::ForbidHighConstruction:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_FORBID_HIGH_CONSTRUCTION;
+                gameState.Park.Flags |= PARK_FLAGS_FORBID_HIGH_CONSTRUCTION;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_FORBID_HIGH_CONSTRUCTION;
+                gameState.Park.Flags &= ~PARK_FLAGS_FORBID_HIGH_CONSTRUCTION;
             }
             break;
         case ScenarioSetSetting::ParkRatingHigherDifficultyLevel:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_DIFFICULT_PARK_RATING;
+                gameState.Park.Flags |= PARK_FLAGS_DIFFICULT_PARK_RATING;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_DIFFICULT_PARK_RATING;
+                gameState.Park.Flags &= ~PARK_FLAGS_DIFFICULT_PARK_RATING;
             }
             break;
         case ScenarioSetSetting::GuestGenerationHigherDifficultyLevel:
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_DIFFICULT_GUEST_GENERATION;
+                gameState.Park.Flags |= PARK_FLAGS_DIFFICULT_GUEST_GENERATION;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_DIFFICULT_GUEST_GENERATION;
+                gameState.Park.Flags &= ~PARK_FLAGS_DIFFICULT_GUEST_GENERATION;
             }
             break;
         case ScenarioSetSetting::AllowEarlyCompletion:
@@ -255,16 +253,16 @@ GameActions::Result ScenarioSetSettingAction::Execute() const
         {
             if (_value != 0)
             {
-                gameState.ParkFlags |= PARK_FLAGS_RCT1_INTEREST;
+                gameState.Park.Flags |= PARK_FLAGS_RCT1_INTEREST;
             }
             else
             {
-                gameState.ParkFlags &= ~PARK_FLAGS_RCT1_INTEREST;
+                gameState.Park.Flags &= ~PARK_FLAGS_RCT1_INTEREST;
             }
             break;
         }
         default:
-            LOG_ERROR("Invalid setting: %u", _setting);
+            LOG_ERROR("Invalid scenario setting %u", _setting);
             return GameActions::Result(
                 GameActions::Status::InvalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_VALUE_OUT_OF_RANGE);
     }

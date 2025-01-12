@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,25 +10,28 @@
 #include "VirtualFloor.h"
 
 #include "../Cheats.h"
+#include "../Diagnostic.h"
+#include "../GameState.h"
 #include "../Input.h"
 #include "../config/Config.h"
 #include "../interface/Viewport.h"
 #include "../profiling/Profiling.h"
 #include "../sprites.h"
-#include "../util/Util.h"
 #include "../world/Location.hpp"
 #include "../world/Map.h"
 #include "../world/TileElementsView.h"
+#include "../world/tile_element/SurfaceElement.h"
+#include "../world/tile_element/TileElement.h"
 #include "Paint.h"
 #include "VirtualFloor.h"
 #include "tile_element/Paint.TileElement.h"
 
-#include <algorithm>
 #include <limits>
 
 using namespace OpenRCT2;
 
-static uint16_t _virtualFloorBaseSize = 5 * 32;
+static constexpr uint16_t kVirtualFloorBaseSize = 5 * kCoordsXYStep;
+static constexpr CoordsXY kVirtualFloorBaseSizeXY = { kVirtualFloorBaseSize, kVirtualFloorBaseSize };
 static uint16_t _virtualFloorHeight = 0;
 static CoordsXYZ _virtualFloorLastMinPos;
 static CoordsXYZ _virtualFloorLastMaxPos;
@@ -128,10 +131,10 @@ void VirtualFloorInvalidate()
            && max_position.y != std::numeric_limits<int32_t>::lowest());
 
     // Apply the virtual floor size to the computed invalidation area.
-    min_position.x -= _virtualFloorBaseSize + 16;
-    min_position.y -= _virtualFloorBaseSize + 16;
-    max_position.x += _virtualFloorBaseSize + 16;
-    max_position.y += _virtualFloorBaseSize + 16;
+    min_position.x -= kVirtualFloorBaseSize + 16;
+    min_position.y -= kVirtualFloorBaseSize + 16;
+    max_position.x += kVirtualFloorBaseSize + 16;
+    max_position.y += kVirtualFloorBaseSize + 16;
 
     // Invalidate previous region if appropriate.
     if (_virtualFloorLastMinPos.x != std::numeric_limits<int32_t>::max()
@@ -185,12 +188,12 @@ bool VirtualFloorTileIsFloor(const CoordsXY& loc)
     }
 
     // Check if map selection (usually single tiles) are enabled
-    //  and if the current tile is near or on them
-    if ((gMapSelectFlags & MAP_SELECT_FLAG_ENABLE) && loc.x >= gMapSelectPositionA.x - _virtualFloorBaseSize
-        && loc.y >= gMapSelectPositionA.y - _virtualFloorBaseSize && loc.x <= gMapSelectPositionB.x + _virtualFloorBaseSize
-        && loc.y <= gMapSelectPositionB.y + _virtualFloorBaseSize)
+    // and if the current tile is near or on them
+    // (short-circuit to false otherwise - we don't want to show a second
+    //  virtual floor from e. g. an open ride construction window)
+    if (gMapSelectFlags & MAP_SELECT_FLAG_ENABLE)
     {
-        return true;
+        return loc >= gMapSelectPositionA - kVirtualFloorBaseSizeXY && loc <= gMapSelectPositionB + kVirtualFloorBaseSizeXY;
     }
 
     if (gMapSelectFlags & MAP_SELECT_FLAG_ENABLE_CONSTRUCT)
@@ -198,8 +201,8 @@ bool VirtualFloorTileIsFloor(const CoordsXY& loc)
         // Check if we are anywhere near the selection tiles (larger scenery / rides)
         for (const auto& tile : gMapSelectionTiles)
         {
-            if (loc.x >= tile.x - _virtualFloorBaseSize && loc.y >= tile.y - _virtualFloorBaseSize
-                && loc.x <= tile.x + _virtualFloorBaseSize && loc.y <= tile.y + _virtualFloorBaseSize)
+            if (loc.x >= tile.x - kVirtualFloorBaseSize && loc.y >= tile.y - kVirtualFloorBaseSize
+                && loc.x <= tile.x + kVirtualFloorBaseSize && loc.y <= tile.y + kVirtualFloorBaseSize)
             {
                 return true;
             }
@@ -244,7 +247,7 @@ static void VirtualFloorGetTileProperties(
 
     *tileOwned = MapIsLocationOwned({ loc, height });
 
-    if (gCheatsSandboxMode)
+    if (GetGameState().Cheats.sandboxMode)
         *tileOwned = true;
 
     // Iterate through the map elements of the current tile to find:
@@ -300,13 +303,13 @@ void VirtualFloorPaint(PaintSession& session)
     PROFILED_FUNCTION();
 
     static constexpr CoordsXY scenery_half_tile_offsets[4] = {
-        { -COORDS_XY_STEP, 0 },
-        { 0, COORDS_XY_STEP },
-        { COORDS_XY_STEP, 0 },
-        { 0, -COORDS_XY_STEP },
+        { -kCoordsXYStep, 0 },
+        { 0, kCoordsXYStep },
+        { kCoordsXYStep, 0 },
+        { 0, -kCoordsXYStep },
     };
 
-    if (_virtualFloorHeight < MINIMUM_LAND_HEIGHT)
+    if (_virtualFloorHeight < kMinimumLandHeight)
         return;
 
     uint8_t direction = session.CurrentRotation;
@@ -336,9 +339,9 @@ void VirtualFloorPaint(PaintSession& session)
 
     // Try the four tiles next to us for the same parameters as above,
     //  if our parameters differ we set an edge towards that tile
-    for (uint8_t i = 0; i < NumOrthogonalDirections; i++)
+    for (uint8_t i = 0; i < kNumOrthogonalDirections; i++)
     {
-        uint8_t effectiveRotation = (NumOrthogonalDirections + i - direction) % NumOrthogonalDirections;
+        uint8_t effectiveRotation = (kNumOrthogonalDirections + i - direction) % kNumOrthogonalDirections;
         CoordsXY theirLocation = session.MapPosition + scenery_half_tile_offsets[effectiveRotation];
 
         bool theyAreOccupied;
@@ -352,7 +355,7 @@ void VirtualFloorPaint(PaintSession& session)
             theirLocation, virtualFloorClipHeight, &theyAreOccupied, &theyAreOwned, &theirOccupiedEdges, &theyAreBelowGround,
             &theyAreAboveGround, &theyAreLit);
 
-        if (theirOccupiedEdges & (1 << ((effectiveRotation + 2) % NumOrthogonalDirections)) && (weAreOwned && !theyAreOwned))
+        if (theirOccupiedEdges & (1 << ((effectiveRotation + 2) % kNumOrthogonalDirections)) && (weAreOwned && !theyAreOwned))
         {
             occupiedEdges |= 1 << i;
         }
@@ -405,7 +408,7 @@ void VirtualFloorPaint(PaintSession& session)
             { { 5, 5, _virtualFloorHeight + ((dullEdges & EDGE_NW) ? -2 : 0) }, { 0, 0, 1 } });
     }
 
-    if (gConfigGeneral.VirtualFloorStyle != VirtualFloorStyles::Glassy)
+    if (Config::Get().general.VirtualFloorStyle != VirtualFloorStyles::Glassy)
         return;
 
     if (!weAreOccupied && !weAreLit && weAreAboveGround && weAreOwned)

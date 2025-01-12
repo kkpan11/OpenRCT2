@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,17 +10,16 @@
 #pragma once
 
 #ifdef ENABLE_SCRIPTING
-#    ifndef DISABLE_NETWORK
+    #ifndef DISABLE_NETWORK
 
-#        include "../../../Context.h"
-#        include "../../../config/Config.h"
-#        include "../../../network/Socket.h"
-#        include "../../Duktape.hpp"
-#        include "../../ScriptEngine.h"
+        #include "../../../Context.h"
+        #include "../../../config/Config.h"
+        #include "../../../network/Socket.h"
+        #include "../../Duktape.hpp"
+        #include "../../ScriptEngine.h"
 
-#        include <algorithm>
-#        include <memory>
-#        include <vector>
+        #include <memory>
+        #include <vector>
 
 namespace OpenRCT2::Scripting
 {
@@ -90,15 +89,16 @@ namespace OpenRCT2::Scripting
             constexpr char delimiter = ',';
             size_t start_pos = 0;
             size_t end_pos = 0;
-            while ((end_pos = gConfigPlugin.AllowedHosts.find(delimiter, start_pos)) != std::string::npos)
+            while ((end_pos = Config::Get().plugin.AllowedHosts.find(delimiter, start_pos)) != std::string::npos)
             {
-                if (host == gConfigPlugin.AllowedHosts.substr(start_pos, end_pos - start_pos))
+                if (host == Config::Get().plugin.AllowedHosts.substr(start_pos, end_pos - start_pos))
                 {
                     return true;
                 }
                 start_pos = end_pos + 1;
             }
-            return host == gConfigPlugin.AllowedHosts.substr(start_pos, gConfigPlugin.AllowedHosts.length() - start_pos);
+            return host
+                == Config::Get().plugin.AllowedHosts.substr(start_pos, Config::Get().plugin.AllowedHosts.length() - start_pos);
         }
 
     public:
@@ -344,7 +344,7 @@ namespace OpenRCT2::Scripting
                 }
                 else if (status == SocketStatus::Connected)
                 {
-                    char buffer[2048];
+                    char buffer[16384];
                     size_t bytesRead{};
                     auto result = _socket->ReceiveData(buffer, sizeof(buffer), &bytesRead);
                     switch (result)
@@ -556,5 +556,5 @@ namespace OpenRCT2::Scripting
     };
 } // namespace OpenRCT2::Scripting
 
-#    endif
+    #endif
 #endif

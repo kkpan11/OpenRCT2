@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,7 +12,6 @@
 #include "../GameState.h"
 #include "../OpenRCT2.h"
 #include "../ParkImporter.h"
-#include "../common.h"
 #include "../core/Console.hpp"
 #include "../core/Path.hpp"
 #include "../interface/Window.h"
@@ -21,6 +20,7 @@
 #include "../scenario/Scenario.h"
 #include "CommandLine.hpp"
 
+#include <cassert>
 #include <memory>
 
 using namespace OpenRCT2;

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,22 +10,20 @@
 #include "TextComposition.h"
 
 #include "UiContext.h"
+#include "UiStringIds.h"
 #include "interface/InGameConsole.h"
 
 #include <SDL.h>
-#include <algorithm>
 #include <openrct2-ui/interface/Window.h>
-#include <openrct2/common.h>
 #include <openrct2/core/Memory.hpp>
 #include <openrct2/core/String.hpp>
-#include <openrct2/interface/InteractiveConsole.h>
-#include <openrct2/localisation/Localisation.h>
+#include <openrct2/core/UTF8.h>
 
 #ifdef __MACOSX__
-// macOS uses COMMAND rather than CTRL for many keyboard shortcuts
-#    define KEYBOARD_PRIMARY_MODIFIER KMOD_GUI
+    // macOS uses COMMAND rather than CTRL for many keyboard shortcuts
+    #define KEYBOARD_PRIMARY_MODIFIER KMOD_GUI
 #else
-#    define KEYBOARD_PRIMARY_MODIFIER KMOD_CTRL
+    #define KEYBOARD_PRIMARY_MODIFIER KMOD_CTRL
 #endif
 
 using namespace OpenRCT2;
@@ -64,10 +62,10 @@ void TextComposition::HandleMessage(const SDL_Event* e)
     {
         case SDL_TEXTEDITING:
             // When inputting Korean characters, `edit.length` is always zero
-            String::Set(_imeBuffer, sizeof(_imeBuffer), e->edit.text);
+            String::set(_imeBuffer, sizeof(_imeBuffer), e->edit.text);
             _imeStart = e->edit.start;
             _imeLength = e->edit.length;
-            _imeActive = ((e->edit.length != 0 || String::SizeOf(e->edit.text) != 0) && _imeBuffer[0] != '\0');
+            _imeActive = ((e->edit.length != 0 || String::sizeOf(e->edit.text) != 0) && _imeBuffer[0] != '\0');
             break;
         case SDL_TEXTINPUT:
             // will receive an `SDL_TEXTINPUT` event when a composition is committed
@@ -84,7 +82,7 @@ void TextComposition::HandleMessage(const SDL_Event* e)
                 Insert(e->text.text);
 
                 console.RefreshCaret(_session.SelectionStart);
-                WindowUpdateTextbox();
+                OpenRCT2::Ui::Windows::WindowUpdateTextbox();
             }
             break;
         case SDL_KEYDOWN:
@@ -127,7 +125,7 @@ void TextComposition::HandleMessage(const SDL_Event* e)
                         Delete();
 
                         console.RefreshCaret(_session.SelectionStart);
-                        WindowUpdateTextbox();
+                        OpenRCT2::Ui::Windows::WindowUpdateTextbox();
                     }
                     break;
                 case SDLK_HOME:
@@ -149,11 +147,11 @@ void TextComposition::HandleMessage(const SDL_Event* e)
                     _session.SelectionStart = startOffset;
                     Delete();
                     console.RefreshCaret(_session.SelectionStart);
-                    WindowUpdateTextbox();
+                    OpenRCT2::Ui::Windows::WindowUpdateTextbox();
                     break;
                 }
                 case SDLK_RETURN:
-                    WindowCancelTextbox();
+                    OpenRCT2::Ui::Windows::WindowCancelTextbox();
                     break;
                 case SDLK_LEFT:
                     if (modifier & KEYBOARD_PRIMARY_MODIFIER)
@@ -182,7 +180,7 @@ void TextComposition::HandleMessage(const SDL_Event* e)
                         utf8* text = SDL_GetClipboardText();
                         Insert(text);
                         SDL_free(text);
-                        WindowUpdateTextbox();
+                        OpenRCT2::Ui::Windows::WindowUpdateTextbox();
                     }
                     break;
             }
@@ -448,5 +446,5 @@ void TextComposition::Delete()
 
 void TextComposition::RecalculateLength()
 {
-    _session.Length = String::LengthOf(_session.Buffer->c_str());
+    _session.Length = String::lengthOf(_session.Buffer->c_str());
 }

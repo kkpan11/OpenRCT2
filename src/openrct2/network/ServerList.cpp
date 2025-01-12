@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,26 +9,27 @@
 
 #ifndef DISABLE_NETWORK
 
-#    include "ServerList.h"
+    #include "ServerList.h"
 
-#    include "../Context.h"
-#    include "../PlatformEnvironment.h"
-#    include "../config/Config.h"
-#    include "../core/File.h"
-#    include "../core/FileStream.h"
-#    include "../core/Guard.hpp"
-#    include "../core/Http.h"
-#    include "../core/Json.hpp"
-#    include "../core/Memory.hpp"
-#    include "../core/Path.hpp"
-#    include "../core/String.hpp"
-#    include "../platform/Platform.h"
-#    include "Socket.h"
-#    include "network.h"
+    #include "../Context.h"
+    #include "../Diagnostic.h"
+    #include "../PlatformEnvironment.h"
+    #include "../config/Config.h"
+    #include "../core/File.h"
+    #include "../core/FileStream.h"
+    #include "../core/Guard.hpp"
+    #include "../core/Http.h"
+    #include "../core/Json.hpp"
+    #include "../core/Memory.hpp"
+    #include "../core/Path.hpp"
+    #include "../core/String.hpp"
+    #include "../localisation/Language.h"
+    #include "../platform/Platform.h"
+    #include "Socket.h"
+    #include "network.h"
 
-#    include <algorithm>
-#    include <numeric>
-#    include <optional>
+    #include <numeric>
+    #include <optional>
 
 using namespace OpenRCT2;
 
@@ -64,7 +65,7 @@ int32_t ServerListEntry::CompareTo(const ServerListEntry& other) const
         return a.Players > b.Players ? -1 : 1;
     }
 
-    return String::Compare(a.Name, b.Name, true);
+    return String::compare(a.Name, b.Name, true);
 }
 
 bool ServerListEntry::IsVersionValid() const noexcept
@@ -118,7 +119,7 @@ void ServerList::Sort()
             [](const ServerListEntry& a, const ServerListEntry& b) {
                 if (a.Favourite == b.Favourite)
                 {
-                    return String::IEquals(a.Address, b.Address);
+                    return String::iequals(a.Address, b.Address);
                 }
                 return false;
             }),
@@ -270,11 +271,11 @@ std::future<std::vector<ServerListEntry>> ServerList::FetchLocalServerListAsync(
         constexpr auto RECV_DELAY_MS = 10;
         constexpr auto RECV_WAIT_MS = 2000;
 
-        std::string_view msg = NETWORK_LAN_BROADCAST_MSG;
+        std::string_view msg = kNetworkLanBroadcastMsg;
         auto udpSocket = CreateUdpSocket();
 
         LOG_VERBOSE("Broadcasting %zu bytes to the LAN (%s)", msg.size(), broadcastAddress.c_str());
-        auto len = udpSocket->SendData(broadcastAddress, NETWORK_LAN_BROADCAST_PORT, msg.data(), msg.size());
+        auto len = udpSocket->SendData(broadcastAddress, kNetworkLanBroadcastPort, msg.data(), msg.size());
         if (len != msg.size())
         {
             throw std::runtime_error("Unable to broadcast server query.");
@@ -353,17 +354,17 @@ std::future<std::vector<ServerListEntry>> ServerList::FetchLocalServerListAsync(
 
 std::future<std::vector<ServerListEntry>> ServerList::FetchOnlineServerListAsync() const
 {
-#    ifdef DISABLE_HTTP
+    #ifdef DISABLE_HTTP
     return {};
-#    else
+    #else
 
     auto p = std::make_shared<std::promise<std::vector<ServerListEntry>>>();
     auto f = p->get_future();
 
-    std::string masterServerUrl = OPENRCT2_MASTER_SERVER_URL;
-    if (!gConfigNetwork.MasterServerUrl.empty())
+    std::string masterServerUrl = kMasterServerURL;
+    if (!Config::Get().network.MasterServerUrl.empty())
     {
-        masterServerUrl = gConfigNetwork.MasterServerUrl;
+        masterServerUrl = Config::Get().network.MasterServerUrl;
     }
 
     Http::Request request;
@@ -422,7 +423,7 @@ std::future<std::vector<ServerListEntry>> ServerList::FetchOnlineServerListAsync
         }
     });
     return f;
-#    endif
+    #endif
 }
 
 uint32_t ServerList::GetTotalPlayerCount() const
@@ -430,6 +431,12 @@ uint32_t ServerList::GetTotalPlayerCount() const
     return std::accumulate(_serverEntries.begin(), _serverEntries.end(), 0, [](uint32_t acc, const ServerListEntry& entry) {
         return acc + entry.Players;
     });
+}
+
+const char* MasterServerException::what() const noexcept
+{
+    static std::string localisedStatusText = LanguageGetString(StatusText);
+    return localisedStatusText.c_str();
 }
 
 #endif

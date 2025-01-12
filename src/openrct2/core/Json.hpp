@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,20 +9,19 @@
 
 #pragma once
 
-#include "../common.h"
-#include "../core/String.hpp"
+#include "../core/StringTypes.h"
 
 #include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
 
-#if NLOHMANN_JSON_VERSION_MAJOR < 3 || (NLOHMANN_JSON_VERSION_MAJOR == 3 && NLOHMANN_JSON_VERSION_MINOR < 6)
-#    error "Unsupported version of nlohmann json library, must be >= 3.6"
-#endif // NLOHMANN_JSON_VERSION_MAJOR < 3 || (NLOHMANN_JSON_VERSION_MAJOR == 3 && NLOHMANN_JSON_VERSION_MINOR < 6)
+#if NLOHMANN_JSON_VERSION_MAJOR < 3 || (NLOHMANN_JSON_VERSION_MAJOR == 3 && NLOHMANN_JSON_VERSION_MINOR < 9)
+    #error "Unsupported version of nlohmann json library, must be >= 3.9"
+#endif // NLOHMANN_JSON_VERSION_MAJOR < 3 || (NLOHMANN_JSON_VERSION_MAJOR == 3 && NLOHMANN_JSON_VERSION_MINOR < 9)
 
 using json_t = nlohmann::json;
 
-namespace Json
+namespace OpenRCT2::Json
 {
     // Don't try to load JSON files that exceed 64 MiB
     constexpr uint64_t MAX_JSON_SIZE = 64 * 1024 * 1024;
@@ -67,7 +66,8 @@ namespace Json
      * @param defaultValue Default value to return if the JSON object is not a number type
      * @return Copy of the JSON value converted to the given type
      */
-    template<typename T> T GetNumber(const json_t& jsonObj, T defaultValue = 0)
+    template<typename T>
+    T GetNumber(const json_t& jsonObj, T defaultValue = 0)
     {
         static_assert(std::is_arithmetic<T>::value, "GetNumber template parameter must be arithmetic");
 
@@ -81,7 +81,8 @@ namespace Json
      * @param defaultValue Default value to return if the JSON object is not an enum type
      * @return Copy of the JSON value converted to the given enum type
      */
-    template<typename T> T GetEnum(const json_t& jsonObj, T defaultValue)
+    template<typename T>
+    T GetEnum(const json_t& jsonObj, T defaultValue)
     {
         static_assert(std::is_enum<T>::value, "GetEnum template parameter must be an enum");
 
@@ -125,7 +126,8 @@ namespace Json
      * @param list List of pairs of keys and bits to enable if that key in the object is true
      * @return Value with relevant bits flipped
      */
-    template<typename T> T GetFlags(const json_t& jsonObj, std::initializer_list<std::pair<std::string, T>> list)
+    template<typename T>
+    T GetFlags(const json_t& jsonObj, std::initializer_list<std::pair<std::string, T>> list)
     {
         static_assert(std::is_convertible<T, int>::value, "GetFlags template parameter must be integral or a weak enum");
 
@@ -159,7 +161,8 @@ namespace Json
      * @return Value with relevant bits flipped
      * @note FLAG_NORMAL behaves like the other GetFlags function, but FLAG_INVERTED will turn the flag on when false
      */
-    template<typename T> T GetFlags(const json_t& jsonObj, std::initializer_list<std::tuple<std::string, T, FlagType>> list)
+    template<typename T>
+    T GetFlags(const json_t& jsonObj, std::initializer_list<std::tuple<std::string, T, FlagType>> list)
     {
         static_assert(std::is_convertible<T, int>::value, "GetFlags template parameter must be integral or a weak enum");
 
@@ -184,7 +187,7 @@ namespace Json
         }
         return flags;
     }
-} // namespace Json
+} // namespace OpenRCT2::Json
 
 class JsonException final : public std::runtime_error
 {

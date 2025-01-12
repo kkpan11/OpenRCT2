@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,19 +9,23 @@
 
 #include "TrackRemoveAction.h"
 
+#include "../Diagnostic.h"
+#include "../GameState.h"
 #include "../management/Finance.h"
 #include "../ride/RideData.h"
 #include "../ride/Track.h"
 #include "../ride/TrackData.h"
 #include "../ride/TrackDesign.h"
-#include "../util/Util.h"
+#include "../world/Footpath.h"
 #include "../world/MapAnimation.h"
-#include "../world/Surface.h"
+#include "../world/tile_element/SurfaceElement.h"
+#include "../world/tile_element/TrackElement.h"
 #include "RideSetSettingAction.h"
 
+using namespace OpenRCT2;
 using namespace OpenRCT2::TrackMetaData;
 
-TrackRemoveAction::TrackRemoveAction(track_type_t trackType, int32_t sequence, const CoordsXYZD& origin)
+TrackRemoveAction::TrackRemoveAction(OpenRCT2::TrackElemType trackType, int32_t sequence, const CoordsXYZD& origin)
     : _trackType(trackType)
     , _sequence(sequence)
     , _origin(origin)
@@ -41,6 +45,18 @@ uint16_t TrackRemoveAction::GetActionFlags() const
     return GameAction::GetActionFlags();
 }
 
+static OpenRCT2::TrackElemType normaliseTrackType(OpenRCT2::TrackElemType trackType)
+{
+    switch (trackType)
+    {
+        case TrackElemType::BeginStation:
+        case TrackElemType::MiddleStation:
+            return TrackElemType::EndStation;
+        default:
+            return trackType;
+    }
+}
+
 void TrackRemoveAction::Serialise(DataSerialiser& stream)
 {
     GameAction::Serialise(stream);
@@ -56,15 +72,7 @@ GameActions::Result TrackRemoveAction::Query() const
     res.Position.z = _origin.z;
     res.Expenditure = ExpenditureType::RideConstruction;
 
-    // Stations require some massaging of the track type for comparing
-    auto comparableTrackType = _trackType;
-    switch (_trackType)
-    {
-        case TrackElemType::BeginStation:
-        case TrackElemType::MiddleStation:
-            comparableTrackType = TrackElemType::EndStation;
-            break;
-    }
+    auto comparableTrackType = normaliseTrackType(_trackType);
 
     bool found = false;
     bool isGhost = GetFlags() & GAME_COMMAND_FLAG_GHOST;
@@ -90,14 +98,7 @@ GameActions::Result TrackRemoveAction::Query() const
         if (tileElement->IsGhost() != isGhost)
             continue;
 
-        auto tileTrackType = tileElement->AsTrack()->GetTrackType();
-        switch (tileTrackType)
-        {
-            case TrackElemType::BeginStation:
-            case TrackElemType::MiddleStation:
-                tileTrackType = TrackElemType::EndStation;
-                break;
-        }
+        auto tileTrackType = normaliseTrackType(tileElement->AsTrack()->GetTrackType());
 
         if (tileTrackType != comparableTrackType)
             continue;
@@ -108,10 +109,11 @@ GameActions::Result TrackRemoveAction::Query() const
 
     if (!found)
     {
-        LOG_WARNING(
+        LOG_ERROR(
             "Track Element not found. x = %d, y = %d, z = %d, d = %d, seq = %d.", _origin.x, _origin.y, _origin.z,
             _origin.direction, _sequence);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_TRACK_ELEMENT_NOT_FOUND);
     }
 
     if (tileElement->AsTrack()->IsIndestructible())
@@ -127,28 +129,32 @@ GameActions::Result TrackRemoveAction::Query() const
     auto ride = GetRide(rideIndex);
     if (ride == nullptr)
     {
-        LOG_WARNING("Ride not found. ride index = %d.", rideIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Ride not found for rideIndex %d.", rideIndex);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_RIDE_NOT_FOUND);
     }
 
     if (ride->type >= RIDE_TYPE_COUNT)
     {
-        LOG_WARNING("Ride type not found. ride type = %d.", ride->type);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Ride type not found. ride type = %d.", ride->type);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_VALUE_OUT_OF_RANGE);
     }
     const auto& ted = GetTrackElementDescriptor(trackType);
     auto sequenceIndex = tileElement->AsTrack()->GetSequenceIndex();
-    const PreviewTrack* trackBlock = ted.GetBlockForSequence(sequenceIndex);
-    if (trackBlock == nullptr)
+    if (sequenceIndex >= ted.numSequences)
     {
-        LOG_WARNING("Track block %d not found for track type %d.", sequenceIndex, trackType);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Track block %d not found for track type %d.", sequenceIndex, trackType);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_TRACK_BLOCK_NOT_FOUND);
     }
+    const auto& currentTrackBlock = ted.sequences[sequenceIndex].clearance;
 
     auto startLoc = _origin;
     startLoc.direction = tileElement->GetDirection();
 
-    auto rotatedTrack = CoordsXYZ{ CoordsXY{ trackBlock->x, trackBlock->y }.Rotate(startLoc.direction), trackBlock->z };
+    auto rotatedTrack = CoordsXYZ{ CoordsXY{ currentTrackBlock.x, currentTrackBlock.y }.Rotate(startLoc.direction),
+                                   currentTrackBlock.z };
     startLoc.x -= rotatedTrack.x;
     startLoc.y -= rotatedTrack.y;
     startLoc.z -= rotatedTrack.z;
@@ -158,10 +164,10 @@ GameActions::Result TrackRemoveAction::Query() const
 
     money64 supportCosts = 0;
 
-    trackBlock = ted.Block;
-    for (; trackBlock->index != 255; trackBlock++)
+    for (uint8_t i = 0; i < ted.numSequences; i++)
     {
-        rotatedTrack = CoordsXYZ{ CoordsXY{ trackBlock->x, trackBlock->y }.Rotate(startLoc.direction), trackBlock->z };
+        const auto& trackBlock = ted.sequences[i].clearance;
+        rotatedTrack = CoordsXYZ{ CoordsXY{ trackBlock.x, trackBlock.y }.Rotate(startLoc.direction), trackBlock.z };
         auto mapLoc = CoordsXYZ{ startLoc.x, startLoc.y, startLoc.z } + rotatedTrack;
 
         if (!LocationValid(mapLoc))
@@ -187,7 +193,7 @@ GameActions::Result TrackRemoveAction::Query() const
             if (tileElement->GetDirection() != _origin.direction)
                 continue;
 
-            if (tileElement->AsTrack()->GetSequenceIndex() != trackBlock->index)
+            if (tileElement->AsTrack()->GetSequenceIndex() != i)
                 continue;
 
             if (tileElement->AsTrack()->GetTrackType() != trackType)
@@ -202,13 +208,14 @@ GameActions::Result TrackRemoveAction::Query() const
 
         if (!found)
         {
-            LOG_WARNING(
+            LOG_ERROR(
                 "Track Element not found. x = %d, y = %d, z = %d, d = %d, seq = %d.", mapLoc.x, mapLoc.y, mapLoc.z,
-                _origin.direction, trackBlock->index);
-            return GameActions::Result(GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+                _origin.direction, i);
+            return GameActions::Result(
+                GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_TRACK_ELEMENT_NOT_FOUND);
         }
 
-        int32_t entranceDirections = std::get<0>(ted.SequenceProperties);
+        int32_t entranceDirections = ted.sequences[0].flags;
         if (entranceDirections & TRACK_SEQUENCE_FLAG_ORIGIN && (tileElement->AsTrack()->GetSequenceIndex() == 0))
         {
             const auto removeElementResult = TrackRemoveStationElement({ mapLoc, _origin.direction }, rideIndex, 0);
@@ -222,8 +229,9 @@ GameActions::Result TrackRemoveAction::Query() const
         auto* surfaceElement = MapGetSurfaceElementAt(mapLoc);
         if (surfaceElement == nullptr)
         {
-            LOG_WARNING("Surface Element not found. x = %d, y = %d", mapLoc.x, mapLoc.y);
-            return GameActions::Result(GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+            LOG_ERROR("Surface Element not found. x = %d, y = %d", mapLoc.x, mapLoc.y);
+            return GameActions::Result(
+                GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_SURFACE_ELEMENT_NOT_FOUND);
         }
 
         int8_t _support_height = tileElement->BaseHeight - surfaceElement->BaseHeight;
@@ -236,7 +244,7 @@ GameActions::Result TrackRemoveAction::Query() const
     }
 
     money64 price = ride->GetRideTypeDescriptor().BuildCosts.TrackPrice;
-    price *= ted.PriceModifier;
+    price *= ted.priceModifier;
     price >>= 16;
     price = supportCosts + price;
     if (ride->lifecycle_flags & RIDE_LIFECYCLE_EVER_BEEN_OPENED)
@@ -257,15 +265,7 @@ GameActions::Result TrackRemoveAction::Execute() const
     res.Position.z = _origin.z;
     res.Expenditure = ExpenditureType::RideConstruction;
 
-    // Stations require some massaging of the track type for comparing
-    auto comparableTrackType = _trackType;
-    switch (_trackType)
-    {
-        case TrackElemType::BeginStation:
-        case TrackElemType::MiddleStation:
-            comparableTrackType = TrackElemType::EndStation;
-            break;
-    }
+    auto comparableTrackType = normaliseTrackType(_trackType);
 
     bool found = false;
     bool isGhost = GetFlags() & GAME_COMMAND_FLAG_GHOST;
@@ -291,14 +291,7 @@ GameActions::Result TrackRemoveAction::Execute() const
         if (tileElement->IsGhost() != isGhost)
             continue;
 
-        auto tileTrackType = tileElement->AsTrack()->GetTrackType();
-        switch (tileTrackType)
-        {
-            case TrackElemType::BeginStation:
-            case TrackElemType::MiddleStation:
-                tileTrackType = TrackElemType::EndStation;
-                break;
-        }
+        auto tileTrackType = normaliseTrackType(tileElement->AsTrack()->GetTrackType());
 
         if (tileTrackType != comparableTrackType)
             continue;
@@ -309,10 +302,11 @@ GameActions::Result TrackRemoveAction::Execute() const
 
     if (!found)
     {
-        LOG_WARNING(
+        LOG_ERROR(
             "Track Element not found. x = %d, y = %d, z = %d, d = %d, seq = %d.", _origin.x, _origin.y, _origin.z,
             _origin.direction, _sequence);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_TRACK_ELEMENT_NOT_FOUND);
     }
 
     RideId rideIndex = tileElement->AsTrack()->GetRideIndex();
@@ -322,22 +316,25 @@ GameActions::Result TrackRemoveAction::Execute() const
     auto ride = GetRide(rideIndex);
     if (ride == nullptr)
     {
-        LOG_WARNING("Ride not found. ride index = %d.", rideIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Ride not found. ride index = %d.", rideIndex);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_RIDE_NOT_FOUND);
     }
     const auto& ted = GetTrackElementDescriptor(trackType);
     auto sequenceIndex = tileElement->AsTrack()->GetSequenceIndex();
-    const PreviewTrack* trackBlock = ted.GetBlockForSequence(sequenceIndex);
-    if (trackBlock == nullptr)
+    if (sequenceIndex >= ted.numSequences)
     {
-        LOG_WARNING("Track block %d not found for track type %d.", sequenceIndex, trackType);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Track block %d not found for track type %d.", sequenceIndex, trackType);
+        return GameActions::Result(
+            GameActions::Status::InvalidParameters, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_TRACK_BLOCK_NOT_FOUND);
     }
 
     auto startLoc = _origin;
     startLoc.direction = tileElement->GetDirection();
 
-    auto rotatedTrackLoc = CoordsXYZ{ CoordsXY{ trackBlock->x, trackBlock->y }.Rotate(startLoc.direction), trackBlock->z };
+    const auto& currentTrackBlock = ted.sequences[sequenceIndex].clearance;
+    auto rotatedTrackLoc = CoordsXYZ{ CoordsXY{ currentTrackBlock.x, currentTrackBlock.y }.Rotate(startLoc.direction),
+                                      currentTrackBlock.z };
     startLoc.x -= rotatedTrackLoc.x;
     startLoc.y -= rotatedTrackLoc.y;
     startLoc.z -= rotatedTrackLoc.z;
@@ -347,10 +344,11 @@ GameActions::Result TrackRemoveAction::Execute() const
 
     money64 supportCosts = 0;
 
-    trackBlock = ted.Block;
-    for (; trackBlock->index != 255; trackBlock++)
+    for (uint8_t i = 0; i < ted.numSequences; i++)
     {
-        rotatedTrackLoc = CoordsXYZ{ CoordsXY{ trackBlock->x, trackBlock->y }.Rotate(startLoc.direction), trackBlock->z };
+        const auto& trackBlock = ted.sequences[i].clearance;
+
+        rotatedTrackLoc = CoordsXYZ{ CoordsXY{ trackBlock.x, trackBlock.y }.Rotate(startLoc.direction), trackBlock.z };
         auto mapLoc = CoordsXYZ{ startLoc.x, startLoc.y, startLoc.z } + rotatedTrackLoc;
 
         MapInvalidateTileFull(mapLoc);
@@ -371,7 +369,7 @@ GameActions::Result TrackRemoveAction::Execute() const
             if (tileElement->GetDirection() != _origin.direction)
                 continue;
 
-            if (tileElement->AsTrack()->GetSequenceIndex() != trackBlock->index)
+            if (tileElement->AsTrack()->GetSequenceIndex() != i)
                 continue;
 
             if (tileElement->AsTrack()->GetTrackType() != trackType)
@@ -386,13 +384,14 @@ GameActions::Result TrackRemoveAction::Execute() const
 
         if (!found)
         {
-            LOG_WARNING(
+            LOG_ERROR(
                 "Track Element not found. x = %d, y = %d, z = %d, d = %d, seq = %d.", mapLoc.x, mapLoc.y, mapLoc.z,
-                _origin.direction, trackBlock->index);
-            return GameActions::Result(GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+                _origin.direction, i);
+            return GameActions::Result(
+                GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_TRACK_ELEMENT_NOT_FOUND);
         }
 
-        int32_t entranceDirections = std::get<0>(ted.SequenceProperties);
+        int32_t entranceDirections = ted.sequences[0].flags;
         if (entranceDirections & TRACK_SEQUENCE_FLAG_ORIGIN && (tileElement->AsTrack()->GetSequenceIndex() == 0))
         {
             const auto removeElementResult = TrackRemoveStationElement({ mapLoc, _origin.direction }, rideIndex, 0);
@@ -406,8 +405,9 @@ GameActions::Result TrackRemoveAction::Execute() const
         auto* surfaceElement = MapGetSurfaceElementAt(mapLoc);
         if (surfaceElement == nullptr)
         {
-            LOG_WARNING("Surface Element not found. x = %d, y = %d", mapLoc.x, mapLoc.y);
-            return GameActions::Result(GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_NONE);
+            LOG_ERROR("Surface Element not found. x = %d, y = %d", mapLoc.x, mapLoc.y);
+            return GameActions::Result(
+                GameActions::Status::Unknown, STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS, STR_ERR_SURFACE_ELEMENT_NOT_FOUND);
         }
 
         int8_t _support_height = tileElement->BaseHeight - surfaceElement->BaseHeight;
@@ -433,14 +433,14 @@ GameActions::Result TrackRemoveAction::Execute() const
             }
         }
 
-        if (ride->GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_TRACK_MUST_BE_ON_WATER))
+        if (ride->GetRideTypeDescriptor().HasFlag(RtdFlag::trackMustBeOnWater))
         {
             surfaceElement->SetHasTrackThatNeedsWater(false);
         }
 
         InvalidateTestResults(*ride);
         FootpathQueueChainReset();
-        if (!gCheatsDisableClearanceChecks || !(tileElement->IsGhost()))
+        if (!GetGameState().Cheats.disableClearanceChecks || !(tileElement->IsGhost()))
         {
             FootpathRemoveEdgesAt(mapLoc, tileElement);
         }
@@ -469,7 +469,7 @@ GameActions::Result TrackRemoveAction::Execute() const
                 {
                     ride->window_invalidate_flags |= RIDE_INVALIDATE_RIDE_OPERATING;
                     RideMode newMode = RideMode::ContinuousCircuit;
-                    if (ride->type == RIDE_TYPE_LIM_LAUNCHED_ROLLER_COASTER)
+                    if (ride->mode == RideMode::PoweredLaunchBlockSectioned)
                     {
                         newMode = RideMode::PoweredLaunch;
                     }
@@ -478,6 +478,8 @@ GameActions::Result TrackRemoveAction::Execute() const
                     GameActions::ExecuteNested(&rideSetSetting);
                 }
 
+                break;
+            default:
                 break;
         }
 
@@ -493,11 +495,13 @@ GameActions::Result TrackRemoveAction::Execute() const
             case TrackElemType::CableLiftHill:
                 ride->num_block_brakes--;
                 break;
+            default:
+                break;
         }
     }
 
     money64 price = ride->GetRideTypeDescriptor().BuildCosts.TrackPrice;
-    price *= ted.PriceModifier;
+    price *= ted.priceModifier;
     price >>= 16;
     price = supportCosts + price;
     if (ride->lifecycle_flags & RIDE_LIFECYCLE_EVER_BEEN_OPENED)

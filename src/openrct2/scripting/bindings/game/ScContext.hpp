@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,23 +11,23 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "../../../OpenRCT2.h"
-#    include "../../../actions/GameAction.h"
-#    include "../../../interface/Screenshot.h"
-#    include "../../../localisation/Formatting.h"
-#    include "../../../object/ObjectManager.h"
-#    include "../../../scenario/Scenario.h"
-#    include "../../Duktape.hpp"
-#    include "../../HookEngine.h"
-#    include "../../IconNames.hpp"
-#    include "../../ScriptEngine.h"
-#    include "../game/ScConfiguration.hpp"
-#    include "../game/ScDisposable.hpp"
-#    include "../object/ScObjectManager.h"
-#    include "../ride/ScTrackSegment.h"
+    #include "../../../OpenRCT2.h"
+    #include "../../../actions/GameAction.h"
+    #include "../../../interface/Screenshot.h"
+    #include "../../../localisation/Formatting.h"
+    #include "../../../object/ObjectManager.h"
+    #include "../../../scenario/Scenario.h"
+    #include "../../Duktape.hpp"
+    #include "../../HookEngine.h"
+    #include "../../IconNames.hpp"
+    #include "../../ScriptEngine.h"
+    #include "../game/ScConfiguration.hpp"
+    #include "../game/ScDisposable.hpp"
+    #include "../object/ScObjectManager.h"
+    #include "../ride/ScTrackSegment.h"
 
-#    include <cstdio>
-#    include <memory>
+    #include <cstdio>
+    #include <memory>
 
 namespace OpenRCT2::Scripting
 {
@@ -126,6 +126,18 @@ namespace OpenRCT2::Scripting
             return "normal";
         }
 
+        bool paused_get()
+        {
+            return GameIsPaused();
+        }
+
+        void paused_set(const bool& value)
+        {
+            ThrowIfGameStateNotMutable();
+            if (value != GameIsPaused())
+                PauseToggle();
+        }
+
         void captureImage(const DukValue& options)
         {
             auto ctx = GetContext()->GetScriptEngine().GetContext();
@@ -133,8 +145,8 @@ namespace OpenRCT2::Scripting
             {
                 CaptureOptions captureOptions;
                 captureOptions.Filename = fs::u8path(AsOrDefault(options["filename"], ""));
-                captureOptions.Rotation = options["rotation"].as_int() & 3;
-                captureOptions.Zoom = ZoomLevel(options["zoom"].as_int());
+                captureOptions.Rotation = options["rotation"].as_uint() & 3;
+                captureOptions.Zoom = ZoomLevel(options["zoom"].as_uint());
                 captureOptions.Transparent = AsOrDefault(options["transparent"], false);
 
                 auto dukPosition = options["position"];
@@ -174,16 +186,16 @@ namespace OpenRCT2::Scripting
             return objectManager.getAllObjects(typez);
         }
 
-        DukValue getTrackSegment(track_type_t type)
+        DukValue getTrackSegment(uint16_t type)
         {
             auto ctx = GetContext()->GetScriptEngine().GetContext();
-            if (type >= TrackElemType::Count)
+            if (type >= EnumValue(TrackElemType::Count))
             {
                 return ToDuk(ctx, nullptr);
             }
             else
             {
-                return GetObjectAsDukValue(ctx, std::make_shared<ScTrackSegment>(type));
+                return GetObjectAsDukValue(ctx, std::make_shared<ScTrackSegment>(static_cast<TrackElemType>(type)));
             }
         }
 
@@ -192,9 +204,9 @@ namespace OpenRCT2::Scripting
             auto ctx = GetContext()->GetScriptEngine().GetContext();
 
             std::vector<DukValue> result;
-            for (track_type_t type = 0; type < TrackElemType::Count; type++)
+            for (uint16_t type = 0; type < EnumValue(TrackElemType::Count); type++)
             {
-                auto obj = std::make_shared<ScTrackSegment>(type);
+                auto obj = std::make_shared<ScTrackSegment>(static_cast<TrackElemType>(type));
                 if (obj != nullptr)
                 {
                     result.push_back(GetObjectAsDukValue(ctx, obj));
@@ -255,13 +267,14 @@ namespace OpenRCT2::Scripting
             return 1;
         }
 
-#    ifdef _MSC_VER
+    #ifdef _MSC_VER
         // HACK workaround to resolve issue #14853
         //      The exception thrown in duk_error was causing a crash when RAII kicked in for this lambda.
         //      Only ensuring it was not in the same generated method fixed it.
         __declspec(noinline)
-#    endif
-            std::shared_ptr<ScDisposable> CreateSubscription(HOOK_TYPE hookType, const DukValue& callback)
+    #endif
+        std::shared_ptr<ScDisposable>
+            CreateSubscription(HOOK_TYPE hookType, const DukValue& callback)
         {
             auto owner = _execInfo.GetCurrentPlugin();
             auto cookie = _hookEngine.Subscribe(hookType, owner, callback);
@@ -433,6 +446,7 @@ namespace OpenRCT2::Scripting
             dukglue_register_property(ctx, &ScContext::sharedStorage_get, nullptr, "sharedStorage");
             dukglue_register_method(ctx, &ScContext::getParkStorage, "getParkStorage");
             dukglue_register_property(ctx, &ScContext::mode_get, nullptr, "mode");
+            dukglue_register_property(ctx, &ScContext::paused_get, &ScContext::paused_set, "paused");
             dukglue_register_method(ctx, &ScContext::captureImage, "captureImage");
             dukglue_register_method(ctx, &ScContext::getObject, "getObject");
             dukglue_register_method(ctx, &ScContext::getAllObjects, "getAllObjects");

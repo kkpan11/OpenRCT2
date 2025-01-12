@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,12 +11,13 @@
 
 #include <type_traits>
 
-namespace Meta
+namespace OpenRCT2::Meta
 {
     /**
      * Meta function for checking that all Conditions are true types.
      */
-    template<typename... TConditions> struct all : std::true_type
+    template<typename... TConditions>
+    struct all : std::true_type
     {
     };
 
@@ -25,6 +26,7 @@ namespace Meta
     {
     };
 
-    template<typename TType, typename... TTypes> using all_convertible = all<std::is_convertible<TTypes, TType>...>;
+    template<typename TType, typename... TTypes>
+    using all_convertible = all<std::is_convertible<TTypes, TType>...>;
 
-} // namespace Meta
+} // namespace OpenRCT2::Meta

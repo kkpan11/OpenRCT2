@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,9 +10,10 @@
 #include "Drawing.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../Game.h"
+#include "../GameState.h"
 #include "../OpenRCT2.h"
-#include "../common.h"
 #include "../config/Config.h"
 #include "../core/Guard.hpp"
 #include "../object/Object.h"
@@ -25,121 +26,61 @@
 #include "../world/Location.hpp"
 #include "LightFX.h"
 
+#include <array>
+#include <cassert>
 #include <cstring>
+#include <numeric>
 
-GamePalette gPalette;
+using namespace OpenRCT2;
+using namespace OpenRCT2::Drawing;
 
-const PaletteMap& PaletteMap::GetDefault()
+static auto _defaultPaletteMapping = []() {
+    std::array<uint8_t, 256> res;
+    std::iota(res.begin(), res.end(), 0);
+    return res;
+}();
+
+PaletteMap PaletteMap::GetDefault()
 {
-    static bool initialised = false;
-    static uint8_t data[256];
-    static PaletteMap defaultMap(data);
-    if (!initialised)
-    {
-        for (size_t i = 0; i < sizeof(data); i++)
-        {
-            data[i] = static_cast<uint8_t>(i);
-        }
-        initialised = true;
-    }
-    return defaultMap;
+    return PaletteMap(_defaultPaletteMapping);
 }
 
 uint8_t& PaletteMap::operator[](size_t index)
 {
-    assert(index < _dataLength);
-
-    // Provide safety in release builds
-    if (index >= _dataLength)
-    {
-        static uint8_t dummy;
-        return dummy;
-    }
-
     return _data[index];
 }
 
 uint8_t PaletteMap::operator[](size_t index) const
 {
-    assert(index < _dataLength);
-
-    // Provide safety in release builds
-    if (index >= _dataLength)
-    {
-        return 0;
-    }
-
     return _data[index];
 }
 
 uint8_t PaletteMap::Blend(uint8_t src, uint8_t dst) const
 {
+#ifdef _DEBUG
     // src = 0 would be transparent so there is no blend palette for that, hence (src - 1)
     assert(src != 0 && (src - 1) < _numMaps);
     assert(dst < _mapLength);
+#endif
     auto idx = ((src - 1) * 256) + dst;
-    return (*this)[idx];
+    return _data[idx];
 }
 
 void PaletteMap::Copy(size_t dstIndex, const PaletteMap& src, size_t srcIndex, size_t length)
 {
-    auto maxLength = std::min(_mapLength - srcIndex, _mapLength - dstIndex);
+    auto maxLength = std::min(_data.size() - srcIndex, _data.size() - dstIndex);
     assert(length <= maxLength);
     auto copyLength = std::min(length, maxLength);
-    std::memcpy(&_data[dstIndex], &src._data[srcIndex], copyLength);
+    std::copy(src._data.begin() + srcIndex, src._data.begin() + srcIndex + copyLength, _data.begin() + dstIndex);
 }
 
-uint8_t gGamePalette[256 * 4];
+OpenRCT2::Drawing::GamePalette gPalette;
+OpenRCT2::Drawing::GamePalette gGamePalette;
 uint32_t gPaletteEffectFrame;
 
 ImageId gPickupPeepImage;
 int32_t gPickupPeepX;
 int32_t gPickupPeepY;
-
-/**
- * 12 elements from 0xF3 are the peep top colour, 12 elements from 0xCA are peep trouser colour
- *
- * rct2: 0x0009ABE0C
- */
-// clang-format off
-thread_local uint8_t gPeepPalette[256] = {
-    0x00, 0xF3, 0xF4, 0xF5, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F,
-    0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
-    0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F,
-    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
-    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
-    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F,
-    0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F,
-    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F,
-    0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF,
-    0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF,
-    0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF,
-    0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB, 0xDC, 0xDD, 0xDE, 0xDF,
-    0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF,
-    0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
-};
-
-/** rct2: 0x009ABF0C */
-thread_local uint8_t gOtherPalette[256] = {
-    0x00, 0xF3, 0xF4, 0xF5, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F,
-    0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
-    0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F,
-    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
-    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
-    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F,
-    0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F,
-    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F,
-    0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF,
-    0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF,
-    0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF,
-    0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB, 0xDC, 0xDD, 0xDE, 0xDF,
-    0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF,
-    0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
-};
 
 // Originally 0x9ABE04
 uint8_t gTextPalette[0x8] = {
@@ -345,7 +286,7 @@ enum
     SPR_PALETTE_GLASS_VOID,
 };
 
-const FilterPaletteID GlassPaletteIds[COLOUR_COUNT] = {
+static constexpr FilterPaletteID GlassPaletteIds[COLOUR_COUNT] = {
     FilterPaletteID::PaletteGlassBlack,
     FilterPaletteID::PaletteGlassGrey,
     FilterPaletteID::PaletteGlassWhite,
@@ -405,7 +346,8 @@ const FilterPaletteID GlassPaletteIds[COLOUR_COUNT] = {
 };
 
 // Previously 0x97FCBC use it to get the correct palette from g1_elements
-static constexpr uint16_t palette_to_g1_offset[PALETTE_TOTAL_OFFSETS] = {
+// clang-format off
+static constexpr uint16_t palette_to_g1_offset[kPaletteTotalOffsets] = {
     SPR_PALETTE_BLACK,
     SPR_PALETTE_GREY,
     SPR_PALETTE_WHITE,
@@ -462,7 +404,6 @@ static constexpr uint16_t palette_to_g1_offset[PALETTE_TOTAL_OFFSETS] = {
     SPR_PALETTE_DULL_BROWN_LIGHT,
     SPR_PALETTE_INVISIBLE,
     SPR_PALETTE_VOID,
-
 
     SPR_PALETTE_WATER,      // PaletteWater (water)
     SPR_PALETTE_3100,
@@ -711,12 +652,12 @@ ImageCatalogue ImageId::GetCatalogue() const
 
 static auto GetMaskFunction()
 {
-    if (AVX2Available())
+    if (Platform::AVX2Available())
     {
         LOG_VERBOSE("registering AVX2 mask function");
         return MaskAvx2;
     }
-    else if (SSE41Available())
+    else if (Platform::SSE41Available())
     {
         LOG_VERBOSE("registering SSE4.1 mask function");
         return MaskSse4_1;
@@ -755,16 +696,17 @@ void GfxTransposePalette(int32_t pal, uint8_t product)
     {
         int32_t width = g1->width;
         int32_t x = g1->x_offset;
-        uint8_t* dest_pointer = &gGamePalette[x * 4];
         uint8_t* source_pointer = g1->offset;
 
         for (; width > 0; width--)
         {
-            dest_pointer[0] = (source_pointer[0] * product) >> 8;
-            dest_pointer[1] = (source_pointer[1] * product) >> 8;
-            dest_pointer[2] = (source_pointer[2] * product) >> 8;
+            auto& dest_pointer = gGamePalette[x];
+            dest_pointer.Blue = (source_pointer[0] * product) >> 8;
+            dest_pointer.Green = (source_pointer[1] * product) >> 8;
+            dest_pointer.Red = (source_pointer[2] * product) >> 8;
             source_pointer += 3;
-            dest_pointer += 4;
+
+            x++;
         }
         UpdatePalette(gGamePalette, 10, 236);
     }
@@ -781,13 +723,12 @@ void LoadPalette()
         return;
     }
 
+    uint32_t palette = SPR_DEFAULT_PALETTE;
+
     auto water_type = OpenRCT2::ObjectManager::GetObjectEntry<WaterObjectEntry>(0);
-
-    uint32_t palette = 0x5FC;
-
     if (water_type != nullptr)
     {
-        Guard::Assert(water_type->image_id != 0xFFFFFFFF, "Failed to load water palette");
+        Guard::Assert(water_type->image_id != ImageIndexUndefined, "Failed to load water palette");
         palette = water_type->image_id;
     }
 
@@ -797,14 +738,14 @@ void LoadPalette()
         int32_t width = g1->width;
         int32_t x = g1->x_offset;
         uint8_t* src = g1->offset;
-        uint8_t* dst = &gGamePalette[x * 4];
         for (; width > 0; width--)
         {
-            dst[0] = src[0];
-            dst[1] = src[1];
-            dst[2] = src[2];
+            auto& dst = gGamePalette[x];
+            dst.Blue = src[0];
+            dst.Green = src[1];
+            dst.Red = src[2];
             src += 3;
-            dst += 4;
+            x++;
         }
     }
     UpdatePalette(gGamePalette, 10, 236);
@@ -831,6 +772,7 @@ void GfxInvalidateScreen()
  */
 bool ClipDrawPixelInfo(DrawPixelInfo& dst, DrawPixelInfo& src, const ScreenCoordsXY& coords, int32_t width, int32_t height)
 {
+    assert(src.zoom_level == ZoomLevel{ 0 });
     int32_t right = coords.x + width;
     int32_t bottom = coords.y + height;
 
@@ -858,7 +800,7 @@ bool ClipDrawPixelInfo(DrawPixelInfo& dst, DrawPixelInfo& src, const ScreenCoord
         uint16_t clippedFromTop = coords.y - dst.y;
         dst.height -= clippedFromTop;
         dst.y = coords.y;
-        uint32_t bitsPlus = (dst.pitch + dst.width) * clippedFromTop;
+        uint32_t bitsPlus = dst.LineStride() * clippedFromTop;
         dst.bits += bitsPlus;
     }
 
@@ -905,7 +847,7 @@ void GfxDrawPickedUpPeep(DrawPixelInfo& dpi)
 
 std::optional<uint32_t> GetPaletteG1Index(colour_t paletteId)
 {
-    if (paletteId < PALETTE_TOTAL_OFFSETS)
+    if (paletteId < kPaletteTotalOffsets)
     {
         return palette_to_g1_offset[paletteId];
     }
@@ -926,25 +868,20 @@ std::optional<PaletteMap> GetPaletteMapForColour(colour_t paletteId)
     return std::nullopt;
 }
 
-size_t DrawPixelInfo::GetBytesPerRow() const
-{
-    return static_cast<size_t>(width) + pitch;
-}
-
 uint8_t* DrawPixelInfo::GetBitsOffset(const ScreenCoordsXY& pos) const
 {
-    return bits + pos.x + (pos.y * GetBytesPerRow());
+    return bits + pos.x + pos.y * LineStride();
 }
 
 DrawPixelInfo DrawPixelInfo::Crop(const ScreenCoordsXY& pos, const ScreenSize& size) const
 {
     DrawPixelInfo result = *this;
     result.bits = GetBitsOffset(pos);
-    result.x = static_cast<int16_t>(pos.x);
-    result.y = static_cast<int16_t>(pos.y);
-    result.width = static_cast<int16_t>(size.width);
-    result.height = static_cast<int16_t>(size.height);
-    result.pitch = static_cast<int16_t>(width + pitch - size.width);
+    result.x = pos.x;
+    result.y = pos.y;
+    result.width = size.width;
+    result.height = size.height;
+    result.pitch = width + pitch - size.width;
     return result;
 }
 
@@ -953,19 +890,18 @@ FilterPaletteID GetGlassPaletteId(colour_t c)
     return GlassPaletteIds[c];
 }
 
-void UpdatePalette(const uint8_t* colours, int32_t start_index, int32_t num_colours)
+void UpdatePalette(std::span<const OpenRCT2::Drawing::PaletteBGRA> palette, int32_t start_index, int32_t num_colours)
 {
-    colours += start_index * 4;
-
     for (int32_t i = start_index; i < num_colours + start_index; i++)
     {
-        uint8_t r = colours[2];
-        uint8_t g = colours[1];
-        uint8_t b = colours[0];
+        const auto& colour = palette[i];
+        uint8_t b = colour.Blue;
+        uint8_t g = colour.Green;
+        uint8_t r = colour.Red;
 
-        if (LightFXIsAvailable())
+        if (LightFx::IsAvailable())
         {
-            LightFXApplyPaletteFilter(i, &r, &g, &b);
+            LightFx::ApplyPaletteFilter(i, &r, &g, &b);
         }
         else
         {
@@ -978,18 +914,17 @@ void UpdatePalette(const uint8_t* colours, int32_t start_index, int32_t num_colo
             }
         }
 
-        gPalette[i].Red = r;
-        gPalette[i].Green = g;
         gPalette[i].Blue = b;
+        gPalette[i].Green = g;
+        gPalette[i].Red = r;
         gPalette[i].Alpha = 0;
-        colours += 4;
     }
 
     // Fix #1749 and #6535: rainbow path, donut shop and pause button contain black spots that should be white.
-    gPalette[255].Alpha = 0;
-    gPalette[255].Red = 255;
-    gPalette[255].Green = 255;
     gPalette[255].Blue = 255;
+    gPalette[255].Green = 255;
+    gPalette[255].Red = 255;
+    gPalette[255].Alpha = 0;
 
     if (!gOpenRCT2Headless)
     {
@@ -997,27 +932,210 @@ void UpdatePalette(const uint8_t* colours, int32_t start_index, int32_t num_colo
     }
 }
 
-void RefreshVideo(bool recreateWindow)
+enum
 {
-    if (recreateWindow)
+    SPR_GAME_PALETTE_DEFAULT = 1532,
+    SPR_GAME_PALETTE_WATER = 1533,
+    SPR_GAME_PALETTE_WATER_DARKER_1 = 1534,
+    SPR_GAME_PALETTE_WATER_DARKER_2 = 1535,
+    SPR_GAME_PALETTE_3 = 1536,
+    SPR_GAME_PALETTE_3_DARKER_1 = 1537,
+    SPR_GAME_PALETTE_3_DARKER_2 = 1538,
+    SPR_GAME_PALETTE_4 = 1539,
+    SPR_GAME_PALETTE_4_DARKER_1 = 1540,
+    SPR_GAME_PALETTE_4_DARKER_2 = 1541,
+};
+
+/**
+ *
+ *  rct2: 0x006838BD
+ */
+void UpdatePaletteEffects()
+{
+    auto water_type = OpenRCT2::ObjectManager::GetObjectEntry<WaterObjectEntry>(0);
+
+    if (gClimateLightningFlash == 1)
     {
-        ContextRecreateWindow();
+        // Change palette to lighter colour during lightning
+        int32_t palette = SPR_GAME_PALETTE_DEFAULT;
+
+        if (water_type != nullptr)
+        {
+            palette = water_type->image_id;
+        }
+        const G1Element* g1 = GfxGetG1Element(palette);
+        if (g1 != nullptr)
+        {
+            int32_t xoffset = g1->x_offset;
+
+            for (int32_t i = 0; i < g1->width; i++)
+            {
+                auto& paletteOffset = gGamePalette[xoffset + i];
+                paletteOffset.Blue = -((0xFF - g1->offset[(i * 3) + 0]) / 2) - 1;
+                paletteOffset.Green = -((0xFF - g1->offset[(i * 3) + 1]) / 2) - 1;
+                paletteOffset.Red = -((0xFF - g1->offset[(i * 3) + 2]) / 2) - 1;
+            }
+
+            UpdatePalette(gGamePalette, kPaletteOffsetDynamic, kPaletteLengthDynamic);
+        }
+        gClimateLightningFlash++;
     }
     else
     {
-        DrawingEngineDispose();
-        DrawingEngineInit();
-        DrawingEngineResize();
-    }
+        if (gClimateLightningFlash == 2)
+        {
+            // Change palette back to normal after lightning
+            int32_t palette = SPR_GAME_PALETTE_DEFAULT;
 
+            if (water_type != nullptr)
+            {
+                palette = water_type->image_id;
+            }
+
+            const G1Element* g1 = GfxGetG1Element(palette);
+            if (g1 != nullptr)
+            {
+                int32_t xoffset = g1->x_offset;
+
+                for (int32_t i = 0; i < g1->width; i++)
+                {
+                    auto& paletteOffset = gGamePalette[xoffset + i];
+                    paletteOffset.Blue = g1->offset[(i * 3) + 0];
+                    paletteOffset.Green = g1->offset[(i * 3) + 1];
+                    paletteOffset.Red = g1->offset[(i * 3) + 2];
+                }
+            }
+        }
+
+        // Animate the water/lava/chain movement palette
+        uint32_t shade = 0;
+        if (Config::Get().general.RenderWeatherGloom)
+        {
+            auto paletteId = ClimateGetWeatherGloomPaletteId(GetGameState().ClimateCurrent);
+            if (paletteId != FilterPaletteID::PaletteNull)
+            {
+                shade = 1;
+                if (paletteId != FilterPaletteID::PaletteDarken1)
+                {
+                    shade = 2;
+                }
+            }
+        }
+        uint32_t j = gPaletteEffectFrame;
+        j = ((static_cast<uint16_t>((~j / 2) * 128) * 15) >> 16);
+        uint32_t waterId = SPR_GAME_PALETTE_WATER;
+        if (water_type != nullptr)
+        {
+            waterId = water_type->palette_index_1;
+        }
+        const G1Element* g1 = GfxGetG1Element(shade + waterId);
+        if (g1 != nullptr)
+        {
+            uint8_t* vs = &g1->offset[j * 3];
+            int32_t n = kPaletteLengthWaterWaves;
+            for (int32_t i = 0; i < n; i++)
+            {
+                auto& vd = gGamePalette[kPaletteOffsetWaterWaves + i];
+                vd.Blue = vs[0];
+                vd.Green = vs[1];
+                vd.Red = vs[2];
+                vs += 9;
+                if (vs >= &g1->offset[9 * n])
+                {
+                    vs -= 9 * n;
+                }
+            }
+        }
+
+        waterId = SPR_GAME_PALETTE_3;
+        if (water_type != nullptr)
+        {
+            waterId = water_type->palette_index_2;
+        }
+
+        g1 = GfxGetG1Element(shade + waterId);
+        if (g1 != nullptr)
+        {
+            uint8_t* vs = &g1->offset[j * 3];
+            int32_t n = kPaletteLengthWaterSparkles;
+            for (int32_t i = 0; i < n; i++)
+            {
+                auto& vd = gGamePalette[kPaletteOffsetWaterSparkles + i];
+                vd.Blue = vs[0];
+                vd.Green = vs[1];
+                vd.Red = vs[2];
+                vs += 9;
+                if (vs >= &g1->offset[9 * n])
+                {
+                    vs -= 9 * n;
+                }
+            }
+        }
+
+        j = (static_cast<uint16_t>(gPaletteEffectFrame * -960) * 3) >> 16;
+        waterId = SPR_GAME_PALETTE_4;
+        g1 = GfxGetG1Element(shade + waterId);
+        if (g1 != nullptr)
+        {
+            uint8_t* vs = &g1->offset[j * 3];
+            int32_t n = 3;
+            for (int32_t i = 0; i < n; i++)
+            {
+                auto& vd = gGamePalette[PALETTE_INDEX_243 + i];
+                vd.Blue = vs[0];
+                vd.Green = vs[1];
+                vd.Red = vs[2];
+                vs += 3;
+                if (vs >= &g1->offset[3 * n])
+                {
+                    vs -= 3 * n;
+                }
+            }
+        }
+
+        UpdatePalette(gGamePalette, kPaletteOffsetAnimated, kPaletteLengthAnimated);
+        if (gClimateLightningFlash == 2)
+        {
+            UpdatePalette(gGamePalette, kPaletteOffsetDynamic, kPaletteLengthDynamic);
+            gClimateLightningFlash = 0;
+        }
+    }
+}
+
+void RefreshVideo()
+{
+    ContextRecreateWindow();
     DrawingEngineSetPalette(gPalette);
     GfxInvalidateScreen();
 }
 
 void ToggleWindowedMode()
 {
-    int32_t targetMode = gConfigGeneral.FullscreenMode == 0 ? 2 : 0;
+    int32_t targetMode = Config::Get().general.FullscreenMode == 0 ? 2 : 0;
     ContextSetFullscreenMode(targetMode);
-    gConfigGeneral.FullscreenMode = targetMode;
-    ConfigSaveDefault();
+    Config::Get().general.FullscreenMode = targetMode;
+    Config::Save();
+}
+
+void DebugDPI(DrawPixelInfo& dpi)
+{
+    ScreenCoordsXY topLeft = { dpi.x, dpi.y };
+    ScreenCoordsXY bottomRight = { dpi.x + dpi.width - 1, dpi.y + dpi.height - 1 };
+    ScreenCoordsXY topRight = { dpi.x + dpi.width - 1, dpi.y };
+    ScreenCoordsXY bottomLeft = { dpi.x, dpi.y + dpi.height - 1 };
+
+    GfxDrawLine(dpi, { topLeft, bottomRight }, PALETTE_INDEX_136);
+    GfxDrawLine(dpi, { bottomLeft, topRight }, PALETTE_INDEX_136);
+    GfxDrawLine(dpi, { topLeft, topRight }, PALETTE_INDEX_129);
+    GfxDrawLine(dpi, { topRight, bottomRight }, PALETTE_INDEX_129);
+    GfxDrawLine(dpi, { bottomLeft, bottomRight }, PALETTE_INDEX_129);
+    GfxDrawLine(dpi, { topLeft, bottomLeft }, PALETTE_INDEX_129);
+
+    GfxDrawLine(dpi, { topLeft, topLeft + ScreenCoordsXY{ 4, 0 } }, PALETTE_INDEX_136);
+
+    const auto str = std::to_string(dpi.x);
+    DrawText(dpi, ScreenCoordsXY{ dpi.x, dpi.y }, { COLOUR_WHITE, FontStyle::Tiny }, str.c_str());
+
+    const auto str2 = std::to_string(dpi.y);
+    DrawText(dpi, ScreenCoordsXY{ dpi.x, dpi.y + 6 }, { COLOUR_WHITE, FontStyle::Tiny }, str2.c_str());
 }

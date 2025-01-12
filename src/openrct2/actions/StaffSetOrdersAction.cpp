@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,12 +10,14 @@
 #include "StaffSetOrdersAction.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../entity/EntityRegistry.h"
 #include "../entity/Staff.h"
 #include "../interface/Window.h"
-#include "../localisation/Localisation.h"
 #include "../localisation/StringIds.h"
 #include "../windows/Intent.h"
+
+using namespace OpenRCT2;
 
 StaffSetOrdersAction::StaffSetOrdersAction(EntityId spriteIndex, uint8_t ordersId)
     : _spriteIndex(spriteIndex)
@@ -45,6 +47,7 @@ GameActions::Result StaffSetOrdersAction::Query() const
 {
     if (_spriteIndex.ToUnderlying() >= MAX_ENTITIES || _spriteIndex.IsNull())
     {
+        LOG_ERROR("Invalid sprite index %u", _spriteIndex);
         return GameActions::Result(
             GameActions::Status::InvalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_VALUE_OUT_OF_RANGE);
     }
@@ -53,7 +56,7 @@ GameActions::Result StaffSetOrdersAction::Query() const
     if (staff == nullptr
         || (staff->AssignedStaffType != StaffType::Handyman && staff->AssignedStaffType != StaffType::Mechanic))
     {
-        LOG_WARNING("Invalid game command for sprite %u", _spriteIndex);
+        LOG_ERROR("Staff orders can't be changed for staff of type %u", _spriteIndex);
         return GameActions::Result(
             GameActions::Status::InvalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_ACTION_INVALID_FOR_THAT_STAFF_TYPE);
     }
@@ -66,7 +69,7 @@ GameActions::Result StaffSetOrdersAction::Execute() const
     auto* staff = TryGetEntity<Staff>(_spriteIndex);
     if (staff == nullptr)
     {
-        LOG_WARNING("Invalid game command for sprite %u", _spriteIndex);
+        LOG_ERROR("Staff entity not found for spriteIndex %u", _spriteIndex);
         return GameActions::Result(GameActions::Status::InvalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_STAFF_NOT_FOUND);
     }
     staff->StaffOrders = _ordersId;

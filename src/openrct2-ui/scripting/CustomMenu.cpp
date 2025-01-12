@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,11 +9,16 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "CustomMenu.h"
+    #include "CustomMenu.h"
 
-#    include <openrct2-ui/input/ShortcutManager.h>
-#    include <openrct2/Input.h>
-#    include <openrct2/world/Map.h>
+    #include "../interface/Viewport.h"
+
+    #include <openrct2-ui/UiContext.h>
+    #include <openrct2-ui/input/ShortcutManager.h>
+    #include <openrct2/Input.h>
+    #include <openrct2/ui/UiContext.h>
+    #include <openrct2/ui/WindowManager.h>
+    #include <openrct2/world/Map.h>
 
 using namespace OpenRCT2;
 using namespace OpenRCT2::Ui;
@@ -79,19 +84,21 @@ namespace OpenRCT2::Scripting
         { "banner", ViewportInteractionItem::Banner },
     });
 
-    template<> DukValue ToDuk(duk_context* ctx, const CursorID& cursorId)
+    template<>
+    DukValue ToDuk(duk_context* ctx, const CursorID& cursorId)
     {
         auto value = EnumValue(cursorId);
         if (value < std::size(CursorNames))
         {
             auto str = CursorNames[value];
             duk_push_lstring(ctx, str.data(), str.size());
-            DukValue::take_from_stack(ctx);
+            return DukValue::take_from_stack(ctx);
         }
-        return {};
+        return ToDuk(ctx, undefined);
     }
 
-    template<> CursorID FromDuk(const DukValue& s)
+    template<>
+    CursorID FromDuk(const DukValue& s)
     {
         if (s.type() == DukValue::Type::STRING)
         {
@@ -192,7 +199,7 @@ namespace OpenRCT2::Scripting
             obj.Set("screenCoords", ToDuk(ctx, screenCoords));
             obj.Set("mapCoords", ToDuk(ctx, info.Loc));
 
-            if (info.SpriteType == ViewportInteractionItem::Entity && info.Entity != nullptr)
+            if (info.interactionType == ViewportInteractionItem::Entity && info.Entity != nullptr)
             {
                 obj.Set("entityId", info.Entity->Id.ToUnderlying());
             }
@@ -261,7 +268,8 @@ namespace OpenRCT2::Scripting
                 customTool.onUp = dukValue["onUp"];
                 customTool.onFinish = dukValue["onFinish"];
 
-                auto toolbarWindow = WindowFindByClass(WindowClass::TopToolbar);
+                auto* windowMgr = GetContext()->GetUiContext()->GetWindowManager();
+                auto toolbarWindow = windowMgr->FindByClass(WindowClass::TopToolbar);
                 if (toolbarWindow != nullptr)
                 {
                     // Use a widget that does not exist on top toolbar but also make sure it isn't -1 as that

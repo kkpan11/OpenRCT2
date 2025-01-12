@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,11 +8,19 @@
  *****************************************************************************/
 #include "MazePlaceTrackAction.h"
 
+#include "../Diagnostic.h"
+#include "../GameState.h"
 #include "../management/Finance.h"
+#include "../ride/MazeCost.h"
 #include "../ride/RideData.h"
 #include "../ride/TrackData.h"
-#include "../ride/gentle/Maze.h"
 #include "../world/ConstructionClearance.h"
+#include "../world/Footpath.h"
+#include "../world/Wall.h"
+#include "../world/tile_element/SurfaceElement.h"
+#include "../world/tile_element/TrackElement.h"
+
+using namespace OpenRCT2;
 
 using namespace OpenRCT2::TrackMetaData;
 
@@ -56,7 +64,8 @@ GameActions::Result MazePlaceTrackAction::Query() const
         res.ErrorMessage = STR_OFF_EDGE_OF_MAP;
         return res;
     }
-    if (!MapIsLocationOwned(_loc) && !gCheatsSandboxMode)
+    auto& gameState = GetGameState();
+    if (!MapIsLocationOwned(_loc) && !gameState.Cheats.sandboxMode)
     {
         res.Error = GameActions::Status::NotOwned;
         res.ErrorMessage = STR_LAND_NOT_OWNED_BY_PARK;
@@ -81,9 +90,9 @@ GameActions::Result MazePlaceTrackAction::Query() const
     auto clearanceHeight = _loc.z + MAZE_CLEARANCE_HEIGHT;
 
     auto heightDifference = baseHeight - surfaceElement->GetBaseZ();
-    if (heightDifference >= 0 && !gCheatsDisableSupportLimits)
+    if (heightDifference >= 0 && !gameState.Cheats.disableSupportLimits)
     {
-        heightDifference /= COORDS_Z_PER_TINY_Z;
+        heightDifference /= kCoordsZPerTinyZ;
 
         auto* ride = GetRide(_rideIndex);
         const auto& rtd = ride->GetRideTypeDescriptor();
@@ -121,8 +130,9 @@ GameActions::Result MazePlaceTrackAction::Query() const
     auto ride = GetRide(_rideIndex);
     if (ride == nullptr || ride->type == RIDE_TYPE_NULL)
     {
+        LOG_ERROR("Ride not found for rideIndex %u", _rideIndex);
         res.Error = GameActions::Status::InvalidParameters;
-        res.ErrorMessage = STR_INVALID_SELECTION_OF_OBJECTS;
+        res.ErrorMessage = STR_ERR_RIDE_NOT_FOUND;
         return res;
     }
 
@@ -142,8 +152,9 @@ GameActions::Result MazePlaceTrackAction::Execute() const
     auto ride = GetRide(_rideIndex);
     if (ride == nullptr)
     {
+        LOG_ERROR("Ride not found for rideIndex %u", _rideIndex);
         res.Error = GameActions::Status::InvalidParameters;
-        res.ErrorMessage = STR_NONE;
+        res.ErrorMessage = STR_ERR_RIDE_NOT_FOUND;
         return res;
     }
 

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,45 +9,56 @@
 
 #pragma once
 
+#include "Cheats.h"
 #include "Date.h"
+#include "Editor.h"
+#include "Limits.h"
+#include "core/EnumUtils.hpp"
+#include "interface/ZoomLevel.h"
+#include "management/Award.h"
 #include "management/Finance.h"
+#include "management/Marketing.h"
 #include "management/NewsItem.h"
+#include "ride/Ride.h"
+#include "ride/RideRatings.h"
 #include "scenario/Scenario.h"
 #include "world/Banner.h"
 #include "world/Climate.h"
 #include "world/Location.hpp"
+#include "world/Park.h"
+#include "world/ScenerySelection.h"
 
 #include <array>
-#include <chrono>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 namespace OpenRCT2
 {
-    class Park;
-
     struct GameState_t
     {
+        ::OpenRCT2::Park::ParkData Park{};
+        std::string PluginStorage;
         uint32_t CurrentTicks{};
-        uint64_t ParkFlags;
-        uint16_t ParkRating;
-        money64 ParkEntranceFee;
-        std::vector<CoordsXYZD> ParkEntrances;
-        uint32_t ParkSize;
-        money64 ParkValue;
-        money64 ParkValueHistory[FINANCE_GRAPH_SIZE];
-        uint8_t ParkRatingHistory[32];
+        ::OpenRCT2::Date Date;
+        money64 CompanyValue;
+        // The total profit for the entire scenario that precedes the current financial table.
+        money64 HistoricalProfit;
+        money64 ConstructionRightsPrice;
+        money64 CurrentExpenditure;
+        money64 CurrentProfit;
+        uint32_t GuestsInParkHistory[kGuestsInParkHistorySize];
         ClimateType Climate;
         ClimateState ClimateCurrent;
         ClimateState ClimateNext;
         uint16_t ClimateUpdateTimer;
         money64 Cash;
+        money64 CashHistory[kFinanceHistorySize];
         money64 InitialCash;
         money64 GuestInitialCash;
         uint8_t GuestInitialHappiness;
         uint8_t GuestInitialHunger;
         uint8_t GuestInitialThirst;
+        uint8_t GuestChangeModifier;
         uint32_t NextGuestNumber;
         uint32_t NumGuestsInPark;
         uint32_t NumGuestsHeadingForPark;
@@ -57,7 +68,7 @@ namespace OpenRCT2
         money64 TotalIncomeFromAdmissions;
         money64 TotalRideValueForMoney;
         uint16_t WeeklyProfitAverageDivisor;
-        money64 WeeklyProfitHistory[FINANCE_GRAPH_SIZE];
+        money64 WeeklyProfitHistory[kFinanceHistorySize];
         Objective ScenarioObjective;
         uint16_t ScenarioParkRatingWarningDays;
         money64 ScenarioCompletedCompanyValue;
@@ -65,21 +76,41 @@ namespace OpenRCT2
         money64 BankLoan;
         uint8_t BankLoanInterestRate;
         money64 MaxBankLoan;
+        money64 ExpenditureTable[kExpenditureTableMonthCount][EnumValue(ExpenditureType::Count)];
         random_engine_t ScenarioRand;
         TileCoordsXY MapSize;
+        money64 LandPrice;
+
+        ::EditorStep EditorStep;
 
         SCENARIO_CATEGORY ScenarioCategory;
         std::string ScenarioName;
         std::string ScenarioDetails;
         std::string ScenarioCompletedBy;
+        std::string ScenarioFileName;
 
         std::vector<Banner> Banners;
+        Entity_t Entities[MAX_ENTITIES]{};
+        // Ride storage for all the rides in the park, rides with RideId::Null are considered free.
+        std::array<Ride, OpenRCT2::Limits::kMaxRidesInPark> Rides{};
+        size_t RidesEndOfUsedRange{};
+        ::RideRatingUpdateStates RideRatingUpdateStates;
+        std::vector<TileElement> TileElements;
+
+        std::vector<ScenerySelection> RestrictedScenery;
+
+        std::vector<PeepSpawn> PeepSpawns;
+        uint8_t PeepWarningThrottle[16];
 
         News::ItemQueues NewsItems;
+
+        uint16_t GrassSceneryTileLoopPosition;
+        CoordsXY WidePathTileLoopPosition;
 
         colour_t StaffHandymanColour;
         colour_t StaffMechanicColour;
         colour_t StaffSecurityColour;
+        uint64_t SamePriceThroughoutPark{};
 
         uint8_t ResearchFundingLevel;
         uint8_t ResearchPriorities;
@@ -94,6 +125,16 @@ namespace OpenRCT2
         std::vector<ResearchItem> ResearchItemsInvented;
         uint8_t ResearchUncompletedCategories;
 
+        ScreenCoordsXY SavedView;
+        uint8_t SavedViewRotation;
+        ZoomLevel SavedViewZoom;
+
+        ObjectEntryIndex LastEntranceStyle;
+
+        std::vector<Award> CurrentAwards;
+
+        std::vector<MarketingCampaign> MarketingCampaigns;
+
         /**
          * Probability out of 65535, of gaining a new guest per game tick.
          * new guests per second = 40 * (probability / 65535)
@@ -105,39 +146,15 @@ namespace OpenRCT2
          * In a difficult guest generation scenario, no guests will be generated if over this value.
          */
         uint32_t SuggestedGuestMaximum;
+
+        CheatsState Cheats;
     };
 
     GameState_t& GetGameState();
+    void SwapGameState(std::unique_ptr<GameState_t>& otherState);
 
-    /**
-     * Class to update the state of the map and park.
-     */
-    class GameState final
-    {
-    private:
-        std::unique_ptr<Park> _park;
-        Date _date;
+    void gameStateInitAll(GameState_t& gameState, const TileCoordsXY& mapSize);
+    void gameStateTick();
+    void gameStateUpdateLogic();
 
-    public:
-        GameState();
-        GameState(const GameState&) = delete;
-
-        Date& GetDate()
-        {
-            return _date;
-        }
-        Park& GetPark()
-        {
-            return *_park;
-        }
-
-        void InitAll(const TileCoordsXY& mapSize);
-        void Tick();
-        void UpdateLogic();
-        void SetDate(Date newDate);
-        void ResetDate();
-
-    private:
-        void CreateStateSnapshot();
-    };
 } // namespace OpenRCT2

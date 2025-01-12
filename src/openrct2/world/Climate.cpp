@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -18,16 +18,16 @@
 #include "../audio/AudioMixer.h"
 #include "../audio/audio.h"
 #include "../config/Config.h"
+#include "../core/EnumUtils.hpp"
 #include "../drawing/Drawing.h"
 #include "../interface/Window.h"
-#include "../localisation/Date.h"
+#include "../localisation/Localisation.Date.h"
 #include "../profiling/Profiling.h"
 #include "../scenario/Scenario.h"
 #include "../sprites.h"
 #include "../util/Util.h"
 #include "../windows/Intent.h"
 
-#include <algorithm>
 #include <iterator>
 #include <memory>
 
@@ -91,7 +91,7 @@ void ClimateReset(ClimateType climate)
     auto& gameState = GetGameState();
     auto weather = WeatherType::PartiallyCloudy;
     int32_t month = GetDate().GetMonth();
-    const WeatherTransition* transition = &ClimateTransitions[static_cast<uint8_t>(climate)][month];
+    const WeatherTransition* transition = &ClimateTransitions[EnumValue(climate)][month];
     const WeatherState* weatherState = &ClimateWeatherData[EnumValue(weather)];
 
     gameState.Climate = climate;
@@ -126,7 +126,7 @@ void ClimateUpdate()
     if (gScreenFlags & (~SCREEN_FLAGS_PLAYING))
         return;
 
-    if (!gCheatsFreezeWeather)
+    if (!GetGameState().Cheats.freezeWeather)
     {
         if (gameState.ClimateUpdateTimer)
         {
@@ -202,7 +202,7 @@ void ClimateForceWeather(WeatherType weather)
 {
     auto& gameState = GetGameState();
     int32_t month = GetDate().GetMonth();
-    const WeatherTransition* transition = &ClimateTransitions[static_cast<uint8_t>(gameState.Climate)][month];
+    const WeatherTransition* transition = &ClimateTransitions[EnumValue(gameState.Climate)][month];
     const auto weatherState = &ClimateWeatherData[EnumValue(weather)];
 
     gameState.ClimateCurrent.Weather = weather;
@@ -234,32 +234,25 @@ void ClimateUpdateSound()
 
 bool ClimateIsRaining()
 {
-    auto& gameState = GetGameState();
-    if (gameState.ClimateCurrent.Weather == WeatherType::Rain || gameState.ClimateCurrent.Weather == WeatherType::HeavyRain
-        || gameState.ClimateCurrent.Weather == WeatherType::Thunder)
-    {
-        return true;
-    }
-
-    return false;
+    auto& weather = GetGameState().ClimateCurrent.Weather;
+    return weather == WeatherType::Rain || weather == WeatherType::HeavyRain || weather == WeatherType::Thunder;
 }
 
 bool ClimateIsSnowing()
 {
-    auto& gameState = GetGameState();
-    if (gameState.ClimateCurrent.Weather == WeatherType::Snow || gameState.ClimateCurrent.Weather == WeatherType::HeavySnow
-        || gameState.ClimateCurrent.Weather == WeatherType::Blizzard)
-    {
-        return true;
-    }
-
-    return false;
+    auto& weather = GetGameState().ClimateCurrent.Weather;
+    return weather == WeatherType::Snow || weather == WeatherType::HeavySnow || weather == WeatherType::Blizzard;
 }
 
-bool WeatherIsDry(WeatherType weatherType)
+bool ClimateIsSnowingHeavily()
 {
-    return weatherType == WeatherType::Sunny || weatherType == WeatherType::PartiallyCloudy
-        || weatherType == WeatherType::Cloudy;
+    auto& weather = GetGameState().ClimateCurrent.Weather;
+    return weather == WeatherType::HeavySnow || weather == WeatherType::Blizzard;
+}
+
+bool WeatherIsDry(WeatherType weather)
+{
+    return weather == WeatherType::Sunny || weather == WeatherType::PartiallyCloudy || weather == WeatherType::Cloudy;
 }
 
 FilterPaletteID ClimateGetWeatherGloomPaletteId(const ClimateState& state)
@@ -306,7 +299,7 @@ static void ClimateDetermineFutureWeather(int32_t randomDistribution)
 
     // Generate a random variable with values 0 up to DistributionSize-1 and chose weather from the distribution table
     // accordingly
-    const WeatherTransition* transition = &ClimateTransitions[static_cast<uint8_t>(gameState.Climate)][month];
+    const WeatherTransition* transition = &ClimateTransitions[EnumValue(gameState.Climate)][month];
     WeatherType nextWeather = (transition->Distribution[((randomDistribution & 0xFF) * transition->DistributionSize) >> 8]);
     gameState.ClimateNext.Weather = nextWeather;
 
@@ -399,9 +392,9 @@ static void ClimateUpdateLightning()
 {
     if (_lightningTimer == 0)
         return;
-    if (gConfigGeneral.DisableLightningEffect)
+    if (Config::Get().general.DisableLightningEffect)
         return;
-    if (!gConfigGeneral.RenderWeatherEffects && !gConfigGeneral.RenderWeatherGloom)
+    if (!Config::Get().general.RenderWeatherEffects && !Config::Get().general.RenderWeatherGloom)
         return;
 
     _lightningTimer--;

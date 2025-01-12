@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,6 +15,7 @@
 
 bool TTFInitialise();
 void TTFDispose();
+struct TTFSurface;
 
 #ifndef NO_TTF
 
@@ -23,7 +24,6 @@ struct TTFSurface
     const void* pixels;
     int32_t w;
     int32_t h;
-    int32_t pitch;
 };
 
 TTFFontDescriptor* TTFGetFontFromSpriteBase(FontStyle fontStyle);
@@ -43,6 +43,5 @@ void TTF_CloseFont(TTF_Font* font);
 void TTF_SetFontHinting(TTF_Font* font, int hinting);
 int TTF_GetFontHinting(const TTF_Font* font);
 void TTF_Quit(void);
-uint8_t GetPixel(const TTFSurface& surface, int32_t x, int32_t y);
 
 #endif // NO_TTF

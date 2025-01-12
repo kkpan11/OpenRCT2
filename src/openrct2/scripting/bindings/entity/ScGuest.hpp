@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,8 +11,11 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "../../../entity/Guest.h"
-#    include "ScPeep.hpp"
+    #include "../../../entity/Guest.h"
+    #include "../../../management/Marketing.h"
+    #include "ScPeep.hpp"
+
+enum class PeepAnimationType : uint8_t;
 
 namespace OpenRCT2::Scripting
 {
@@ -165,6 +168,9 @@ namespace OpenRCT2::Scripting
         uint8_t lostCountdown_get() const;
         void lostCountdown_set(uint8_t value);
 
+        DukValue favouriteRide_get() const;
+        void favouriteRide_set(const DukValue& value);
+
         DukValue thoughts_get() const;
 
         DukValue items_get() const;
@@ -172,6 +178,14 @@ namespace OpenRCT2::Scripting
         void give_item(const DukValue& item) const;
         void remove_item(const DukValue& item) const;
         void remove_all_items() const;
+
+        std::vector<std::string> availableAnimations_get() const;
+        std::vector<uint32_t> getAnimationSpriteIds(std::string groupKey, uint8_t rotation) const;
+        std::string animation_get() const;
+        void animation_set(std::string groupKey);
+        uint8_t animationOffset_get() const;
+        void animationOffset_set(uint8_t offset);
+        uint8_t animationLength_get() const;
     };
 
 } // namespace OpenRCT2::Scripting

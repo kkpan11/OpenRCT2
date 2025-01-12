@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,6 +12,8 @@
 #include "../core/String.hpp"
 #include "../network/network.h"
 #include "CommandLine.hpp"
+
+using namespace OpenRCT2;
 
 static exitcode_t HandleUri(const std::string& uri);
 
@@ -26,7 +28,7 @@ exitcode_t CommandLine::HandleCommandUri(CommandLineArgEnumerator* enumerator)
     const utf8* uri;
     if (enumerator->TryPopString(&uri))
     {
-        if (String::StartsWith(uri, "openrct2://"))
+        if (String::startsWith(uri, "openrct2://"))
         {
             const utf8* uriCommand = uri + 11;
             return HandleUri(uriCommand);
@@ -40,7 +42,7 @@ exitcode_t CommandLine::HandleCommandUri(CommandLineArgEnumerator* enumerator)
 static exitcode_t HandleUri(const std::string& uri)
 {
     exitcode_t result = EXITCODE_CONTINUE;
-    auto args = String::Split(uri, "/");
+    auto args = String::split(uri, "/");
     if (!args.empty())
     {
 #ifndef DISABLE_NETWORK
@@ -60,7 +62,7 @@ static exitcode_t HandleUriJoin(const std::vector<std::string>& args)
 {
     std::string hostname;
     int32_t port;
-    if (args.size() > 1 && TryParseHostnamePort(args[1], &hostname, &port, NETWORK_DEFAULT_PORT))
+    if (args.size() > 1 && TryParseHostnamePort(args[1], &hostname, &port, kNetworkDefaultPort))
     {
         // Set the network start configuration
         gNetworkStart = NETWORK_MODE_CLIENT;

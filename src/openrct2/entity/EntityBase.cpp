@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,28 +10,20 @@
 #include "EntityBase.h"
 
 #include "../core/DataSerialiser.h"
+#include "../interface/Viewport.h"
+
+using namespace OpenRCT2;
 
 // Required for GetEntity to return a default
-template<> bool EntityBase::Is<EntityBase>() const
+template<>
+bool EntityBase::Is<EntityBase>() const
 {
     return true;
 }
 
-CoordsXYZ EntityBase::GetLocation() const
-{
-    return { x, y, z };
-}
-
-void EntityBase::SetLocation(const CoordsXYZ& newLocation)
-{
-    x = newLocation.x;
-    y = newLocation.y;
-    z = newLocation.z;
-}
-
 void EntityBase::Invalidate()
 {
-    if (x == LOCATION_NULL)
+    if (x == kLocationNull)
         return;
 
     ZoomLevel maxZoom{ 0 };
@@ -64,7 +56,7 @@ void EntityBase::Invalidate()
             break;
     }
 
-    ViewportsInvalidate(SpriteData.SpriteRect, maxZoom);
+    ViewportsInvalidate(GetLocation(), SpriteData.Width, SpriteData.HeightMin, SpriteData.HeightMax, maxZoom);
 }
 
 void EntityBase::Serialise(DataSerialiser& stream)

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,13 +9,14 @@
 
 #include "SDLAudioSource.h"
 
+#include <openrct2/Diagnostic.h>
 #include <stdexcept>
 
 #ifndef DISABLE_FLAC
-#    include <FLAC/all.h>
-#    include <SDL.h>
-#    include <cstring>
-#    include <vector>
+    #include <FLAC/all.h>
+    #include <SDL.h>
+    #include <cstring>
+    #include <vector>
 #endif
 
 namespace OpenRCT2::Audio

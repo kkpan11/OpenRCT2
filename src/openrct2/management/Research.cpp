@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,21 +9,24 @@
 
 #include "Research.h"
 
+#include "../Context.h"
 #include "../Date.h"
+#include "../Diagnostic.h"
 #include "../Game.h"
 #include "../GameState.h"
 #include "../OpenRCT2.h"
 #include "../actions/ParkSetResearchFundingAction.h"
 #include "../config/Config.h"
 #include "../core/BitSet.hpp"
+#include "../core/EnumUtils.hpp"
 #include "../core/Guard.hpp"
 #include "../core/Memory.hpp"
 #include "../interface/Window.h"
-#include "../localisation/Date.h"
 #include "../localisation/Formatter.h"
-#include "../localisation/Localisation.h"
+#include "../localisation/Localisation.Date.h"
 #include "../localisation/StringIds.h"
 #include "../object/ObjectEntryManager.h"
+#include "../object/ObjectLimits.h"
 #include "../object/ObjectList.h"
 #include "../object/RideObject.h"
 #include "../object/SceneryGroupEntry.h"
@@ -33,13 +36,12 @@
 #include "../ride/RideEntry.h"
 #include "../ride/TrackData.h"
 #include "../scenario/Scenario.h"
-#include "../util/Util.h"
+#include "../windows/Intent.h"
 #include "../world/Park.h"
 #include "../world/Scenery.h"
 #include "Finance.h"
 #include "NewsItem.h"
 
-#include <algorithm>
 #include <iterator>
 
 using namespace OpenRCT2;
@@ -52,10 +54,19 @@ static constexpr int32_t _researchRate[] = {
 };
 
 static bool _researchedRideTypes[RIDE_TYPE_COUNT];
-static bool _researchedRideEntries[MAX_RIDE_OBJECTS];
+static bool _researchedRideEntries[kMaxRideObjects];
 static bool _researchedSceneryItems[SCENERY_TYPE_COUNT][UINT16_MAX];
 
 bool gSilentResearch = false;
+
+// clang-format off
+const StringId kResearchFundingLevelNames[] = {
+    STR_RESEARCH_FUNDING_NONE,
+    STR_RESEARCH_FUNDING_MINIMUM,
+    STR_RESEARCH_FUNDING_NORMAL,
+    STR_RESEARCH_FUNDING_MAXIMUM,
+};
+// clang-format on
 
 /**
  *
@@ -205,7 +216,7 @@ void ResearchFinishItem(const ResearchItem& researchItem)
             RideTypeSetInvented(base_ride_type);
             RideEntrySetInvented(rideEntryIndex);
 
-            bool seenRideEntry[MAX_RIDE_OBJECTS]{};
+            bool seenRideEntry[kMaxRideObjects]{};
             for (auto const& researchItem3 : gameState.ResearchItemsUninvented)
             {
                 ObjectEntryIndex index = researchItem3.entryIndex;
@@ -214,7 +225,7 @@ void ResearchFinishItem(const ResearchItem& researchItem)
 
             // RCT2 made non-separated vehicles available at once, by removing all but one from research.
             // To ensure old files keep working, look for ride entries not in research, and make them available as well.
-            for (int32_t i = 0; i < MAX_RIDE_OBJECTS; i++)
+            for (int32_t i = 0; i < kMaxRideObjects; i++)
             {
                 if (!seenRideEntry[i])
                 {
@@ -238,7 +249,7 @@ void ResearchFinishItem(const ResearchItem& researchItem)
 
             // If a vehicle is the first to be invented for its ride type, show the ride type/group name.
             // Independently listed vehicles (like all flat rides and shops) should always be announced as such.
-            if (GetRideTypeDescriptor(base_ride_type).HasFlag(RIDE_TYPE_FLAG_LIST_VEHICLES_SEPARATELY)
+            if (GetRideTypeDescriptor(base_ride_type).HasFlag(RtdFlag::listVehiclesSeparately)
                 || researchItem.flags & RESEARCH_ENTRY_FLAG_FIRST_OF_TYPE)
             {
                 RideNaming naming = GetRideNaming(base_ride_type, *rideEntry);
@@ -258,7 +269,7 @@ void ResearchFinishItem(const ResearchItem& researchItem)
 
             if (!gSilentResearch)
             {
-                if (gConfigNotifications.RideResearched)
+                if (Config::Get().notifications.RideResearched)
                 {
                     News::AddItemToQueue(News::ItemType::Research, availabilityString, researchItem.rawValue, ft);
                 }
@@ -280,7 +291,7 @@ void ResearchFinishItem(const ResearchItem& researchItem)
 
             if (!gSilentResearch)
             {
-                if (gConfigNotifications.RideResearched)
+                if (Config::Get().notifications.RideResearched)
                 {
                     News::AddItemToQueue(
                         News::ItemType::Research, STR_NEWS_ITEM_RESEARCH_NEW_SCENERY_SET_AVAILABLE, researchItem.rawValue, ft);
@@ -288,7 +299,9 @@ void ResearchFinishItem(const ResearchItem& researchItem)
             }
 
             ResearchInvalidateRelatedWindows();
-            SceneryInit();
+
+            auto intent = Intent(INTENT_ACTION_INIT_SCENERY);
+            ContextBroadcastIntent(&intent);
         }
     }
 }
@@ -315,7 +328,7 @@ void ResearchUpdate()
         return;
     }
 
-    if ((gameState.ParkFlags & PARK_FLAGS_NO_MONEY) && gameState.ResearchFundingLevel == RESEARCH_FUNDING_NONE)
+    if ((gameState.Park.Flags & PARK_FLAGS_NO_MONEY) && gameState.ResearchFundingLevel == RESEARCH_FUNDING_NONE)
     {
         researchLevel = RESEARCH_FUNDING_NORMAL;
     }
@@ -453,7 +466,7 @@ void ResearchPopulateListRandom()
     ResearchResetItems(gameState);
 
     // Rides
-    for (int32_t i = 0; i < MAX_RIDE_OBJECTS; i++)
+    for (int32_t i = 0; i < kMaxRideObjects; i++)
     {
         const auto* rideEntry = GetRideEntryByIndex(i);
         if (rideEntry == nullptr)
@@ -473,7 +486,7 @@ void ResearchPopulateListRandom()
     }
 
     // Scenery
-    for (uint32_t i = 0; i < MAX_SCENERY_GROUP_OBJECTS; i++)
+    for (uint32_t i = 0; i < kMaxSceneryGroupObjects; i++)
     {
         const auto* sceneryGroupEntry = OpenRCT2::ObjectManager::GetObjectEntry<SceneryGroupEntry>(i);
         if (sceneryGroupEntry == nullptr)
@@ -548,7 +561,7 @@ bool ResearchIsInvented(ObjectType objectType, ObjectEntryIndex index)
     }
 }
 
-bool RideTypeIsInvented(uint32_t rideType)
+bool RideTypeIsInvented(ride_type_t rideType)
 {
     return RideTypeIsValid(rideType) ? _researchedRideTypes[rideType] : false;
 }
@@ -561,7 +574,7 @@ bool RideEntryIsInvented(ObjectEntryIndex rideEntryIndex)
     return _researchedRideEntries[rideEntryIndex];
 }
 
-void RideTypeSetInvented(uint32_t rideType)
+void RideTypeSetInvented(ride_type_t rideType)
 {
     if (RideTypeIsValid(rideType))
     {
@@ -627,7 +640,7 @@ bool SceneryGroupIsInvented(int32_t sgIndex)
         return true;
     }
 
-    if (gCheatsIgnoreResearchStatus)
+    if (GetGameState().Cheats.ignoreResearchStatus)
     {
         return true;
     }
@@ -653,7 +666,7 @@ void SceneryGroupSetInvented(int32_t sgIndex)
 
 void SetAllSceneryGroupsNotInvented()
 {
-    for (int32_t i = 0; i < MAX_SCENERY_GROUP_OBJECTS; ++i)
+    for (int32_t i = 0; i < kMaxSceneryGroupObjects; ++i)
     {
         const auto* scenery_set = OpenRCT2::ObjectManager::GetObjectEntry<SceneryGroupEntry>(i);
         if (scenery_set == nullptr)
@@ -822,7 +835,7 @@ static void ResearchAddAllMissingItems(bool isResearched)
 {
     auto& gameState = GetGameState();
     // Mark base ridetypes as seen if they exist in the invented research list.
-    bool seenBaseEntry[MAX_RIDE_OBJECTS]{};
+    bool seenBaseEntry[kMaxRideObjects]{};
     for (auto const& researchItem : gameState.ResearchItemsInvented)
     {
         ObjectEntryIndex index = researchItem.baseRideType;
@@ -830,7 +843,7 @@ static void ResearchAddAllMissingItems(bool isResearched)
     }
 
     // Unlock and add research entries to the invented list for ride types whose base ridetype has been seen.
-    for (ObjectEntryIndex i = 0; i < MAX_RIDE_OBJECTS; i++)
+    for (ObjectEntryIndex i = 0; i < kMaxRideObjects; i++)
     {
         const auto* rideEntry = GetRideEntryByIndex(i);
         if (rideEntry != nullptr)
@@ -856,7 +869,7 @@ static void ResearchAddAllMissingItems(bool isResearched)
 
     // Only add Rides to uninvented research that haven't had their base ridetype seen.
     // This prevents rct2 grouped rides from only unlocking the first train.
-    for (ObjectEntryIndex i = 0; i < MAX_RIDE_OBJECTS; i++)
+    for (ObjectEntryIndex i = 0; i < kMaxRideObjects; i++)
     {
         const auto* rideEntry = GetRideEntryByIndex(i);
         if (rideEntry != nullptr)
@@ -877,7 +890,7 @@ static void ResearchAddAllMissingItems(bool isResearched)
         }
     }
 
-    for (ObjectEntryIndex i = 0; i < MAX_SCENERY_GROUP_OBJECTS; i++)
+    for (ObjectEntryIndex i = 0; i < kMaxSceneryGroupObjects; i++)
     {
         const auto* groupEntry = OpenRCT2::ObjectManager::GetObjectEntry<SceneryGroupEntry>(i);
         if (groupEntry != nullptr)
@@ -1030,7 +1043,7 @@ static void ResearchUpdateFirstOfType(ResearchItem* researchItem)
 
     researchItem->flags &= ~RESEARCH_ENTRY_FLAG_FIRST_OF_TYPE;
     const auto& rtd = GetRideTypeDescriptor(rideType);
-    if (rtd.HasFlag(RIDE_TYPE_FLAG_LIST_VEHICLES_SEPARATELY))
+    if (rtd.HasFlag(RtdFlag::listVehiclesSeparately))
     {
         researchItem->flags |= RESEARCH_ENTRY_FLAG_FIRST_OF_TYPE;
         return;
@@ -1064,7 +1077,7 @@ void ResearchDetermineFirstOfType()
             continue;
 
         const auto& rtd = GetRideTypeDescriptor(rideType);
-        if (rtd.HasFlag(RIDE_TYPE_FLAG_LIST_VEHICLES_SEPARATELY))
+        if (rtd.HasFlag(RtdFlag::listVehiclesSeparately))
             continue;
 
         // The last research item will also be present in gameState.ResearchItemsInvented.

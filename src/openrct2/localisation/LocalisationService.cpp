@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -141,16 +141,6 @@ void LocalisationService::CloseLanguages()
     _languageOrder.clear();
     _loadedLanguages.clear();
     _currentLanguage = LANGUAGE_UNDEFINED;
-}
-
-std::tuple<StringId, StringId, StringId> LocalisationService::GetLocalisedScenarioStrings(
-    const std::string& scenarioFilename) const
-{
-    Guard::Assert(!_loadedLanguages.empty());
-    auto result0 = _loadedLanguages[0]->GetScenarioOverrideStringId(scenarioFilename.c_str(), 0);
-    auto result1 = _loadedLanguages[0]->GetScenarioOverrideStringId(scenarioFilename.c_str(), 1);
-    auto result2 = _loadedLanguages[0]->GetScenarioOverrideStringId(scenarioFilename.c_str(), 2);
-    return std::make_tuple(result0, result1, result2);
 }
 
 StringId LocalisationService::AllocateObjectString(const std::string& target)

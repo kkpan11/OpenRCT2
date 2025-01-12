@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -28,7 +28,7 @@
 #    include <mach/mach_time.h>
 #    include <pwd.h>
 
-namespace Platform
+namespace OpenRCT2::Platform
 {
     std::string GetFolderPath(SPECIAL_FOLDER folder)
     {
@@ -101,9 +101,10 @@ namespace Platform
                 auto exeDirectory = Path::GetDirectory(exePath);
 
                 // check build and install paths
-                NSArray *dataSearchLocations = @[@"data", @"../share/openrct2"];
+                NSArray* dataSearchLocations = @[ @"data", @"../share/openrct2" ];
 
-                for (NSString *searchLocation in dataSearchLocations) {
+                for (NSString* searchLocation in dataSearchLocations)
+                {
                     path = Path::Combine(exeDirectory, [searchLocation UTF8String]);
                     NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
                     if ([[NSFileManager defaultManager] fileExistsAtPath:nsPath])
@@ -143,11 +144,11 @@ namespace Platform
 
     bool HandleSpecialCommandLineArgument(const char* argument)
     {
-        if (String::Equals(argument, "-NSDocumentRevisionsDebugMode"))
+        if (String::equals(argument, "-NSDocumentRevisionsDebugMode"))
         {
             return true;
         }
-        if (String::StartsWith(argument, "-psn_"))
+        if (String::startsWith(argument, "-psn_"))
         {
             return true;
         }
@@ -252,6 +253,16 @@ namespace Platform
         return {};
     }
 
+    u8string GetRCT1SteamDir()
+    {
+        return u8"app_285310" PATH_SEPARATOR u8"depot_285311";
+    }
+
+    u8string GetRCT2SteamDir()
+    {
+        return u8"app_285330" PATH_SEPARATOR u8"depot_285331";
+    }
+
     std::string GetFontPath(const TTFFontDescriptor& font)
     {
         @autoreleasepool
@@ -270,6 +281,16 @@ namespace Platform
             }
         }
     }
-}
+
+    std::vector<std::string_view> GetSearchablePathsRCT1()
+    {
+        return {};
+    }
+
+    std::vector<std::string_view> GetSearchablePathsRCT2()
+    {
+        return {};
+    }
+} // namespace OpenRCT2::Platform
 
 #endif

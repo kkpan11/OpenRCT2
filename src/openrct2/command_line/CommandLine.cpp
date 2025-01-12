@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,10 +12,12 @@
 #include "../OpenRCT2.h"
 #include "../core/Console.hpp"
 #include "../core/String.hpp"
+#include "../drawing/Font.h"
 #include "../platform/Platform.h"
 
-#include <algorithm>
 #include <cstring>
+
+using namespace OpenRCT2;
 
 #pragma region CommandLineArgEnumerator
 
@@ -91,7 +93,7 @@ bool CommandLineArgEnumerator::TryPopString(const char** result)
 
 #pragma endregion
 
-namespace CommandLine
+namespace OpenRCT2::CommandLine
 {
     constexpr const char* HelpText = "openrct2 -ha shows help for all commands. "
                                      "openrct2 <command> -h will show help and details for a given command.";
@@ -123,7 +125,7 @@ namespace CommandLine
             {
                 if (command->SubCommands != nullptr)
                 {
-                    size_t commandNameLength = String::LengthOf(command->Name);
+                    size_t commandNameLength = String::lengthOf(command->Name);
                     for (size_t i = 0; i < commandNameLength; i++)
                     {
                         Console::Write("-");
@@ -149,7 +151,7 @@ namespace CommandLine
     {
         // Print usage
         const char* usageString = "usage: openrct2 ";
-        const size_t usageStringLength = String::LengthOf(usageString);
+        const size_t usageStringLength = String::lengthOf(usageString);
         Console::Write(usageString);
 
         // Get the largest command name length and parameter length
@@ -158,8 +160,8 @@ namespace CommandLine
         const CommandLineCommand* command;
         for (command = commands; command->Name != nullptr; command++)
         {
-            maxNameLength = std::max(maxNameLength, String::LengthOf(command->Name));
-            maxParamsLength = std::max(maxParamsLength, String::LengthOf(command->Parameters));
+            maxNameLength = std::max(maxNameLength, String::lengthOf(command->Name));
+            maxParamsLength = std::max(maxParamsLength, String::lengthOf(command->Parameters));
         }
 
         for (command = commands; command->Name != nullptr; command++)
@@ -170,12 +172,12 @@ namespace CommandLine
             }
 
             Console::Write(command->Name);
-            Console::WriteSpace(maxNameLength - String::LengthOf(command->Name) + 1);
+            Console::WriteSpace(maxNameLength - String::lengthOf(command->Name) + 1);
 
             if (command->SubCommands == nullptr)
             {
                 Console::Write(command->Parameters);
-                Console::WriteSpace(maxParamsLength - String::LengthOf(command->Parameters));
+                Console::WriteSpace(maxParamsLength - String::lengthOf(command->Parameters));
 
                 if (command->Options != nullptr)
                 {
@@ -205,7 +207,7 @@ namespace CommandLine
         {
             char buffer[128];
             GetOptionCaption(buffer, sizeof(buffer), option);
-            size_t optionCaptionLength = String::LengthOf(buffer);
+            size_t optionCaptionLength = String::lengthOf(buffer);
             maxOptionLength = std::max(maxOptionLength, optionCaptionLength);
         }
 
@@ -216,7 +218,7 @@ namespace CommandLine
 
             char buffer[128];
             GetOptionCaption(buffer, sizeof(buffer), option);
-            size_t optionCaptionLength = String::LengthOf(buffer);
+            size_t optionCaptionLength = String::lengthOf(buffer);
             Console::Write(buffer);
 
             Console::WriteSpace(maxOptionLength - optionCaptionLength + 4);
@@ -233,7 +235,7 @@ namespace CommandLine
         const CommandLineExample* example;
         for (example = examples; example->Arguments != nullptr; example++)
         {
-            size_t argumentsLength = String::LengthOf(example->Arguments);
+            size_t argumentsLength = String::lengthOf(example->Arguments);
             maxArgumentsLength = std::max(maxArgumentsLength, argumentsLength);
         }
 
@@ -243,7 +245,7 @@ namespace CommandLine
             Console::Write("  openrct2 ");
             Console::Write(example->Arguments);
 
-            size_t argumentsLength = String::LengthOf(example->Arguments);
+            size_t argumentsLength = String::lengthOf(example->Arguments);
             Console::WriteSpace(maxArgumentsLength - argumentsLength + 4);
             Console::Write(example->Description);
             Console::WriteLine();
@@ -258,22 +260,22 @@ namespace CommandLine
 
         if (option->ShortName != '\0')
         {
-            String::AppendFormat(buffer, bufferSize, "-%c, ", option->ShortName);
+            String::appendFormat(buffer, bufferSize, "-%c, ", option->ShortName);
         }
 
-        String::Append(buffer, bufferSize, "--");
-        String::Append(buffer, bufferSize, option->LongName);
+        String::append(buffer, bufferSize, "--");
+        String::append(buffer, bufferSize, option->LongName);
 
         switch (option->Type)
         {
             case CMDLINE_TYPE_INTEGER:
-                String::Append(buffer, bufferSize, "=<int>");
+                String::append(buffer, bufferSize, "=<int>");
                 break;
             case CMDLINE_TYPE_REAL:
-                String::Append(buffer, bufferSize, "=<real>");
+                String::append(buffer, bufferSize, "=<real>");
                 break;
             case CMDLINE_TYPE_STRING:
-                String::Append(buffer, bufferSize, "=<str>");
+                String::append(buffer, bufferSize, "=<str>");
                 break;
         }
 
@@ -304,7 +306,7 @@ namespace CommandLine
                 // If we don't find a command, this should be used
                 fallback = command;
             }
-            else if (String::Equals(command->Name, firstArgument))
+            else if (String::equals(command->Name, firstArgument))
             {
                 if (command->SubCommands == nullptr)
                 {
@@ -371,11 +373,11 @@ namespace CommandLine
         const char* equalsCh = strchr(argument, '=');
         if (equalsCh != nullptr)
         {
-            String::Set(optionName, sizeof(optionName), argument, equalsCh - argument);
+            String::set(optionName, sizeof(optionName), argument, equalsCh - argument);
         }
         else
         {
-            String::Set(optionName, sizeof(optionName), argument);
+            String::set(optionName, sizeof(optionName), argument);
         }
 
         // Find a matching option definition
@@ -515,14 +517,14 @@ namespace CommandLine
     {
         for (const CommandLineOptionDefinition* option = options; option->Type != 255; option++)
         {
-            if (String::Equals(option->LongName, longName))
+            if (String::equals(option->LongName, longName))
             {
                 return option;
             }
         }
         return nullptr;
     }
-} // namespace CommandLine
+} // namespace OpenRCT2::CommandLine
 
 int32_t CommandLineRun(const char** argv, int32_t argc)
 {

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,6 +10,7 @@
 #include "Object.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../core/File.h"
 #include "../core/FileStream.h"
 #include "../core/Memory.hpp"
@@ -24,6 +25,7 @@
 #include "ObjectRepository.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cstring>
 #include <stdexcept>
 
@@ -171,11 +173,11 @@ ObjectEntryDescriptor Object::GetScgPathXHeader() const
     return ObjectEntryDescriptor("rct2.scenery_group.scgpathx");
 }
 
-RCTObjectEntry Object::CreateHeader(const char name[DAT_NAME_LENGTH + 1], uint32_t flags, uint32_t checksum)
+RCTObjectEntry Object::CreateHeader(const char name[kDatNameLength + 1], uint32_t flags, uint32_t checksum)
 {
     RCTObjectEntry header = {};
     header.flags = flags;
-    std::copy_n(name, DAT_NAME_LENGTH, header.name);
+    std::copy_n(name, kDatNameLength, header.name);
     header.checksum = checksum;
     return header;
 }
@@ -191,8 +193,8 @@ void Object::SetSourceGames(const std::vector<ObjectSourceGame>& sourceGames)
 }
 
 #ifdef __WARN_SUGGEST_FINAL_METHODS__
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wsuggest-final-methods"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wsuggest-final-methods"
 #endif
 
 std::string Object::GetName() const
@@ -387,7 +389,7 @@ ObjectVersion VersionTuple(std::string_view version)
         return std::make_tuple(0, 0, 0);
     }
 
-    auto nums = String::Split(version, ".");
+    auto nums = String::split(version, ".");
     uint16_t versions[VersionNumFields] = {};
     if (nums.size() > VersionNumFields)
     {
@@ -403,12 +405,13 @@ ObjectVersion VersionTuple(std::string_view version)
         size_t highestIndex = std::min(nums.size(), VersionNumFields);
         for (size_t i = 0; i < highestIndex; i++)
         {
-            auto value = stoi(nums.at(i));
+            auto value = stoll(nums.at(i));
             constexpr auto maxValue = std::numeric_limits<uint16_t>().max();
             if (value > maxValue)
             {
                 LOG_WARNING(
-                    "Version value too high in version string '%s', version value will be capped to %i.", version, maxValue);
+                    "Version value too high in version string '%.*s', version value will be capped to %i.",
+                    static_cast<int>(version.size()), version.data(), maxValue);
                 value = maxValue;
             }
             versions[i] = value;
@@ -416,12 +419,12 @@ ObjectVersion VersionTuple(std::string_view version)
     }
     catch (const std::exception&)
     {
-        LOG_WARNING("Malformed version string '%s', expected X.Y.Z", version);
+        LOG_WARNING("Malformed version string '%.*s', expected X.Y.Z", static_cast<int>(version.size()), version.data());
     }
 
     return std::make_tuple(versions[0], versions[1], versions[2]);
 }
 
 #ifdef __WARN_SUGGEST_FINAL_METHODS__
-#    pragma GCC diagnostic pop
+    #pragma GCC diagnostic pop
 #endif

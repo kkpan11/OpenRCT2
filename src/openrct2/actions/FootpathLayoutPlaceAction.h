@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "../world/Footpath.h"
 #include "GameAction.h"
 
 class FootpathLayoutPlaceAction final : public GameActionBase<GameCommand::PlacePathLayout>
@@ -32,11 +33,11 @@ public:
     uint16_t GetActionFlags() const override;
 
     void Serialise(DataSerialiser& stream) override;
-    GameActions::Result Query() const override;
-    GameActions::Result Execute() const override;
+    OpenRCT2::GameActions::Result Query() const override;
+    OpenRCT2::GameActions::Result Execute() const override;
 
 private:
-    GameActions::Result ElementInsertQuery(GameActions::Result res) const;
-    GameActions::Result ElementInsertExecute(GameActions::Result res) const;
+    OpenRCT2::GameActions::Result ElementInsertQuery(OpenRCT2::GameActions::Result res) const;
+    OpenRCT2::GameActions::Result ElementInsertExecute(OpenRCT2::GameActions::Result res) const;
     bool IsSameAsEntranceElement(const EntranceElement& entranceElement) const;
 };

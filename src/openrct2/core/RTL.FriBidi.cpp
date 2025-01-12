@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,15 +8,17 @@
  *****************************************************************************/
 
 #if defined(_WIN32) && defined(USE_FRIBIDI)
-#    include "RTL.h"
+    #include "RTL.h"
 
-#    include <string>
+    #include "../Diagnostic.h"
+
+    #include <string>
 
 extern "C" {
-#    include <fribidi/fribidi-bidi-types.h>
-#    include <fribidi/fribidi-char-sets.h>
-#    include <fribidi/fribidi-flags.h>
-#    include <fribidi/fribidi.h>
+    #include <fribidi/fribidi-bidi-types.h>
+    #include <fribidi/fribidi-char-sets.h>
+    #include <fribidi/fribidi-flags.h>
+    #include <fribidi/fribidi.h>
 }
 
 static constexpr uint16_t BufferLength = 1024;
@@ -48,10 +50,10 @@ std::string FixRTL(std::string& input)
     return std::string(outputString);
 }
 #elif defined(_WIN32)
-#    include "../Diagnostic.h"
-#    include "RTL.h"
+    #include "../Diagnostic.h"
+    #include "RTL.h"
 
-#    include <string>
+    #include <string>
 
 static bool hasWarned = false;
 

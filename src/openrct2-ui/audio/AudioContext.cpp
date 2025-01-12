@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,9 +15,9 @@
 
 #include <SDL.h>
 #include <memory>
+#include <openrct2/Diagnostic.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/audio/AudioSource.h>
-#include <openrct2/common.h>
 #include <openrct2/core/String.hpp>
 
 namespace OpenRCT2::Audio
@@ -34,7 +34,7 @@ namespace OpenRCT2::Audio
         {
             if (SDL_Init(SDL_INIT_AUDIO) < 0)
             {
-                SDLException::Throw("SDL_Init(SDL_INIT_AUDIO)");
+                Ui::SDLException::Throw("SDL_Init(SDL_INIT_AUDIO)");
             }
             _audioMixer = std::make_unique<AudioMixer>();
         }
@@ -55,7 +55,7 @@ namespace OpenRCT2::Audio
             int32_t numDevices = SDL_GetNumAudioDevices(SDL_FALSE);
             for (int32_t i = 0; i < numDevices; i++)
             {
-                devices.emplace_back(String::ToStd(SDL_GetAudioDeviceName(i, SDL_FALSE)));
+                devices.emplace_back(String::toStd(SDL_GetAudioDeviceName(i, SDL_FALSE)));
             }
             return devices;
         }
@@ -90,6 +90,7 @@ namespace OpenRCT2::Audio
             }
             catch (const std::exception& e)
             {
+                SDL_RWclose(rw);
                 LOG_VERBOSE("Unable to create audio source: %s", e.what());
                 return nullptr;
             }
@@ -119,6 +120,7 @@ namespace OpenRCT2::Audio
             }
             catch (const std::exception& e)
             {
+                SDL_RWclose(rw);
                 LOG_VERBOSE("Unable to create audio source: %s", e.what());
                 return nullptr;
             }

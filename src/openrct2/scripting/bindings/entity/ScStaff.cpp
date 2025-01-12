@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,10 +9,13 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "ScStaff.hpp"
+    #include "ScStaff.hpp"
 
-#    include "../../../entity/PatrolArea.h"
-#    include "../../../entity/Staff.h"
+    #include "../../../entity/PatrolArea.h"
+    #include "../../../entity/Staff.h"
+    #include "../../../object/ObjectManager.h"
+    #include "../../../object/PeepAnimationsObject.h"
+    #include "../../../peep/PeepAnimations.h"
 
 namespace OpenRCT2::Scripting
 {
@@ -26,9 +29,16 @@ namespace OpenRCT2::Scripting
         dukglue_set_base_class<ScPeep, ScStaff>(ctx);
         dukglue_register_property(ctx, &ScStaff::staffType_get, &ScStaff::staffType_set, "staffType");
         dukglue_register_property(ctx, &ScStaff::colour_get, &ScStaff::colour_set, "colour");
+        dukglue_register_property(ctx, &ScStaff::availableCostumes_get, nullptr, "availableCostumes");
         dukglue_register_property(ctx, &ScStaff::costume_get, &ScStaff::costume_set, "costume");
         dukglue_register_property(ctx, &ScStaff::patrolArea_get, nullptr, "patrolArea");
         dukglue_register_property(ctx, &ScStaff::orders_get, &ScStaff::orders_set, "orders");
+        dukglue_register_property(ctx, &ScStaff::availableAnimations_get, nullptr, "availableAnimations");
+        dukglue_register_property(ctx, &ScStaff::animation_get, &ScStaff::animation_set, "animation");
+        dukglue_register_property(ctx, &ScStaff::animationOffset_get, &ScStaff::animationOffset_set, "animationOffset");
+        dukglue_register_property(ctx, &ScStaff::animationLength_get, nullptr, "animationLength");
+        dukglue_register_method(ctx, &ScStaff::getAnimationSpriteIds, "getAnimationSpriteIds");
+        dukglue_register_method(ctx, &ScStaff::getCostumeStrings, "getCostumeStrings");
     }
 
     Staff* ScStaff::GetStaff() const
@@ -67,23 +77,31 @@ namespace OpenRCT2::Scripting
             if (value == "handyman" && peep->AssignedStaffType != StaffType::Handyman)
             {
                 peep->AssignedStaffType = StaffType::Handyman;
-                peep->SpriteType = PeepSpriteType::Handyman;
+                peep->AnimationObjectIndex = findPeepAnimationsIndexForType(AnimationPeepType::Handyman);
+                peep->AnimationGroup = PeepAnimationGroup::Normal;
             }
             else if (value == "mechanic" && peep->AssignedStaffType != StaffType::Mechanic)
             {
                 peep->AssignedStaffType = StaffType::Mechanic;
-                peep->SpriteType = PeepSpriteType::Mechanic;
+                peep->AnimationObjectIndex = findPeepAnimationsIndexForType(AnimationPeepType::Mechanic);
+                peep->AnimationGroup = PeepAnimationGroup::Normal;
             }
             else if (value == "security" && peep->AssignedStaffType != StaffType::Security)
             {
                 peep->AssignedStaffType = StaffType::Security;
-                peep->SpriteType = PeepSpriteType::Security;
+                peep->AnimationObjectIndex = findPeepAnimationsIndexForType(AnimationPeepType::Security);
+                peep->AnimationGroup = PeepAnimationGroup::Normal;
             }
             else if (value == "entertainer" && peep->AssignedStaffType != StaffType::Entertainer)
             {
                 peep->AssignedStaffType = StaffType::Entertainer;
-                peep->SpriteType = PeepSpriteType::EntertainerPanda;
+                peep->AnimationObjectIndex = findPeepAnimationsIndexForType(AnimationPeepType::Entertainer);
+                peep->AnimationGroup = PeepAnimationGroup::Normal;
             }
+
+            // Reset state to walking to prevent invalid actions from carrying over
+            peep->Action = PeepActionType::Walking;
+            peep->AnimationType = peep->NextAnimationType = PeepAnimationType::Walking;
         }
     }
 
@@ -104,24 +122,94 @@ namespace OpenRCT2::Scripting
         }
     }
 
-    uint8_t ScStaff::costume_get() const
+    static const std::vector<AnimationGroupResult> costumesByStaffType(StaffType staffType)
     {
-        auto peep = GetStaff();
-        if (peep != nullptr && peep->AssignedStaffType == StaffType::Entertainer)
-        {
-            return peep->GetCostume();
-        }
-        return 0;
+        // TODO: shouldn't get hit repeatedly, but cache these if (and only if) it's too slow
+        auto animPeepType = getAnimationPeepType(staffType);
+        return getAnimationGroupsByPeepType(animPeepType);
     }
 
-    void ScStaff::costume_set(uint8_t value)
+    std::vector<std::string> ScStaff::availableCostumes_get() const
     {
-        ThrowIfGameStateNotMutable();
+        std::vector<std::string> availableCostumes{};
         auto peep = GetStaff();
         if (peep != nullptr)
         {
-            peep->SetCostume(value);
+            for (auto& costume : costumesByStaffType(peep->AssignedStaffType))
+            {
+                availableCostumes.push_back(std::string(costume.scriptName));
+            }
         }
+        return availableCostumes;
+    }
+
+    std::vector<std::string> ScStaff::getCostumeStrings() const
+    {
+        auto peep = GetStaff();
+        auto animPeepType = getAnimationPeepType(peep->AssignedStaffType);
+
+        std::vector<std::string> availableCostumes{};
+        for (auto& costume : getAvailableCostumeStrings(animPeepType))
+        {
+            availableCostumes.push_back(costume.friendlyName);
+        }
+        return availableCostumes;
+    }
+
+    std::string ScStaff::costume_get() const
+    {
+        auto peep = GetStaff();
+        if (peep == nullptr)
+        {
+            return "";
+        }
+
+        auto& costumes = costumesByStaffType(peep->AssignedStaffType);
+
+        auto costume = std::find_if(costumes.begin(), costumes.end(), [peep](auto& candidate) {
+            return candidate.objectId == peep->AnimationObjectIndex;
+        });
+
+        if (costume != costumes.end())
+        {
+            return std::string(costume->scriptName);
+        }
+        else
+            return "";
+    }
+
+    void ScStaff::costume_set(const DukValue& value)
+    {
+        ThrowIfGameStateNotMutable();
+
+        auto peep = GetStaff();
+        if (peep == nullptr)
+        {
+            return;
+        }
+
+        auto& costumes = costumesByStaffType(peep->AssignedStaffType);
+        auto costume = costumes.end();
+
+        // Split by type passed so as to not break old plugins
+        if (value.type() == DukValue::Type::STRING)
+        {
+            costume = std::find_if(costumes.begin(), costumes.end(), [value](auto& candidate) {
+                return candidate.scriptName == value.as_string();
+            });
+        }
+        else if (value.type() == DukValue::Type::NUMBER)
+        {
+            auto target = RCT12PeepAnimationGroup(value.as_uint() + EnumValue(RCT12PeepAnimationGroup::EntertainerPanda));
+            costume = std::find_if(
+                costumes.begin(), costumes.end(), [target](auto& candidate) { return candidate.legacyPosition == target; });
+        }
+
+        if (costume == costumes.end())
+            throw DukException() << "Invalid costume for this staff member";
+
+        peep->AnimationObjectIndex = costume->objectId;
+        peep->AnimationGroup = costume->group;
     }
 
     std::shared_ptr<ScPatrolArea> ScStaff::patrolArea_get() const
@@ -143,6 +231,338 @@ namespace OpenRCT2::Scripting
         {
             peep->StaffOrders = value;
         }
+    }
+
+    const DukEnumMap<PeepAnimationType>& ScStaff::animationsByStaffType(StaffType staffType) const
+    {
+        AnimationPeepType animPeepType{};
+        switch (staffType)
+        {
+            case StaffType::Handyman:
+                animPeepType = AnimationPeepType::Handyman;
+                break;
+            case StaffType::Mechanic:
+                animPeepType = AnimationPeepType::Mechanic;
+                break;
+            case StaffType::Security:
+                animPeepType = AnimationPeepType::Security;
+                break;
+            case StaffType::Entertainer:
+            default:
+                animPeepType = AnimationPeepType::Entertainer;
+        }
+        return getAnimationsByPeepType(animPeepType);
+    }
+
+    std::vector<std::string> ScStaff::availableAnimations_get() const
+    {
+        std::vector<std::string> availableAnimations{};
+
+        auto* peep = GetStaff();
+        if (peep != nullptr)
+        {
+            for (auto& animation : animationsByStaffType(peep->AssignedStaffType))
+            {
+                availableAnimations.push_back(std::string(animation.first));
+            }
+        }
+
+        return availableAnimations;
+    }
+
+    std::vector<uint32_t> ScStaff::getAnimationSpriteIds(std::string groupKey, uint8_t rotation) const
+    {
+        std::vector<uint32_t> spriteIds{};
+
+        auto* peep = GetStaff();
+        if (peep == nullptr)
+        {
+            return spriteIds;
+        }
+
+        auto& animationGroups = animationsByStaffType(peep->AssignedStaffType);
+        auto animationType = animationGroups.TryGet(groupKey);
+        if (animationType == std::nullopt)
+        {
+            return spriteIds;
+        }
+
+        auto& objManager = GetContext()->GetObjectManager();
+        auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+        const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, *animationType);
+        for (auto frameOffset : animationGroup.frame_offsets)
+        {
+            auto imageId = animationGroup.base_image;
+            if (animationType != PeepAnimationType::Hanging)
+                imageId += rotation + frameOffset * 4;
+            else
+                imageId += frameOffset;
+
+            spriteIds.push_back(imageId);
+        }
+
+        return spriteIds;
+    }
+
+    std::string ScStaff::animation_get() const
+    {
+        auto* peep = GetStaff();
+        if (peep == nullptr)
+        {
+            return nullptr;
+        }
+
+        auto& animationGroups = animationsByStaffType(peep->AssignedStaffType);
+        std::string_view action = animationGroups[peep->AnimationType];
+        return std::string(action);
+    }
+
+    void ScStaff::animation_set(std::string groupKey)
+    {
+        ThrowIfGameStateNotMutable();
+
+        auto* peep = GetStaff();
+        auto& animationGroups = animationsByStaffType(peep->AssignedStaffType);
+        auto newType = animationGroups.TryGet(groupKey);
+        if (newType == std::nullopt)
+        {
+            throw DukException() << "Invalid animation for this staff member (" << groupKey << ")";
+        }
+
+        peep->AnimationType = peep->NextAnimationType = *newType;
+
+        auto offset = 0;
+        if (peep->IsActionWalking())
+            peep->WalkingAnimationFrameNum = offset;
+        else
+            peep->AnimationFrameNum = offset;
+
+        auto& objManager = GetContext()->GetObjectManager();
+        auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+        const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, peep->AnimationType);
+        peep->AnimationImageIdOffset = animationGroup.frame_offsets[offset];
+        peep->Invalidate();
+        peep->UpdateSpriteBoundingBox();
+        peep->Invalidate();
+    }
+
+    uint8_t ScStaff::animationOffset_get() const
+    {
+        auto* peep = GetStaff();
+        if (peep == nullptr)
+        {
+            return 0;
+        }
+
+        if (peep->IsActionWalking())
+            return peep->WalkingAnimationFrameNum;
+        else
+            return peep->AnimationFrameNum;
+    }
+
+    void ScStaff::animationOffset_set(uint8_t offset)
+    {
+        ThrowIfGameStateNotMutable();
+
+        auto* peep = GetStaff();
+
+        auto& objManager = GetContext()->GetObjectManager();
+        auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+        const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, peep->AnimationType);
+        auto length = animationGroup.frame_offsets.size();
+        offset %= length;
+
+        if (peep->IsActionWalking())
+            peep->WalkingAnimationFrameNum = offset;
+        else
+            peep->AnimationFrameNum = offset;
+
+        peep->AnimationImageIdOffset = animationGroup.frame_offsets[offset];
+        peep->Invalidate();
+        peep->UpdateSpriteBoundingBox();
+        peep->Invalidate();
+    }
+
+    uint8_t ScStaff::animationLength_get() const
+    {
+        auto* peep = GetStaff();
+        if (peep == nullptr)
+        {
+            return 0;
+        }
+
+        auto& objManager = GetContext()->GetObjectManager();
+        auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(peep->AnimationObjectIndex);
+
+        const auto& animationGroup = animObj->GetPeepAnimation(peep->AnimationGroup, peep->AnimationType);
+        return static_cast<uint8_t>(animationGroup.frame_offsets.size());
+    }
+
+    ScHandyman::ScHandyman(EntityId Id)
+        : ScStaff(Id)
+    {
+    }
+
+    void ScHandyman::Register(duk_context* ctx)
+    {
+        dukglue_set_base_class<ScStaff, ScHandyman>(ctx);
+        dukglue_register_property(ctx, &ScHandyman::lawnsMown_get, nullptr, "lawnsMown");
+        dukglue_register_property(ctx, &ScHandyman::gardensWatered_get, nullptr, "gardensWatered");
+        dukglue_register_property(ctx, &ScHandyman::litterSwept_get, nullptr, "litterSwept");
+        dukglue_register_property(ctx, &ScHandyman::binsEmptied_get, nullptr, "binsEmptied");
+    }
+
+    Staff* ScHandyman::GetHandyman() const
+    {
+        return ::GetEntity<Staff>(_id);
+    }
+
+    DukValue ScHandyman::lawnsMown_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetHandyman();
+        if (peep != nullptr && peep->AssignedStaffType == StaffType::Handyman)
+        {
+            duk_push_uint(ctx, peep->StaffLawnsMown);
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
+    }
+
+    DukValue ScHandyman::gardensWatered_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetHandyman();
+        if (peep != nullptr && peep->AssignedStaffType == StaffType::Handyman)
+        {
+            duk_push_uint(ctx, peep->StaffGardensWatered);
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
+    }
+
+    DukValue ScHandyman::litterSwept_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetHandyman();
+        if (peep != nullptr && peep->AssignedStaffType == StaffType::Handyman)
+        {
+            duk_push_uint(ctx, peep->StaffLitterSwept);
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
+    }
+
+    DukValue ScHandyman::binsEmptied_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetHandyman();
+        if (peep != nullptr && peep->AssignedStaffType == StaffType::Handyman)
+        {
+            duk_push_uint(ctx, peep->StaffBinsEmptied);
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
+    }
+
+    ScMechanic::ScMechanic(EntityId Id)
+        : ScStaff(Id)
+    {
+    }
+
+    void ScMechanic::Register(duk_context* ctx)
+    {
+        dukglue_set_base_class<ScStaff, ScMechanic>(ctx);
+        dukglue_register_property(ctx, &ScMechanic::ridesFixed_get, nullptr, "ridesFixed");
+        dukglue_register_property(ctx, &ScMechanic::ridesInspected_get, nullptr, "ridesInspected");
+    }
+
+    Staff* ScMechanic::GetMechanic() const
+    {
+        return ::GetEntity<Staff>(_id);
+    }
+
+    DukValue ScMechanic::ridesFixed_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetMechanic();
+        if (peep != nullptr && peep->AssignedStaffType == StaffType::Mechanic)
+        {
+            duk_push_uint(ctx, peep->StaffRidesFixed);
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
+    }
+
+    DukValue ScMechanic::ridesInspected_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetMechanic();
+        if (peep != nullptr && peep->AssignedStaffType == StaffType::Mechanic)
+        {
+            duk_push_uint(ctx, peep->StaffRidesInspected);
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
+    }
+
+    ScSecurity::ScSecurity(EntityId Id)
+        : ScStaff(Id)
+    {
+    }
+
+    void ScSecurity::Register(duk_context* ctx)
+    {
+        dukglue_set_base_class<ScStaff, ScSecurity>(ctx);
+        dukglue_register_property(ctx, &ScSecurity::vandalsStopped_get, nullptr, "vandalsStopped");
+    }
+
+    Staff* ScSecurity::GetSecurity() const
+    {
+        return ::GetEntity<Staff>(_id);
+    }
+
+    DukValue ScSecurity::vandalsStopped_get() const
+    {
+        auto& scriptEngine = GetContext()->GetScriptEngine();
+        auto* ctx = scriptEngine.GetContext();
+        auto peep = GetSecurity();
+        if (peep != nullptr && peep->AssignedStaffType == StaffType::Security)
+        {
+            duk_push_uint(ctx, peep->StaffVandalsStopped);
+        }
+        else
+        {
+            duk_push_null(ctx);
+        }
+        return DukValue::take_from_stack(ctx);
     }
 
     ScPatrolArea::ScPatrolArea(EntityId id)
@@ -182,9 +602,9 @@ namespace OpenRCT2::Scripting
             else
             {
                 auto mapRange = FromDuk<MapRange>(coordsOrRange);
-                for (int32_t y = mapRange.GetTop(); y <= mapRange.GetBottom(); y += COORDS_XY_STEP)
+                for (int32_t y = mapRange.GetTop(); y <= mapRange.GetBottom(); y += kCoordsXYStep)
                 {
-                    for (int32_t x = mapRange.GetLeft(); x <= mapRange.GetRight(); x += COORDS_XY_STEP)
+                    for (int32_t x = mapRange.GetLeft(); x <= mapRange.GetRight(); x += kCoordsXYStep)
                     {
                         CoordsXY coord(x, y);
                         staff->SetPatrolArea(coord, value);

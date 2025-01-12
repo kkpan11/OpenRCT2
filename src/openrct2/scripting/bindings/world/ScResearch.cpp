@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,17 +9,16 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "ScResearch.hpp"
+    #include "ScResearch.hpp"
 
-#    include "../../../Context.h"
-#    include "../../../GameState.h"
-#    include "../../../common.h"
-#    include "../../../core/String.hpp"
-#    include "../../../management/Research.h"
-#    include "../../../ride/RideData.h"
-#    include "../../Duktape.hpp"
-#    include "../../ScriptEngine.h"
-#    include "../object/ScObject.hpp"
+    #include "../../../Context.h"
+    #include "../../../GameState.h"
+    #include "../../../core/String.hpp"
+    #include "../../../management/Research.h"
+    #include "../../../ride/RideData.h"
+    #include "../../Duktape.hpp"
+    #include "../../ScriptEngine.h"
+    #include "../object/ScObject.hpp"
 
 using namespace OpenRCT2;
 
@@ -48,7 +47,8 @@ namespace OpenRCT2::Scripting
         { "scenery", Research::EntryType::Scenery },
     });
 
-    template<> inline DukValue ToDuk(duk_context* ctx, const ResearchItem& value)
+    template<>
+    inline DukValue ToDuk(duk_context* ctx, const ResearchItem& value)
     {
         DukObject obj(ctx);
         obj.Set("category", ResearchCategoryMap[value.category]);
@@ -61,7 +61,8 @@ namespace OpenRCT2::Scripting
         return obj.Take();
     }
 
-    template<> Research::EntryType inline FromDuk(const DukValue& d)
+    template<>
+    Research::EntryType inline FromDuk(const DukValue& d)
     {
         if (d.type() == DukValue::STRING)
         {
@@ -74,7 +75,8 @@ namespace OpenRCT2::Scripting
         return Research::EntryType::Scenery;
     }
 
-    template<> ResearchItem inline FromDuk(const DukValue& d)
+    template<>
+    ResearchItem inline FromDuk(const DukValue& d)
     {
         ResearchItem result;
         result.baseRideType = 0;
@@ -83,8 +85,8 @@ namespace OpenRCT2::Scripting
         result.type = FromDuk<Research::EntryType>(d["type"]);
         auto baseRideType = d["rideType"];
         if (baseRideType.type() == DukValue::NUMBER)
-            result.baseRideType = baseRideType.as_int();
-        result.entryIndex = d["object"].as_int();
+            result.baseRideType = baseRideType.as_uint();
+        result.entryIndex = d["object"].as_uint();
         return result;
     }
 

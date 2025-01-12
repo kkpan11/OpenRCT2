@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2024 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,15 +15,15 @@
 #include "../../interface/Viewport.h"
 #include "../../localisation/Formatter.h"
 #include "../../localisation/Formatting.h"
-#include "../../localisation/Localisation.h"
+#include "../../localisation/StringIds.h"
 #include "../../object/BannerObject.h"
 #include "../../object/ObjectEntryManager.h"
 #include "../../profiling/Profiling.h"
 #include "../../ride/TrackDesign.h"
-#include "../../sprites.h"
 #include "../../world/Banner.h"
 #include "../../world/Scenery.h"
 #include "../../world/TileInspector.h"
+#include "../../world/tile_element/BannerElement.h"
 #include "Paint.TileElement.h"
 
 using namespace OpenRCT2;
@@ -49,7 +49,7 @@ static void PaintBannerScrollingText(
         return;
 
     auto scrollingMode = bannerEntry.scrolling_mode + (direction & 3);
-    if (scrollingMode >= MAX_SCROLLING_TEXT_MODES)
+    if (scrollingMode >= kMaxScrollingTextModes)
     {
         return;
     }
@@ -58,7 +58,7 @@ static void PaintBannerScrollingText(
     banner.FormatTextTo(ft, true);
 
     char text[256];
-    if (gConfigGeneral.UpperCaseBanners)
+    if (Config::Get().general.UpperCaseBanners)
     {
         FormatStringToUpper(text, sizeof(text), STR_BANNER_TEXT_FORMAT, ft.Data());
     }
@@ -68,7 +68,7 @@ static void PaintBannerScrollingText(
     }
 
     auto stringWidth = GfxGetStringWidth(text, FontStyle::Tiny);
-    auto scroll = (GetGameState().CurrentTicks / 2) % stringWidth;
+    auto scroll = stringWidth > 0 ? (GetGameState().CurrentTicks / 2) % stringWidth : 0;
     auto imageId = ScrollingTextSetup(session, STR_BANNER_TEXT_FORMAT, ft, scroll, scrollingMode, COLOUR_BLACK);
     PaintAddImageAsChild(session, imageId, { 0, 0, height + 22 }, { bbOffset, { 1, 1, 21 } });
 }
