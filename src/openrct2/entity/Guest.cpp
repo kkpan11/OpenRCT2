@@ -53,7 +53,6 @@
 #include "../scripting/HookEngine.h"
 #include "../scripting/ScriptEngine.h"
 #include "../sprites.h"
-#include "../ui/UiContext.h"
 #include "../ui/WindowManager.h"
 #include "../util/Util.h"
 #include "../windows/Intent.h"
@@ -1463,7 +1462,7 @@ void Guest::CheckCantFindRide()
         w->OnPrepareDraw();
     }
 
-    WindowInvalidateByNumber(WindowClass::Peep, Id);
+    windowMgr->InvalidateByNumber(WindowClass::Peep, Id);
 }
 
 /**
@@ -1935,7 +1934,7 @@ OpenRCT2::BitSet<OpenRCT2::Limits::kMaxRidesInPark> Guest::FindRidesToGoOn()
         // Always take the tall rides into consideration (realistic as you can usually see them from anywhere in the park)
         for (auto& ride : GetRideManager())
         {
-            if (ride.highest_drop_height > 66 || ride.ratings.excitement >= RIDE_RATING(8, 00))
+            if (ride.highest_drop_height > 66 || ride.ratings.excitement >= MakeRideRating(8, 00))
             {
                 rideConsideration[ride.id.ToUnderlying()] = true;
             }
@@ -1959,7 +1958,7 @@ bool Guest::ShouldGoOnRide(Ride& ride, StationIndex entranceNum, bool atQueue, b
     if (ride.status == RideStatus::Open && !(ride.lifecycle_flags & RIDE_LIFECYCLE_BROKEN_DOWN))
     {
         // Peeps that are leaving the park will refuse to go on any rides, with the exception of free transport rides.
-        assert(ride.type < std::size(RideTypeDescriptors));
+        assert(ride.type < std::size(kRideTypeDescriptors));
         if (!ride.GetRideTypeDescriptor().HasFlag(RtdFlag::isTransportRide) || ride.value == RIDE_VALUE_UNDEFINED
             || RideGetPrice(ride) != 0)
         {
@@ -2074,7 +2073,7 @@ bool Guest::ShouldGoOnRide(Ride& ride, StationIndex entranceNum, bool atQueue, b
                 // excitement check and will only do a basic intensity check when they arrive at the ride itself.
                 if (ride.id == GuestHeadingToRideId)
                 {
-                    if (ride.ratings.intensity > RIDE_RATING(10, 00) && !GetGameState().Cheats.ignoreRideIntensity)
+                    if (ride.ratings.intensity > MakeRideRating(10, 00) && !GetGameState().Cheats.ignoreRideIntensity)
                     {
                         PeepRideIsTooIntense(this, ride, peepAtRide);
                         return false;
@@ -2147,7 +2146,7 @@ bool Guest::ShouldGoOnRide(Ride& ride, StationIndex entranceNum, bool atQueue, b
                             }
 
                             // Very nauseous peeps will only go on very gentle rides.
-                            if (ride.ratings.nausea >= FIXED_2DP(1, 40) && Nausea > 160)
+                            if (ride.ratings.nausea >= MakeRideRating(1, 40) && Nausea > 160)
                             {
                                 ChoseNotToGoOnRide(ride, peepAtRide, false);
                                 return false;
@@ -2169,8 +2168,9 @@ bool Guest::ShouldGoOnRide(Ride& ride, StationIndex entranceNum, bool atQueue, b
 
                 if (!GetGameState().Cheats.ignoreRideIntensity)
                 {
-                    if (ride.max_positive_vertical_g > FIXED_2DP(5, 00) || ride.max_negative_vertical_g < FIXED_2DP(-4, 00)
-                        || ride.max_lateral_g > FIXED_2DP(4, 00))
+                    if (ride.max_positive_vertical_g > MakeFixed16_2dp(5, 00)
+                        || ride.max_negative_vertical_g < MakeFixed16_2dp(-4, 00)
+                        || ride.max_lateral_g > MakeFixed16_2dp(4, 00))
                     {
                         ChoseNotToGoOnRide(ride, peepAtRide, false);
                         return false;
@@ -2334,7 +2334,8 @@ void Guest::SpendMoney(money64& peep_expend_type, money64 amount, ExpenditureTyp
 
     peep_expend_type += amount;
 
-    WindowInvalidateByNumber(WindowClass::Peep, Id);
+    auto* windowMgr = Ui::GetWindowManager();
+    windowMgr->InvalidateByNumber(WindowClass::Peep, Id);
 
     FinancePayment(-amount, expenditure);
 
@@ -2882,7 +2883,7 @@ static bool PeepShouldGoOnRideAgain(Guest* peep, const Ride& ride)
         return false;
     if (!RideHasRatings(ride))
         return false;
-    if (ride.ratings.intensity > RIDE_RATING(10, 00) && !GetGameState().Cheats.ignoreRideIntensity)
+    if (ride.ratings.intensity > MakeRideRating(10, 00) && !GetGameState().Cheats.ignoreRideIntensity)
         return false;
     if (peep->Happiness < 180)
         return false;
@@ -2927,7 +2928,7 @@ static bool PeepReallyLikedRide(Guest* peep, const Ride& ride)
         return false;
     if (!RideHasRatings(ride))
         return false;
-    if (ride.ratings.intensity > RIDE_RATING(10, 00) && !GetGameState().Cheats.ignoreRideIntensity)
+    if (ride.ratings.intensity > MakeRideRating(10, 00) && !GetGameState().Cheats.ignoreRideIntensity)
         return false;
     return true;
 }
@@ -2949,8 +2950,8 @@ static PeepThoughtType PeepAssessSurroundings(int16_t centre_x, int16_t centre_y
     // TODO: Refactor this to step as tiles, 160 units is 5 tiles.
     int16_t initial_x = std::max(centre_x - 160, 0);
     int16_t initial_y = std::max(centre_y - 160, 0);
-    int16_t final_x = std::min(centre_x + 160, MAXIMUM_MAP_SIZE_BIG);
-    int16_t final_y = std::min(centre_y + 160, MAXIMUM_MAP_SIZE_BIG);
+    int16_t final_x = std::min(centre_x + 160, kMaximumMapSizeBig);
+    int16_t final_y = std::min(centre_y + 160, kMaximumMapSizeBig);
 
     for (int16_t x = initial_x; x < final_x; x += kCoordsXYStep)
     {
@@ -3149,7 +3150,7 @@ static void PeepLeavePark(Guest* peep)
     WindowBase* w = windowMgr->FindByNumber(WindowClass::Peep, peep->Id);
     if (w != nullptr)
         w->OnPrepareDraw();
-    WindowInvalidateByNumber(WindowClass::Peep, peep->Id);
+    windowMgr->InvalidateByNumber(WindowClass::Peep, peep->Id);
 }
 
 template<typename T>
@@ -3388,7 +3389,8 @@ void Guest::UpdateBuying()
             {
                 CashInPocket += 50.00_GBP;
             }
-            WindowInvalidateByNumber(WindowClass::Peep, Id);
+            auto* windowMgr = Ui::GetWindowManager();
+            windowMgr->InvalidateByNumber(WindowClass::Peep, Id);
         }
         Orientation ^= 0x10;
 
@@ -3544,7 +3546,7 @@ void Guest::UpdateRideAtEntrance()
 }
 
 /** rct2: 0x00981FD4, 0x00981FD6 */
-static constexpr CoordsXY _MazeEntranceStart[] = {
+static constexpr CoordsXY kMazeEntranceStart[] = {
     { 8, 8 },
     { 8, 24 },
     { 24, 24 },
@@ -3570,8 +3572,8 @@ void PeepUpdateRideLeaveEntranceMaze(Guest* peep, Ride& ride, CoordsXYZD& entran
     peep->Var37 = direction;
     peep->MazeLastEdge &= 3;
 
-    entrance_loc.x += _MazeEntranceStart[direction / 4].x;
-    entrance_loc.y += _MazeEntranceStart[direction / 4].y;
+    entrance_loc.x += kMazeEntranceStart[direction / 4].x;
+    entrance_loc.y += kMazeEntranceStart[direction / 4].y;
 
     peep->SetDestination(entrance_loc, 3);
 
@@ -3902,7 +3904,8 @@ void Guest::UpdateRideFreeVehicleEnterRide(Ride& ride)
     if (queueTime != station.QueueTime)
     {
         station.QueueTime = queueTime;
-        WindowInvalidateByNumber(WindowClass::Ride, CurrentRide.ToUnderlying());
+        auto* windowMgr = Ui::GetWindowManager();
+        windowMgr->InvalidateByNumber(WindowClass::Ride, CurrentRide.ToUnderlying());
     }
 
     if (PeepFlags & PEEP_FLAGS_TRACKING)
@@ -5785,7 +5788,9 @@ void Guest::UpdateLeavingPark()
     ContextBroadcastIntent(&intent);
     Var37 = 1;
 
-    WindowInvalidateByClass(WindowClass::GuestList);
+    auto* windowMgr = Ui::GetWindowManager();
+    windowMgr->InvalidateByClass(WindowClass::GuestList);
+
     uint8_t pathingResult;
     PerformNextAction(pathingResult);
     if (!(pathingResult & PATHING_OUTSIDE_PARK))
@@ -6320,12 +6325,12 @@ static bool PeepShouldWatchRide(TileElement* tileElement)
         return true;
     }
 
-    if (ride->ratings.excitement >= RIDE_RATING(4, 70))
+    if (ride->ratings.excitement >= MakeRideRating(4, 70))
     {
         return true;
     }
 
-    if (ride->ratings.intensity >= RIDE_RATING(4, 50))
+    if (ride->ratings.intensity >= MakeRideRating(4, 50))
     {
         return true;
     }

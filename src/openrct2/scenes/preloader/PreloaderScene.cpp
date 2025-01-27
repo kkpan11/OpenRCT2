@@ -16,9 +16,9 @@
 #include "../../OpenRCT2.h"
 #include "../../audio/audio.h"
 #include "../../interface/Viewport.h"
-#include "../../interface/Window.h"
 #include "../../localisation/LocalisationService.h"
 #include "../../localisation/StringIds.h"
+#include "../../ui/WindowManager.h"
 #include "../../windows/Intent.h"
 
 #include <sstream>
@@ -36,7 +36,7 @@ void PreloaderScene::Load()
     LOG_VERBOSE("PreloaderScene::Load()");
 
     gScreenFlags = SCREEN_FLAGS_PLAYING;
-    gameStateInitAll(GetGameState(), DEFAULT_MAP_SIZE);
+    gameStateInitAll(GetGameState(), kDefaultMapSize);
     ViewportInitAll();
     ContextOpenWindow(WindowClass::MainWindow);
     WindowSetFlagForAllViewports(VIEWPORT_FLAG_RENDERING_INHIBITED, true);
@@ -50,7 +50,9 @@ void PreloaderScene::Tick()
     gInUpdateCode = true;
 
     ContextHandleInput();
-    WindowInvalidateAll();
+
+    auto* windowMgr = Ui::GetWindowManager();
+    windowMgr->InvalidateAll();
 
     gInUpdateCode = false;
 
