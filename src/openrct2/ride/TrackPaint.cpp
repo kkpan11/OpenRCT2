@@ -16,7 +16,6 @@
 #include "../drawing/Drawing.h"
 #include "../drawing/LightFX.h"
 #include "../interface/Viewport.h"
-#include "../interface/Window.h"
 #include "../object/StationObject.h"
 #include "../paint/Paint.SessionFlags.h"
 #include "../paint/Paint.h"
@@ -1981,7 +1980,7 @@ void PaintTrack(PaintSession& session, Direction direction, int32_t height, cons
             const auto* originElement = ride->GetOriginElement(StationIndex::FromUnderlying(0));
             if (originElement != nullptr && originElement->GetTrackType() == TrackElemType::FlatTrack1x1B)
                 LightFx::AddKioskLights(session.MapPosition, height, zOffset);
-            else if (RideTypeDescriptors[ride->type].HasFlag(RtdFlag::isShopOrFacility))
+            else if (kRideTypeDescriptors[ride->type].HasFlag(RtdFlag::isShopOrFacility))
                 LightFx::AddShopLights(session.MapPosition, trackElement.GetDirection(), height, zOffset);
         }
 
