@@ -20,6 +20,7 @@
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
+#include <openrct2/SpriteIds.h>
 #include <openrct2/audio/audio.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/core/File.h>
@@ -35,7 +36,6 @@
 #include <openrct2/ride/TrackDesign.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/scenes/title/TitleScene.h>
-#include <openrct2/sprites.h>
 #include <openrct2/ui/UiContext.h>
 #include <openrct2/ui/WindowManager.h>
 #include <openrct2/windows/Intent.h>
@@ -798,7 +798,7 @@ namespace OpenRCT2::Ui::Windows
             if (GetCurrentTextBox().window.classification == classification && GetCurrentTextBox().window.number == number)
             {
                 WindowUpdateTextboxCaret();
-                WidgetInvalidate(*this, WIDX_FILENAME_TEXTBOX);
+                InvalidateWidget(WIDX_FILENAME_TEXTBOX);
             }
         }
 
@@ -1223,7 +1223,7 @@ namespace OpenRCT2::Ui::Windows
             {
                 // Load or overwrite
                 String::set(_currentFilename, std::size(_currentFilename), _listItems[selectedItem].name.c_str());
-                WidgetInvalidate(*this, WIDX_FILENAME_TEXTBOX);
+                InvalidateWidget(WIDX_FILENAME_TEXTBOX);
 
                 if ((_type & 0x01) == LOADSAVETYPE_SAVE)
                     WindowOverwritePromptOpen(_listItems[selectedItem].name, _listItems[selectedItem].path);

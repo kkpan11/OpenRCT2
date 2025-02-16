@@ -12,6 +12,7 @@
 #include "../../Cheats.h"
 #include "../../GameState.h"
 #include "../../OpenRCT2.h"
+#include "../../SpriteIds.h"
 #include "../../config/Config.h"
 #include "../../core/Numerics.hpp"
 #include "../../drawing/Drawing.h"
@@ -26,7 +27,6 @@
 #include "../../paint/Paint.h"
 #include "../../profiling/Profiling.h"
 #include "../../ride/TrackDesign.h"
-#include "../../sprites.h"
 #include "../../world/tile_element/Slope.h"
 #include "../../world/tile_element/SurfaceElement.h"
 #include "../../world/tile_element/TileElement.h"
@@ -841,7 +841,7 @@ static std::pair<int32_t, int32_t> SurfaceGetHeightAboveWater(
         int32_t waterHeight = surfaceElement.GetWaterHeight();
         if (waterHeight > height)
         {
-            localHeight += LAND_HEIGHT_STEP;
+            localHeight += kLandHeightStep;
 
             if (waterHeight != localHeight || !(localSurfaceShape & static_cast<int32_t>(kTileSlopeDiagonalFlag)))
             {
