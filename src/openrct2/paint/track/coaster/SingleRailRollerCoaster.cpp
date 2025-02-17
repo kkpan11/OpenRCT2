@@ -7,12 +7,12 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "../../../SpriteIds.h"
 #include "../../../drawing/Drawing.h"
 #include "../../../interface/Viewport.h"
 #include "../../../ride/RideData.h"
 #include "../../../ride/TrackData.h"
 #include "../../../ride/TrackPaint.h"
-#include "../../../sprites.h"
 #include "../../../world/Map.h"
 #include "../../../world/tile_element/TrackElement.h"
 #include "../../Paint.h"
@@ -723,7 +723,7 @@ namespace OpenRCT2::SingleRailRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex((SPR_G2_SINGLE_RAIL_TRACK_VERTICAL + 0)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            { 0, 0, height }, { { 4, 6, height + 8 }, { 13, 20, 55 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
@@ -738,7 +738,7 @@ namespace OpenRCT2::SingleRailRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex((SPR_G2_SINGLE_RAIL_TRACK_VERTICAL + 3)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            { 0, 0, height }, { { 4, 6, height + 8 }, { 13, 20, 55 } });
                         break;
                 }
                 if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
@@ -776,7 +776,7 @@ namespace OpenRCT2::SingleRailRC
             case 0:
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex((SPR_G2_SINGLE_RAIL_TRACK_VERTICAL + 4)),
-                    { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
+                    { 0, 0, height }, { { 4, 6, height + 8 }, { 2, 20, 48 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -791,7 +791,7 @@ namespace OpenRCT2::SingleRailRC
             case 3:
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex((SPR_G2_SINGLE_RAIL_TRACK_VERTICAL + 7)),
-                    { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
+                    { 0, 0, height }, { { 4, 6, height + 8 }, { 2, 20, 48 } });
                 break;
         }
         switch (direction)
@@ -825,12 +825,12 @@ namespace OpenRCT2::SingleRailRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex((SPR_G2_SINGLE_RAIL_TRACK_VERTICAL + 7)),
-                            { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
+                            { 0, 0, height }, { { 4, 6, height + 8 }, { 2, 20, 48 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex((SPR_G2_SINGLE_RAIL_TRACK_VERTICAL + 4)),
-                            { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
+                            { 0, 0, height }, { { 4, 6, height + 8 }, { 2, 20, 48 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
