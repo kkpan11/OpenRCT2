@@ -7,12 +7,12 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "../../../SpriteIds.h"
 #include "../../../drawing/Drawing.h"
 #include "../../../interface/Viewport.h"
 #include "../../../ride/RideData.h"
 #include "../../../ride/TrackData.h"
 #include "../../../ride/TrackPaint.h"
-#include "../../../sprites.h"
 #include "../../../world/Map.h"
 #include "../../../world/tile_element/TrackElement.h"
 #include "../../Paint.h"
@@ -499,16 +499,16 @@ namespace OpenRCT2::HybridRC
         const TrackElement& trackElement, SupportType supportType)
     {
         const CoordsXYZ boundBoxOffsets[4] = {
-            { 0, 6, height },
+            { 4, 6, height + 8 },
             { 24, 6, height },
             { 24, 6, height },
-            { 0, 6, height },
+            { 4, 6, height + 8 },
         };
         static constexpr CoordsXYZ boundBoxLengths[4] = {
-            { 32, 20, 3 },
+            { 13, 20, 55 },
             { 2, 20, 55 },
             { 2, 20, 55 },
-            { 32, 20, 3 },
+            { 13, 20, 55 },
         };
         static constexpr uint32_t imageIds[4] = {
             SPR_G2_HYBRID_TRACK_VERTICAL + 0,
@@ -551,16 +551,16 @@ namespace OpenRCT2::HybridRC
         const TrackElement& trackElement, SupportType supportType)
     {
         const CoordsXYZ boundBoxOffsets[4] = {
-            { 0, 6, height + 8 },
+            { 4, 6, height + 8 },
             { 24, 6, height + 8 },
             { 24, 6, height + 8 },
-            { 0, 6, height + 8 },
+            { 4, 6, height + 8 },
         };
         static constexpr CoordsXYZ boundBoxLengths[4] = {
-            { 32, 20, 3 },
+            { 2, 20, 48 },
             { 2, 20, 31 },
             { 2, 20, 31 },
-            { 32, 20, 3 },
+            { 2, 20, 48 },
         };
         static constexpr uint32_t imageIds[4] = {
             SPR_G2_HYBRID_TRACK_VERTICAL + 4,

@@ -12,6 +12,7 @@
 #include "../../Context.h"
 #include "../../Game.h"
 #include "../../GameState.h"
+#include "../../SpriteIds.h"
 #include "../../config/Config.h"
 #include "../../drawing/LightFX.h"
 #include "../../interface/Viewport.h"
@@ -23,7 +24,6 @@
 #include "../../profiling/Profiling.h"
 #include "../../ride/RideData.h"
 #include "../../ride/TrackDesign.h"
-#include "../../sprites.h"
 #include "../../world/Banner.h"
 #include "../../world/Entrance.h"
 #include "../../world/Footpath.h"
@@ -291,7 +291,7 @@ static void PaintParkEntrance(PaintSession& session, uint8_t direction, int32_t 
 
     auto& objManager = GetContext()->GetObjectManager();
     auto entrance = reinterpret_cast<EntranceObject*>(
-        objManager.GetLoadedObject(ObjectType::ParkEntrance, entranceEl.getEntryIndex()));
+        objManager.GetLoadedObject(ObjectType::parkEntrance, entranceEl.getEntryIndex()));
     auto sequence = entranceEl.GetSequenceIndex();
     switch (sequence)
     {
@@ -323,9 +323,8 @@ static void PaintParkEntrance(PaintSession& session, uint8_t direction, int32_t 
             if (entrance != nullptr)
             {
                 auto imageIndex = entrance->GetImage(sequence, direction);
-                auto y = ((direction / 2 + sequence / 2) & 1) ? 26 : 32;
                 PaintAddImageAsParent(
-                    session, imageTemplate.WithIndex(imageIndex), { 0, 0, height }, { { 3, 3, height }, { 26, y, 79 } });
+                    session, imageTemplate.WithIndex(imageIndex), { 0, 0, height }, { { 3, 3, height }, { 26, 26, 79 } });
             }
             break;
     }
