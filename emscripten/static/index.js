@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,35 +12,72 @@
     if (!window.SharedArrayBuffer)
     {
         document.getElementById("loadingWebassembly").innerText = "Error! SharedArrayBuffer is not defined. This page required the CORP and COEP response headers.";
+        return;
     }
     if (!window.WebAssembly)
     {
         document.getElementById("loadingWebassembly").innerText = "Error! This page requires WebAssembly. Please upgrade your browser or enable WebAssembly support.";
+        return;
     }
 
-    window.Module = await window.OPENRCT2_WEB(
-        {
-            noInitialRun: true,
-            arguments: [],
-            preRun: [],
-            postRun: [],
-            canvas: document.getElementById("canvas"),
-            print: function(msg)
-            {
-                console.log(msg);
-            },
-            printErr: function(msg)
-            {
-                console.log(msg);
-            },
-            totalDependencies: 0,
-            monitorRunDependencies: () => {},
-            locateFile: function(fileName)
-            {
-                console.log("loading", fileName);
-                return fileName;
-            }
+    let assets;
+    try
+    {
+        let req = await fetch("openrct2.zip");
+        if (!req.ok) {
+            throw new Error("Response is not ok!")
+        }
+        let data = await req.blob();
+        let zip = new JSZip();
+        let contents = await zip.loadAsync(data);
+        assets = {
+            js: URL.createObjectURL(new Blob([await zip.file("openrct2.js").async("uint8array")], {type: 'application/json'})),
+            wasm: URL.createObjectURL(new Blob([await zip.file("openrct2.wasm").async("uint8array")], {type: 'application/wasm'}))
+        }
+    }
+    catch(e)
+    {
+        assets = null;
+        console.warn("Failed to fetch openrct2.zip. Will pull not-compressed files", e);
+    }
+
+    await new Promise(resolve => {
+        const script = document.createElement("script");
+        script.src = assets === null ? "openrct2.js" : assets.js;
+        script.addEventListener("load", resolve);
+        script.addEventListener("error", (e) => {
+            document.getElementById("loadingWebassembly").innerText = "Error loading openrct2.js!";
+            console.error(e);
         });
+        document.body.appendChild(script);
+    })
+
+    window.Module = await window.OPENRCT2_WEB({
+        noInitialRun: true,
+        arguments: [],
+        preRun: [],
+        postRun: [],
+        canvas: document.getElementById("canvas"),
+        print: function(msg)
+        {
+            console.log(msg);
+        },
+        printErr: function(msg)
+        {
+            console.log(msg);
+        },
+        totalDependencies: 0,
+        monitorRunDependencies: () => {},
+        locateFile: function(fileName)
+        {
+            if (assets !== null && fileName === "openrct2.wasm")
+            {
+                return assets.wasm;
+            }
+            console.log("loading", fileName);
+            return fileName;
+        }
+    });
 
     Module.FS.mkdir("/persistent");
     Module.FS.mount(Module.FS.filesystems.IDBFS, {autoPersist: true}, '/persistent');
@@ -53,31 +90,23 @@
 
     await new Promise(res => Module.FS.syncfs(true, res));
 
-    let configExists = fileExists("/persistent/config.ini");
-    if (!configExists)
-    {
-        Module.FS.writeFile("/persistent/config.ini", `
-[general]
-game_path = "/RCT"
-uncap_fps = true
-window_scale = 1.750000
-`);
-    }
-
     const assetsOK = await updateAssets();
     if (!assetsOK)
     {
-        return
+        return;
     }
-    
-    Module.FS.writeFile("/OpenRCT2/changelog.txt", `EMSCRIPTEN --- README
 
-Since we're running in the web browser, we don't have direct access to the file system.
-All save data is saved under the directory /persistent.
+    let changelog = "";
+    try {
+        const request = await fetch("https://api.github.com/repos/OpenRCT2/OpenRCT2/releases/latest");
+        const json = JSON.parse(await request.text());
+        changelog = json.body;
+    } catch(e) {
+        console.log("Failed to fetch changelog with error:", e);
+    }
 
-ALWAYS be sure to save to /persistent/saves when saving a game! Otherwise it will be wiped!
+    Module.FS.writeFile("/OpenRCT2/changelog.txt", changelog);
 
-You can import/export the /persistent folder in the options menu.`);
     document.getElementById("loadingWebassembly").remove();
 
     let filesFound = fileExists("/RCT/Data/ch.dat");

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,9 +12,18 @@
 #include <deque>
 #include <openrct2/core/StringTypes.h>
 #include <openrct2/interface/InteractiveConsole.h>
-#include <openrct2/localisation/FormatCodes.h>
-#include <openrct2/world/Location.hpp>
+#include <openrct2/interface/ScreenCoords.hpp>
 #include <vector>
+
+namespace OpenRCT2
+{
+    struct TextInputSession;
+}
+
+namespace OpenRCT2::Drawing
+{
+    struct RenderTarget;
+}
 
 namespace OpenRCT2::Ui
 {
@@ -62,14 +71,14 @@ namespace OpenRCT2::Ui
         void Close() override;
         void Hide() override;
         void Toggle();
-        void WriteLine(const std::string& s, FormatToken colourFormat) override;
+        void WriteLine(const std::string& input, FormatToken colourFormat) override;
 
         void Input(ConsoleInput input);
         void RefreshCaret(size_t position = 0);
         void Scroll(int32_t linesToScroll);
 
         void Update();
-        void Draw(DrawPixelInfo& dpi) const;
+        void Draw(Drawing::RenderTarget& rt) const;
 
     private:
         void ClearInput();

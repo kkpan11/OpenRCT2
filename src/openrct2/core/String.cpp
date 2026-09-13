@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,10 +8,11 @@
  *****************************************************************************/
 
 #include "../Diagnostic.h"
+#include "EnumUtils.hpp"
 
 #include <cassert>
 #include <cctype>
-#include <cwctype>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -20,23 +21,20 @@
 #ifndef _WIN32
     #if defined(__linux__) || defined(__sun)
         #include <alloca.h>
-    #else
-        #include <stdlib.h>
     #endif
-    #include <unicode/ucnv.h>
     #include <unicode/unistr.h>
     #include <unicode/utypes.h>
 #else
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
     #include <windows.h>
 #endif
 
-#include "Memory.hpp"
 #include "String.hpp"
-#include "StringBuilder.h"
 #include "UTF8.h"
 
-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-    #include <strings.h>
+#if defined(__unix__) || defined(__HAIKU__) || (defined(__APPLE__) && defined(__MACH__))
     #define _stricmp(x, y) strcasecmp((x), (y))
 #endif
 
@@ -54,9 +52,9 @@ namespace OpenRCT2::String
     {
 #ifdef _WIN32
         int srcLen = static_cast<int>(src.size());
-        int sizeReq = WideCharToMultiByte(OpenRCT2::CodePage::UTF8, 0, src.data(), srcLen, nullptr, 0, nullptr, nullptr);
+        int sizeReq = WideCharToMultiByte(EnumValue(CodePage::utf8), 0, src.data(), srcLen, nullptr, 0, nullptr, nullptr);
         auto result = std::string(sizeReq, 0);
-        WideCharToMultiByte(OpenRCT2::CodePage::UTF8, 0, src.data(), srcLen, result.data(), sizeReq, nullptr, nullptr);
+        WideCharToMultiByte(EnumValue(CodePage::utf8), 0, src.data(), srcLen, result.data(), sizeReq, nullptr, nullptr);
         return result;
 #else
     // Which constructor to use depends on the size of wchar_t...
@@ -82,9 +80,9 @@ namespace OpenRCT2::String
     {
 #ifdef _WIN32
         int srcLen = static_cast<int>(src.size());
-        int sizeReq = MultiByteToWideChar(OpenRCT2::CodePage::UTF8, 0, src.data(), srcLen, nullptr, 0);
+        int sizeReq = MultiByteToWideChar(EnumValue(CodePage::utf8), 0, src.data(), srcLen, nullptr, 0);
         auto result = std::wstring(sizeReq, 0);
-        MultiByteToWideChar(OpenRCT2::CodePage::UTF8, 0, src.data(), srcLen, result.data(), sizeReq);
+        MultiByteToWideChar(EnumValue(CodePage::utf8), 0, src.data(), srcLen, result.data(), sizeReq);
         return result;
 #else
         icu::UnicodeString str = icu::UnicodeString::fromUTF8(std::string(src));
@@ -172,11 +170,6 @@ namespace OpenRCT2::String
         return equalsImpl(a, b, false);
     }
 
-    bool equals(const u8string& a, const u8string& b)
-    {
-        return equalsImpl(a, b, false);
-    }
-
     bool equals(const utf8* a, const utf8* b, bool ignoreCase)
     {
         if (a == b)
@@ -193,11 +186,6 @@ namespace OpenRCT2::String
     }
 
     bool iequals(u8string_view a, u8string_view b)
-    {
-        return equalsImpl(a, b, true);
-    }
-
-    bool iequals(const u8string& a, const u8string& b)
     {
         return equalsImpl(a, b, true);
     }
@@ -348,7 +336,15 @@ namespace OpenRCT2::String
         // null terminator.
         va_list copy;
         va_copy(copy, args);
+#pragma GCC diagnostic push
+// clang does not recognize -Wformat-truncation and errors on -Wunknown-warning-option.
+// GCC does not recognize disabling -Wunknown-warning-option via pragma
+// Only disable this warning for GCC, as Clang does not support it.
+#ifndef __clang__
+    #pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
         auto len = vsnprintf(nullptr, 0, format, copy);
+#pragma GCC diagnostic pop
         va_end(copy);
 
         if (len >= 0)
@@ -363,7 +359,7 @@ namespace OpenRCT2::String
             return u8string(buffer, buffer + len);
         }
 
-        LOG_WARNING("Encoding error occured");
+        LOG_WARNING("Encoding error occurred");
         return u8string{};
     }
 
@@ -392,31 +388,27 @@ namespace OpenRCT2::String
         return buffer;
     }
 
-    std::vector<std::string> split(std::string_view s, std::string_view delimiter)
+    std::vector<std::string_view> split(std::string_view s, std::string_view delimiter)
     {
         if (delimiter.empty())
         {
             throw std::invalid_argument("delimiter can not be empty.");
         }
-
-        std::vector<std::string> results;
-        if (!s.empty())
+        std::vector<std::string_view> results;
+        if (s.empty())
         {
-            size_t index = 0;
-            size_t nextIndex;
-            do
+            return results;
+        }
+        size_t start = 0;
+        while (true)
+        {
+            size_t end = s.find(delimiter, start);
+            results.emplace_back(s.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start));
+            if (end == std::string_view::npos)
             {
-                nextIndex = s.find(delimiter, index);
-                if (nextIndex == std::string::npos)
-                {
-                    results.emplace_back(s.substr(index));
-                }
-                else
-                {
-                    results.emplace_back(s.substr(index, nextIndex - index));
-                }
-                index = nextIndex + delimiter.size();
-            } while (nextIndex != SIZE_MAX);
+                break;
+            }
+            start = end + delimiter.size();
         }
         return results;
     }
@@ -494,7 +486,7 @@ namespace OpenRCT2::String
             // current character.
             size_t newStringSize = (nextCh - 1) - firstNonWhitespace;
 
-#ifdef DEBUG
+#if DEBUG > 0
             size_t currentStringSize = sizeOf(str);
             Guard::Assert(newStringSize < currentStringSize, GUARD_LINE);
 #endif
@@ -568,53 +560,53 @@ namespace OpenRCT2::String
     }
 
 #ifndef _WIN32
-    static const char* getIcuCodePage(int32_t codePage)
+    static const char* getIcuCodePage(OpenRCT2::CodePage codePage)
     {
         switch (codePage)
         {
-            case OpenRCT2::CodePage::CP_932:
+            case OpenRCT2::CodePage::cp932:
                 return "windows-932";
 
-            case OpenRCT2::CodePage::CP_936:
+            case OpenRCT2::CodePage::cp936:
                 return "GB2312";
 
-            case OpenRCT2::CodePage::CP_949:
+            case OpenRCT2::CodePage::cp949:
                 return "windows-949";
 
-            case OpenRCT2::CodePage::CP_950:
+            case OpenRCT2::CodePage::cp950:
                 return "big5";
 
-            case OpenRCT2::CodePage::CP_1252:
+            case OpenRCT2::CodePage::cp1252:
                 return "windows-1252";
 
-            case OpenRCT2::CodePage::UTF8:
+            case OpenRCT2::CodePage::utf8:
                 return "utf-8";
 
             default:
-                throw std::runtime_error("Unsupported code page: " + std::to_string(codePage));
+                throw std::runtime_error("Unsupported code page: " + std::to_string(EnumValue(codePage)));
         }
     }
 #endif
 
-    std::string convertToUtf8(std::string_view src, int32_t srcCodePage)
+    std::string convertToUtf8(std::string_view src, CodePage srcCodePage)
     {
 #ifdef _WIN32
         // Convert from source code page to UTF-16
         std::wstring u16;
         {
             int srcLen = static_cast<int>(src.size());
-            int sizeReq = MultiByteToWideChar(srcCodePage, 0, src.data(), srcLen, nullptr, 0);
+            int sizeReq = MultiByteToWideChar(EnumValue(srcCodePage), 0, src.data(), srcLen, nullptr, 0);
             u16 = std::wstring(sizeReq, 0);
-            MultiByteToWideChar(srcCodePage, 0, src.data(), srcLen, u16.data(), sizeReq);
+            MultiByteToWideChar(EnumValue(srcCodePage), 0, src.data(), srcLen, u16.data(), sizeReq);
         }
 
         // Convert from UTF-16 to destination code page
         std::string dst;
         {
             int srcLen = static_cast<int>(u16.size());
-            int sizeReq = WideCharToMultiByte(OpenRCT2::CodePage::UTF8, 0, u16.data(), srcLen, nullptr, 0, nullptr, nullptr);
+            int sizeReq = WideCharToMultiByte(EnumValue(CodePage::utf8), 0, u16.data(), srcLen, nullptr, 0, nullptr, nullptr);
             dst = std::string(sizeReq, 0);
-            WideCharToMultiByte(OpenRCT2::CodePage::UTF8, 0, u16.data(), srcLen, dst.data(), sizeReq, nullptr, nullptr);
+            WideCharToMultiByte(EnumValue(CodePage::utf8), 0, u16.data(), srcLen, dst.data(), sizeReq, nullptr, nullptr);
         }
 
         return dst;
@@ -724,43 +716,71 @@ namespace OpenRCT2::String
         return escaped.str();
     }
 
-    /* Case insensitive logical compare */
-    // Example:
-    // - Guest 10
-    // - Guest 99
-    // - Guest 100
-    // - John v2.0
-    // - John v2.1
+    // Case insensitive natural sort (numbers compared numerically).
+    // Strings starting with digits sort before alphabetic strings.
     int32_t logicalCmp(const char* s1, const char* s2)
     {
-        for (;;)
+        const auto isDigit = [](char c) { return std::isdigit(static_cast<unsigned char>(c)); };
+        const auto toUpper = [](char c) { return std::toupper(static_cast<unsigned char>(c)); };
+
+        // Prioritise strings starting with digits
+        bool s1StartsDigit = isDigit(*s1);
+        bool s2StartsDigit = isDigit(*s2);
+        if (s1StartsDigit && !s2StartsDigit)
+            return -1;
+        if (!s1StartsDigit && s2StartsDigit)
+            return 1;
+
+        while (*s1 != '\0' && *s2 != '\0')
         {
-            if (*s2 == '\0')
-                return *s1 != '\0';
-            if (*s1 == '\0')
-                return -1;
-            if (!(isdigit(static_cast<unsigned char>(*s1)) && isdigit(static_cast<unsigned char>(*s2))))
+            // Check if both characters are digits
+            if (isDigit(*s1) && isDigit(*s2))
             {
-                if (toupper(*s1) != toupper(*s2))
-                    return toupper(*s1) - toupper(*s2);
+                // Skip leading zeros
+                while (*s1 == '0' && isDigit(*(s1 + 1)))
+                    s1++;
+                while (*s2 == '0' && isDigit(*(s2 + 1)))
+                    s2++;
 
-                ++s1;
-                ++s2;
+                unsigned long long num1 = 0, num2 = 0;
+                const char* p1 = s1;
+                const char* p2 = s2;
+
+                while (isDigit(*p1))
+                {
+                    num1 = num1 * 10 + (*p1 - '0');
+                    p1++;
+                }
+                while (isDigit(*p2))
+                {
+                    num2 = num2 * 10 + (*p2 - '0');
+                    p2++;
+                }
+
+                if (num1 != num2)
+                {
+                    return num1 < num2 ? -1 : 1;
+                }
+
+                s1 = p1;
+                s2 = p2;
+
+                continue;
             }
-            else
+
+            // Compare non-digit characters case-insensitively
+            char c1 = toUpper(*s1);
+            char c2 = toUpper(*s2);
+            if (c1 != c2)
             {
-                char *lim1, *lim2;
-                unsigned long n1 = strtoul(s1, &lim1, 10);
-                unsigned long n2 = strtoul(s2, &lim2, 10);
-                if (n1 > n2)
-                    return 1;
-                if (n1 < n2)
-                    return -1;
-
-                s1 = lim1;
-                s2 = lim2;
+                return c1 - c2;
             }
+
+            s1++;
+            s2++;
         }
+
+        return *s1 == '\0' ? (*s2 == '\0' ? 0 : -1) : 1;
     }
 
     char* safeUtf8Copy(char* destination, const char* source, size_t size)

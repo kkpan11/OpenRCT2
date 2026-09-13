@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include "../core/IStream.hpp"
 #include "../peep/PeepAnimations.h"
 #include "Object.h"
 
@@ -18,43 +17,46 @@
 
 enum class RCT12PeepAnimationGroup : uint8_t;
 
-class PeepAnimationsObject final : public Object
+namespace OpenRCT2
 {
-private:
-    ImageIndex _imageOffsetId;
-    std::vector<OpenRCT2::PeepAnimations> _animationGroups;
-    OpenRCT2::AnimationPeepType _peepType;
-    bool _noRandomPlacement;
-
-public:
-    static constexpr ObjectType kObjectType = ObjectType::peepAnimations;
-
-    void ReadJson(IReadObjectContext* context, json_t& root) override;
-    OpenRCT2::PeepAnimations ReadAnimations(const EnumMap<PeepAnimationType>& requiredAnimationMap, json_t& animations);
-    void ReadProperties(json_t& properties);
-    void Load() override;
-    void Unload() override;
-
-    std::string GetCostumeName() const;
-    ImageIndex GetInlineImageId() const;
-
-    const OpenRCT2::PeepAnimation& GetPeepAnimation(
-        PeepAnimationGroup animGroup, PeepAnimationType animType = PeepAnimationType::Walking) const;
-    const OpenRCT2::SpriteBounds& GetSpriteBounds(
-        PeepAnimationGroup spriteType, PeepAnimationType actionAnimationGroup = PeepAnimationType::Walking) const;
-
-    OpenRCT2::AnimationPeepType GetPeepType() const;
-    size_t GetNumAnimationGroups() const;
-    RCT12PeepAnimationGroup GetLegacyPosition(PeepAnimationGroup animGroup) const;
-    std::string_view GetScriptName(PeepAnimationGroup animGroup) const;
-
-    bool IsSlowWalking(PeepAnimationGroup animGroup) const;
-
-    bool ShouldExcludeFromRandomPlacement() const
+    class PeepAnimationsObject final : public Object
     {
-        return _noRandomPlacement;
-    }
+    private:
+        ImageIndex _imageOffsetId;
+        std::vector<PeepAnimations> _animationGroups;
+        AnimationPeepType _peepType;
+        bool _noRandomPlacement;
 
-    void DrawPreview(DrawPixelInfo& dpi, int32_t width, int32_t height) const override;
-    void SetRepositoryItem(ObjectRepositoryItem* item) const override;
-};
+    public:
+        static constexpr ObjectType kObjectType = ObjectType::peepAnimations;
+
+        void ReadJson(IReadObjectContext* context, json_t& root) override;
+        PeepAnimations ReadAnimations(const EnumMap<PeepAnimationType>& requiredAnimationMap, json_t& animations);
+        void ReadProperties(json_t& properties);
+        void Load() override;
+        void Unload() override;
+
+        std::string GetCostumeName() const;
+        ImageIndex GetInlineImageId() const;
+
+        const PeepAnimation& GetPeepAnimation(
+            PeepAnimationGroup animGroup, PeepAnimationType animType = PeepAnimationType::walking) const;
+        const SpriteBounds& GetSpriteBounds(
+            PeepAnimationGroup spriteType, PeepAnimationType actionAnimationGroup = PeepAnimationType::walking) const;
+
+        AnimationPeepType GetPeepType() const;
+        size_t GetNumAnimationGroups() const;
+        RCT12PeepAnimationGroup GetLegacyPosition(PeepAnimationGroup animGroup) const;
+        std::string_view GetScriptName(PeepAnimationGroup animGroup) const;
+
+        bool IsSlowWalking(PeepAnimationGroup animGroup) const;
+
+        bool ShouldExcludeFromRandomPlacement() const
+        {
+            return _noRandomPlacement;
+        }
+
+        void DrawPreview(Drawing::RenderTarget& rt, int32_t width, int32_t height) const override;
+        void SetRepositoryItem(ObjectRepositoryItem* item) const override;
+    };
+} // namespace OpenRCT2

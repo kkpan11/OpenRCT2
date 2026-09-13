@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,10 +10,9 @@
 #include "Window.h"
 
 #include "../UiStringIds.h"
-#include "Theme.h"
 #include "Widget.h"
 
-#include <SDL.h>
+#include <SDL_video.h>
 #include <algorithm>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -21,24 +20,20 @@
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/SpriteIds.h>
-#include <openrct2/audio/Audio.h>
 #include <openrct2/config/Config.h>
-#include <openrct2/drawing/Drawing.h>
-#include <openrct2/entity/EntityRegistry.h>
+#include <openrct2/drawing/Rectangle.h>
+#include <openrct2/drawing/RenderTarget.h>
 #include <openrct2/interface/Viewport.h>
 #include <openrct2/interface/Widget.h>
 #include <openrct2/ui/WindowManager.h>
 #include <openrct2/world/Location.hpp>
 
-class Formatter;
+using namespace OpenRCT2::Drawing;
 
-namespace OpenRCT2
+namespace OpenRCT2::Ui
 {
-    using namespace OpenRCT2::Ui;
-
     // The amount of pixels to scroll per wheel click
     constexpr int32_t kWindowScrollPixels = 17;
-
     static int32_t _previousAbsoluteWheel = 0;
 
     static int32_t WindowGetWidgetIndex(const WindowBase& w, Widget* widget)
@@ -52,7 +47,7 @@ namespace OpenRCT2
 
     static int32_t WindowGetScrollIndex(const WindowBase& w, int32_t targetWidgetIndex)
     {
-        if (w.widgets[targetWidgetIndex].type != WindowWidgetType::Scroll)
+        if (w.widgets[targetWidgetIndex].type != WidgetType::scroll)
             return -1;
 
         int32_t scrollIndex = 0;
@@ -61,7 +56,7 @@ namespace OpenRCT2
             if (widgetIndex == targetWidgetIndex)
                 break;
             auto& widget = w.widgets[widgetIndex];
-            if (widget.type == WindowWidgetType::Scroll)
+            if (widget.type == WidgetType::scroll)
                 scrollIndex++;
         }
 
@@ -73,7 +68,7 @@ namespace OpenRCT2
         for (WidgetIndex widgetIndex = 0; widgetIndex < w.widgets.size(); widgetIndex++)
         {
             auto& widget = w.widgets[widgetIndex];
-            if (widget.type != WindowWidgetType::Scroll)
+            if (widget.type != WidgetType::scroll)
                 continue;
 
             if (scrollIndex == 0)
@@ -94,26 +89,26 @@ namespace OpenRCT2
         Widget* widget = WindowGetScrollWidget(w, scrollIndex);
         WidgetIndex widgetIndex = WindowGetWidgetIndex(w, widget);
 
-        if (scroll.flags & VSCROLLBAR_VISIBLE)
+        if (scroll.flags.has(ScrollFlag::vScrollbarVisible))
         {
-            int32_t size = widget->height() - 1;
-            if (scroll.flags & HSCROLLBAR_VISIBLE)
+            int32_t size = widget->height() - 2;
+            if (scroll.flags.has(ScrollFlag::hScrollbarVisible))
                 size -= 11;
             size = std::max(0, scroll.contentHeight - size);
             scroll.contentOffsetY = std::min(std::max(0, scroll.contentOffsetY + wheel), size);
         }
         else
         {
-            int32_t size = widget->width() - 1;
-            if (scroll.flags & VSCROLLBAR_VISIBLE)
+            int32_t size = widget->width() - 2;
+            if (scroll.flags.has(ScrollFlag::vScrollbarVisible))
                 size -= 11;
             size = std::max(0, scroll.contentWidth - size);
             scroll.contentOffsetX = std::min(std::max(0, scroll.contentOffsetX + wheel), size);
         }
 
-        WidgetScrollUpdateThumbs(w, widgetIndex);
+        widgetScrollUpdateThumbs(w, widgetIndex);
 
-        auto* windowMgr = Ui::GetWindowManager();
+        auto* windowMgr = GetWindowManager();
         windowMgr->InvalidateWidget(w, widgetIndex);
     }
 
@@ -127,12 +122,12 @@ namespace OpenRCT2
         for (WidgetIndex widgetIndex = 0; widgetIndex < w.widgets.size(); widgetIndex++)
         {
             const auto& widget = w.widgets[widgetIndex];
-            if (widget.type != WindowWidgetType::Scroll)
+            if (widget.type != WidgetType::scroll)
                 continue;
 
             // Originally always checked first scroll view, bug maybe?
             const auto& scroll = w.scrolls[scrollIndex];
-            if (scroll.flags & (HSCROLLBAR_VISIBLE | VSCROLLBAR_VISIBLE))
+            if (scroll.flags.hasAny(ScrollFlag::hScrollbarVisible, ScrollFlag::vScrollbarVisible))
             {
                 WindowScrollWheelInput(w, scrollIndex, wheel);
                 return 1;
@@ -158,11 +153,11 @@ namespace OpenRCT2
             Windows::WindowZoomOut(w, true);
     }
 
-    static bool isSpinnerGroup(WindowBase& w, WidgetIndex index, WindowWidgetType buttonType)
+    static bool isSpinnerGroup(WindowBase& w, WidgetIndex index, WidgetType buttonType)
     {
         const auto& widgets = w.widgets;
 
-        if (widgets[index].type != WindowWidgetType::Spinner && widgets[index].type != WindowWidgetType::ImgBtn)
+        if (widgets[index].type != WidgetType::spinner && widgets[index].type != WidgetType::imgBtn)
             return false;
 
         if (static_cast<size_t>(index + 2) >= widgets.size())
@@ -188,12 +183,12 @@ namespace OpenRCT2
                 break;
             }
 
-            if (isSpinnerGroup(w, reverseIndex, WindowWidgetType::TrnBtn))
+            if (isSpinnerGroup(w, reverseIndex, WidgetType::trnBtn))
             {
                 return reverseIndex;
             }
 
-            if (isSpinnerGroup(w, reverseIndex, WindowWidgetType::Button))
+            if (isSpinnerGroup(w, reverseIndex, WidgetType::button))
             {
                 return reverseIndex;
             }
@@ -217,10 +212,10 @@ namespace OpenRCT2
         const auto entryWidgetType = w.widgets[*spinnerGroupIndex].type;
         auto targetWidgetIndex = *spinnerGroupIndex;
 
-        if (entryWidgetType == WindowWidgetType::ImgBtn)
+        if (entryWidgetType == WidgetType::imgBtn)
         {
-            auto expectedContent1 = ImageId(SPR_LAND_TOOL_DECREASE, FilterPaletteID::PaletteNull);
-            auto expectedContent2 = ImageId(SPR_LAND_TOOL_INCREASE, FilterPaletteID::PaletteNull);
+            auto expectedContent1 = ImageId(SPR_LAND_TOOL_DECREASE, FilterPaletteID::paletteNull);
+            auto expectedContent2 = ImageId(SPR_LAND_TOOL_INCREASE, FilterPaletteID::paletteNull);
 
             auto button1Image = w.widgets[*spinnerGroupIndex + 1].image;
             auto button2Image = w.widgets[*spinnerGroupIndex + 2].image;
@@ -232,7 +227,7 @@ namespace OpenRCT2
             // Expected widget order: decrease, increase
             targetWidgetIndex += wheel < 0 ? 2 : 1;
         }
-        else if (entryWidgetType == WindowWidgetType::Spinner)
+        else if (entryWidgetType == WidgetType::spinner)
         {
             auto button1StringId = w.widgets[*spinnerGroupIndex + 1].text;
             auto button2StringId = w.widgets[*spinnerGroupIndex + 2].text;
@@ -247,12 +242,12 @@ namespace OpenRCT2
 
         assert(targetWidgetIndex >= 0 && targetWidgetIndex < w.widgets.size());
 
-        if (WidgetIsDisabled(w, targetWidgetIndex))
+        if (widgetIsDisabled(w, targetWidgetIndex))
         {
             return false;
         }
 
-        w.OnMouseDown(targetWidgetIndex);
+        w.onMouseDown(targetWidgetIndex);
         return true;
     }
 
@@ -273,14 +268,14 @@ namespace OpenRCT2
             return;
 
         // Check window cursor is over
-        if (!(InputTestFlag(INPUT_FLAG_5)))
+        if (!gInputFlags.has(InputFlag::rightMousePressed))
         {
             auto* windowMgr = GetWindowManager();
             WindowBase* w = windowMgr->FindFromPoint(cursorState->position);
             if (w != nullptr)
             {
                 // Check if main window
-                if (w->classification == WindowClass::MainWindow || w->classification == WindowClass::Viewport)
+                if (w->classification == WindowClass::mainWindow || w->classification == WindowClass::viewport)
                 {
                     WindowViewportWheelInput(*w, relative_wheel);
                     return;
@@ -291,11 +286,11 @@ namespace OpenRCT2
                 if (widgetIndex != kWidgetIndexNull)
                 {
                     const auto& widget = w->widgets[widgetIndex];
-                    if (widget.type == WindowWidgetType::Scroll)
+                    if (widget.type == WidgetType::scroll)
                     {
                         int32_t scrollIndex = WindowGetScrollIndex(*w, widgetIndex);
                         const auto& scroll = w->scrolls[scrollIndex];
-                        if (scroll.flags & (HSCROLLBAR_VISIBLE | VSCROLLBAR_VISIBLE))
+                        if (scroll.flags.hasAny(ScrollFlag::hScrollbarVisible, ScrollFlag::vScrollbarVisible))
                         {
                             WindowScrollWheelInput(*w, WindowGetScrollIndex(*w, widgetIndex), pixel_scroll);
                             return;
@@ -319,27 +314,10 @@ namespace OpenRCT2
 
     void ApplyScreenSaverLockSetting()
     {
-        Config::Get().general.DisableScreensaver ? SDL_DisableScreenSaver() : SDL_EnableScreenSaver();
+        Config::Get().general.disableScreensaver ? SDL_DisableScreenSaver() : SDL_EnableScreenSaver();
     }
 
-    /**
-     *
-     *  rct2: 0x006EA776
-     */
-    static void WindowInvalidatePressedImageButton(const WindowBase& w)
-    {
-        for (WidgetIndex widgetIndex = 0; widgetIndex < w.widgets.size(); widgetIndex++)
-        {
-            auto& widget = w.widgets[widgetIndex];
-            if (widget.type != WindowWidgetType::ImgBtn)
-                continue;
-
-            if (WidgetIsPressed(w, widgetIndex) || isToolActive(w, widgetIndex))
-                GfxSetDirtyBlocks({ w.windowPos, w.windowPos + ScreenCoordsXY{ w.width, w.height } });
-        }
-    }
-
-    void Window::ScrollToViewport()
+    void Window::scrollToViewport()
     {
         if (viewport == nullptr || !focus.has_value())
             return;
@@ -351,104 +329,104 @@ namespace OpenRCT2
             WindowScrollToLocation(*mainWindow, newCoords);
     }
 
-    void Window::OnDraw(DrawPixelInfo& dpi)
+    void Window::onDraw(RenderTarget& rt)
     {
-        Windows::WindowDrawWidgets(*this, dpi);
+        Windows::WindowDrawWidgets(*this, rt);
     }
 
-    void Window::OnDrawWidget(WidgetIndex widgetIndex, DrawPixelInfo& dpi)
+    void Window::onDrawWidget(WidgetIndex widgetIndex, RenderTarget& rt)
     {
-        WidgetDraw(dpi, *this, widgetIndex);
+        widgetDraw(rt, *this, widgetIndex);
     }
 
-    void Window::InitScrollWidgets()
+    void Window::initScrollWidgets()
     {
         Windows::WindowInitScrollWidgets(*this);
     }
 
-    void Window::InvalidateWidget(WidgetIndex widgetIndex)
+    void Window::invalidateWidget(WidgetIndex widgetIndex)
     {
-        auto* windowMgr = Ui::GetWindowManager();
+        auto* windowMgr = GetWindowManager();
         windowMgr->InvalidateWidget(*this, widgetIndex);
     }
 
-    bool Window::IsWidgetDisabled(WidgetIndex widgetIndex) const
+    bool Window::isWidgetDisabled(WidgetIndex widgetIndex) const
     {
-        return WidgetIsDisabled(*this, widgetIndex);
+        return widgetIsDisabled(*this, widgetIndex);
     }
 
-    bool Window::IsWidgetPressed(WidgetIndex widgetIndex) const
+    bool Window::isWidgetPressed(WidgetIndex widgetIndex) const
     {
-        return WidgetIsPressed(*this, widgetIndex);
+        return widgetIsPressed(*this, widgetIndex);
     }
 
-    void Window::SetWidgetEnabled(WidgetIndex widgetIndex, bool value)
+    void Window::setWidgetEnabled(WidgetIndex widgetIndex, bool value)
     {
-        WidgetSetEnabled(*this, widgetIndex, value);
+        widgetSetEnabled(*this, widgetIndex, value);
     }
 
-    void Window::SetWidgetDisabled(WidgetIndex widgetIndex, bool value)
+    void Window::setWidgetDisabled(WidgetIndex widgetIndex, bool value)
     {
-        WidgetSetDisabled(*this, widgetIndex, value);
+        widgetSetDisabled(*this, widgetIndex, value);
     }
 
-    void Window::SetWidgetDisabledAndInvalidate(WidgetIndex widgetIndex, bool value)
+    void Window::setWidgetDisabledAndInvalidate(WidgetIndex widgetIndex, bool value)
     {
-        bool oldState = IsWidgetDisabled(widgetIndex);
+        bool oldState = isWidgetDisabled(widgetIndex);
         if (oldState != value)
         {
-            WidgetSetDisabled(*this, widgetIndex, value);
-            InvalidateWidget(widgetIndex);
+            widgetSetDisabled(*this, widgetIndex, value);
+            invalidateWidget(widgetIndex);
         }
     }
 
-    void Window::SetWidgetPressed(WidgetIndex widgetIndex, bool value)
+    void Window::setWidgetPressed(WidgetIndex widgetIndex, bool value)
     {
-        WidgetSetPressed(*this, widgetIndex, value);
+        widgetSetPressed(*this, widgetIndex, value);
     }
 
-    void Window::SetCheckboxValue(WidgetIndex widgetIndex, bool value)
+    void Window::setCheckboxValue(WidgetIndex widgetIndex, bool value)
     {
-        SetWidgetPressed(widgetIndex, value);
+        setWidgetPressed(widgetIndex, value);
     }
 
-    void Window::DrawWidgets(DrawPixelInfo& dpi)
+    void Window::drawWidgets(RenderTarget& rt)
     {
-        Windows::WindowDrawWidgets(*this, dpi);
+        Windows::WindowDrawWidgets(*this, rt);
     }
 
-    void Window::Close()
+    void Window::close()
     {
-        CloseWindowModifier modifier = GetCloseModifier();
+        CloseWindowModifier modifier = getCloseModifier();
 
         if (modifier == CloseWindowModifier::shift)
         {
-            CloseOthers();
+            closeOthers();
         }
         else if (modifier == CloseWindowModifier::control)
         {
-            CloseOthersOfThisClass();
+            closeOthersOfThisClass();
         }
         else
         {
-            auto* windowMgr = Ui::GetWindowManager();
+            auto* windowMgr = GetWindowManager();
             windowMgr->Close(*this);
         }
     }
 
-    void Window::CloseOthers()
+    void Window::closeOthers()
     {
-        auto* windowMgr = Ui::GetWindowManager();
+        auto* windowMgr = GetWindowManager();
         windowMgr->CloseAllExceptNumberAndClass(number, classification);
     }
 
-    void Window::CloseOthersOfThisClass()
+    void Window::closeOthersOfThisClass()
     {
-        auto* windowMgr = Ui::GetWindowManager();
+        auto* windowMgr = GetWindowManager();
         windowMgr->CloseByClass(classification);
     }
 
-    CloseWindowModifier Window::GetCloseModifier()
+    CloseWindowModifier Window::getCloseModifier()
     {
         CloseWindowModifier lastModifier = CloseWindowModifier::none;
 
@@ -462,43 +440,15 @@ namespace OpenRCT2
         return lastModifier;
     }
 
-    void Window::TextInputOpen(
+    void Window::textInputOpen(
         WidgetIndex callWidget, StringId title, StringId description, const Formatter& descriptionArgs, StringId existingText,
         uintptr_t existingArgs, int32_t maxLength)
     {
-        OpenRCT2::Ui::Windows::WindowTextInputOpen(
+        Windows::WindowTextInputOpen(
             this, callWidget, title, description, descriptionArgs, existingText, existingArgs, maxLength);
     }
 
-    void Window::ResizeFrame()
-    {
-        // Frame
-        widgets[0].right = width - 1;
-        widgets[0].bottom = height - 1;
-        // Title
-        widgets[1].right = width - 2;
-        // Close button
-        if (Config::Get().interface.WindowButtonsOnTheLeft)
-        {
-            widgets[2].left = 2;
-            widgets[2].right = 2 + kCloseButtonSize;
-        }
-        else
-        {
-            widgets[2].left = width - 3 - kCloseButtonSize;
-            widgets[2].right = width - 3;
-        }
-    }
-
-    void Window::ResizeFrameWithPage()
-    {
-        ResizeFrame();
-        // Page background
-        widgets[3].right = width - 1;
-        widgets[3].bottom = height - 1;
-    }
-
-    void Window::ResizeSpinner(WidgetIndex widgetIndex, const ScreenCoordsXY& origin, const ScreenSize& size)
+    void Window::resizeSpinner(WidgetIndex widgetIndex, const ScreenCoordsXY& origin, const ScreenSize& size)
     {
         auto right = origin.x + size.width - 1;
         auto bottom = origin.y + size.height - 1;
@@ -507,18 +457,19 @@ namespace OpenRCT2
         widgets[widgetIndex].right = right;
         widgets[widgetIndex].bottom = bottom;
 
-        widgets[widgetIndex + 1].left = right - size.height; // subtract height to maintain aspect ratio
+        auto buttonHeight = size.height - 2;
+        widgets[widgetIndex + 1].left = right - buttonHeight; // subtract height to maintain aspect ratio
         widgets[widgetIndex + 1].top = origin.y + 1;
         widgets[widgetIndex + 1].right = right - 1;
         widgets[widgetIndex + 1].bottom = bottom - 1;
 
-        widgets[widgetIndex + 2].left = right - size.height * 2;
+        widgets[widgetIndex + 2].left = right - buttonHeight * 2;
         widgets[widgetIndex + 2].top = origin.y + 1;
-        widgets[widgetIndex + 2].right = right - size.height - 1;
+        widgets[widgetIndex + 2].right = right - buttonHeight - 1;
         widgets[widgetIndex + 2].bottom = bottom - 1;
     }
 
-    void Window::ResizeDropdown(WidgetIndex widgetIndex, const ScreenCoordsXY& origin, const ScreenSize& size)
+    void Window::resizeDropdown(WidgetIndex widgetIndex, const ScreenCoordsXY& origin, const ScreenSize& size)
     {
         auto right = origin.x + size.width - 1;
         auto bottom = origin.y + size.height - 1;
@@ -527,7 +478,8 @@ namespace OpenRCT2
         widgets[widgetIndex].right = right;
         widgets[widgetIndex].bottom = bottom;
 
-        widgets[widgetIndex + 1].left = right - size.height + 1; // subtract height to maintain aspect ratio
+        auto buttonHeight = size.height - 2;
+        widgets[widgetIndex + 1].left = right - buttonHeight + 1; // subtract height to maintain aspect ratio
         widgets[widgetIndex + 1].top = origin.y + 1;
         widgets[widgetIndex + 1].right = right - 1;
         widgets[widgetIndex + 1].bottom = bottom - 1;
@@ -538,15 +490,15 @@ namespace OpenRCT2
         assert(start_tab_id < w->widgets.size());
         assert(end_tab_id < w->widgets.size());
 
-        int32_t i, x = w->widgets[start_tab_id].left;
-        int32_t tab_width = w->widgets[start_tab_id].width();
+        int32_t x = w->widgets[start_tab_id].left;
+        int32_t tab_width = w->widgets[start_tab_id].width() - 1;
 
-        for (i = start_tab_id; i <= end_tab_id; i++)
+        for (int32_t i = start_tab_id; i <= end_tab_id; i++)
         {
             auto& widget = w->widgets[i];
-            assert(widget.type == WindowWidgetType::Tab);
+            assert(widget.type == WidgetType::tab);
 
-            if (!WidgetIsDisabled(*w, i))
+            if (!widgetIsDisabled(*w, i))
             {
                 widget.left = x;
                 widget.right = x + tab_width;
@@ -564,10 +516,10 @@ namespace OpenRCT2
 
     ScreenCoordsXY WindowGetViewportSoundIconPos(WindowBase& w)
     {
-        const uint8_t buttonOffset = (Config::Get().interface.WindowButtonsOnTheLeft) ? kCloseButtonSize + 2 : 0;
+        const uint8_t buttonOffset = (Config::Get().interface.windowButtonsOnTheLeft) ? kCloseButtonSize.width + 2 : 0;
         return w.windowPos + ScreenCoordsXY{ 2 + buttonOffset, 2 };
     }
-} // namespace OpenRCT2
+} // namespace OpenRCT2::Ui
 
 namespace OpenRCT2::Ui::Windows
 {
@@ -575,14 +527,14 @@ namespace OpenRCT2::Ui::Windows
     static int32_t _textBoxFrameNo = 0;
     static bool _usingWidgetTextBox = false;
     static TextInputSession* _textInput;
-    static WidgetIdentifier _currentTextBox = { { WindowClass::Null, 0 }, 0 };
+    static WidgetIdentifier _currentTextBox = { { WindowClass::null, 0 }, 0 };
 
     WindowBase* WindowGetListening()
     {
-        for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
+        for (auto it = gWindowList.rbegin(); it != gWindowList.rend(); it++)
         {
             auto& w = **it;
-            if (w.flags & WF_DEAD)
+            if (w.flags.has(WindowFlag::dead))
                 continue;
 
             auto viewport = w.viewport;
@@ -610,11 +562,11 @@ namespace OpenRCT2::Ui::Windows
         _usingWidgetTextBox = true;
         _currentTextBox.window.classification = callW.classification;
         _currentTextBox.window.number = callW.number;
-        _currentTextBox.widget_index = callWidget;
+        _currentTextBox.widgetIndex = callWidget;
         _textBoxFrameNo = 0;
 
-        auto* windowMgr = Ui::GetWindowManager();
-        windowMgr->CloseByClass(WindowClass::Textinput);
+        auto* windowMgr = GetWindowManager();
+        windowMgr->CloseByClass(WindowClass::textinput);
 
         _textBoxInput = existingText;
 
@@ -627,15 +579,15 @@ namespace OpenRCT2::Ui::Windows
         {
             auto* windowMgr = GetWindowManager();
             WindowBase* w = windowMgr->FindByNumber(_currentTextBox.window.classification, _currentTextBox.window.number);
-            _currentTextBox.window.classification = WindowClass::Null;
+            _currentTextBox.window.classification = WindowClass::null;
             _currentTextBox.window.number = 0;
             ContextStopTextInput();
             _usingWidgetTextBox = false;
             if (w != nullptr)
             {
-                windowMgr->InvalidateWidget(*w, _currentTextBox.widget_index);
+                windowMgr->InvalidateWidget(*w, _currentTextBox.widgetIndex);
             }
-            _currentTextBox.widget_index = kWidgetIndexNull;
+            _currentTextBox.widgetIndex = kWidgetIndexNull;
         }
     }
 
@@ -653,8 +605,8 @@ namespace OpenRCT2::Ui::Windows
             _textBoxFrameNo = 0;
             auto* windowMgr = GetWindowManager();
             WindowBase* w = windowMgr->FindByNumber(_currentTextBox.window.classification, _currentTextBox.window.number);
-            windowMgr->InvalidateWidget(*w, _currentTextBox.widget_index);
-            w->OnTextInput(_currentTextBox.widget_index, _textBoxInput);
+            windowMgr->InvalidateWidget(*w, _currentTextBox.widgetIndex);
+            w->onTextInput(_currentTextBox.widgetIndex, _textBoxInput);
         }
     }
     const TextInputSession* GetTextboxSession()
@@ -664,6 +616,14 @@ namespace OpenRCT2::Ui::Windows
     void SetTexboxSession(TextInputSession* session)
     {
         _textInput = session;
+    }
+    void SetTextboxCaret(size_t position)
+    {
+        if (_textInput != nullptr)
+        {
+            _textInput->SelectionStart = std::clamp<size_t>(position, 0, _textInput->Length);
+            _textInput->SelectionSize = 0;
+        }
     }
     bool IsUsingWidgetTextBox()
     {
@@ -678,20 +638,21 @@ namespace OpenRCT2::Ui::Windows
         return _currentTextBox;
     }
 
-    void WindowResize(WindowBase& w, int16_t dw, int16_t dh)
+    void WindowResizeByDelta(WindowBase& w, int16_t dw, int16_t dh)
     {
         if (dw == 0 && dh == 0)
             return;
 
         // Invalidate old region
-        w.Invalidate();
+        w.invalidate();
 
         // Clamp new size to minimum and maximum
-        w.width = std::clamp<int16_t>(w.width + dw, w.min_width, w.max_width);
-        w.height = std::clamp<int16_t>(w.height + dh, w.min_height, w.max_height);
+        w.width = std::clamp<int16_t>(w.width + dw, w.minWidth, w.maxWidth);
+        w.height = std::clamp<int16_t>(w.height + dh, w.minHeight, w.maxHeight);
 
-        w.OnResize();
-        w.OnPrepareDraw();
+        w.onResize();
+        w.resizeFrame();
+        w.onPrepareDraw();
 
         // Update scroll widgets
         for (auto& scroll : w.scrolls)
@@ -702,7 +663,7 @@ namespace OpenRCT2::Ui::Windows
         WindowUpdateScrollWidgets(w);
 
         // Invalidate new region
-        w.Invalidate();
+        w.invalidate();
     }
 
     /**
@@ -718,11 +679,11 @@ namespace OpenRCT2::Ui::Windows
         for (WidgetIndex widgetIndex = 0; widgetIndex < w.widgets.size(); widgetIndex++)
         {
             auto& widget = w.widgets[widgetIndex];
-            if (widget.type != WindowWidgetType::Scroll)
+            if (widget.type != WidgetType::scroll)
                 continue;
 
             auto& scroll = w.scrolls[scrollIndex];
-            ScreenSize scrollSize = w.OnScrollGetSize(scrollIndex);
+            ScreenSize scrollSize = w.onScrollGetSize(scrollIndex);
             width = scrollSize.width;
             height = scrollSize.height;
 
@@ -752,8 +713,8 @@ namespace OpenRCT2::Ui::Windows
 
             if (scrollPositionChanged)
             {
-                WidgetScrollUpdateThumbs(w, widgetIndex);
-                w.Invalidate();
+                widgetScrollUpdateThumbs(w, widgetIndex);
+                w.invalidate();
             }
             scrollIndex++;
         }
@@ -768,25 +729,25 @@ namespace OpenRCT2::Ui::Windows
         for (WidgetIndex widgetIndex = 0; widgetIndex < w.widgets.size(); widgetIndex++)
         {
             auto& widget = w.widgets[widgetIndex];
-            if (widget.type != WindowWidgetType::Scroll)
+            if (widget.type != WidgetType::scroll)
             {
                 continue;
             }
 
             auto& scroll = w.scrolls[scroll_index];
-            scroll.flags = 0;
-            ScreenSize scrollSize = w.OnScrollGetSize(scroll_index);
+            scroll.flags.clearAll();
+            ScreenSize scrollSize = w.onScrollGetSize(scroll_index);
             scroll.contentOffsetX = 0;
             scroll.contentWidth = scrollSize.width + 1;
             scroll.contentOffsetY = 0;
             scroll.contentHeight = scrollSize.height + 1;
 
             if (widget.content & SCROLL_HORIZONTAL)
-                scroll.flags |= HSCROLLBAR_VISIBLE;
+                scroll.flags.set(ScrollFlag::hScrollbarVisible);
             if (widget.content & SCROLL_VERTICAL)
-                scroll.flags |= VSCROLLBAR_VISIBLE;
+                scroll.flags.set(ScrollFlag::vScrollbarVisible);
 
-            WidgetScrollUpdateThumbs(w, widgetIndex);
+            widgetScrollUpdateThumbs(w, widgetIndex);
             scroll_index++;
         }
     }
@@ -943,7 +904,7 @@ namespace OpenRCT2::Ui::Windows
             return;
 
         // Invalidate old region
-        w.Invalidate();
+        w.invalidate();
 
         // Translate window and viewport
         w.windowPos += deltaCoords;
@@ -953,7 +914,7 @@ namespace OpenRCT2::Ui::Windows
         }
 
         // Invalidate new region
-        w.Invalidate();
+        w.invalidate();
     }
 
     void WindowSetPosition(WindowBase& w, const ScreenCoordsXY& screenCoords)
@@ -974,7 +935,7 @@ namespace OpenRCT2::Ui::Windows
             // Work out if the window requires moving
             if (w->windowPos.x + 10 < width)
             {
-                if (w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT))
+                if (w->flags.hasAny(WindowFlag::stickToBack, WindowFlag::stickToFront))
                 {
                     if (w->windowPos.y - 22 < height)
                     {
@@ -1002,35 +963,45 @@ namespace OpenRCT2::Ui::Windows
         });
     }
 
-    bool WindowSetResize(WindowBase& w, const ScreenSize minSize, const ScreenSize maxSize)
+    bool WindowSetResize(WindowBase& w, ScreenSize minSize, ScreenSize maxSize)
     {
-        w.min_width = minSize.width;
-        w.min_height = minSize.height;
-        w.max_width = maxSize.width;
-        w.max_height = maxSize.height;
+        w.minWidth = std::min(minSize.width, maxSize.width);
+        w.minHeight = std::min(minSize.height, maxSize.height);
+        w.maxWidth = std::max(minSize.width, maxSize.width);
+        w.maxHeight = std::max(minSize.height, maxSize.height);
+
+        if (Config::Get().interface.enlargedUi)
+        {
+            // Not sure why plugin windows have to be treated differently,
+            // but they currently show a deviation if we don't.
+            if (w.classification == WindowClass::custom)
+            {
+                w.minHeight += w.getTitleBarDiffTarget();
+                w.maxHeight += w.getTitleBarDiffTarget();
+            }
+            else
+            {
+                w.minHeight += w.getTitleBarDiffNormal();
+                w.maxHeight += w.getTitleBarDiffNormal();
+            }
+        }
 
         // Clamp width and height to minimum and maximum
-        int16_t width = std::clamp<int16_t>(
-            w.width, std::min(minSize.width, maxSize.width), std::max(minSize.width, maxSize.width));
-        int16_t height = std::clamp<int16_t>(
-            w.height, std::min(minSize.height, maxSize.height), std::max(minSize.height, maxSize.height));
+        int16_t width = std::clamp<int16_t>(w.width, w.minWidth, w.maxWidth);
+        int16_t height = std::clamp<int16_t>(w.height, w.minHeight, w.maxHeight);
 
         // Resize window if size has changed
         if (w.width != width || w.height != height)
         {
-            w.Invalidate();
+            w.invalidate();
             w.width = width;
             w.height = height;
-            w.Invalidate();
+            w.resizeFrame();
+            w.invalidate();
             return true;
         }
 
         return false;
-    }
-
-    bool WindowCanResize(const WindowBase& w)
-    {
-        return (w.flags & WF_RESIZABLE) && (w.min_width != w.max_width || w.min_height != w.max_height);
     }
 
     /**
@@ -1039,61 +1010,57 @@ namespace OpenRCT2::Ui::Windows
      */
     void InvalidateAllWindowsAfterInput()
     {
-        WindowVisitEach([](WindowBase* w) {
-            Windows::WindowUpdateScrollWidgets(*w);
-            WindowInvalidatePressedImageButton(*w);
-            w->OnResize();
-        });
+        WindowVisitEach([](WindowBase* w) { WindowUpdateScrollWidgets(*w); });
     }
 
     /**
      *
      *  rct2: 0x00685BE1
      *
-     * @param dpi (edi)
+     * @param rt (edi)
      * @param w (esi)
      */
-    void WindowDrawViewport(DrawPixelInfo& dpi, WindowBase& w)
+    void WindowDrawViewport(RenderTarget& rt, WindowBase& w)
     {
-        ViewportRender(dpi, w.viewport);
+        ViewportRender(rt, w.viewport);
     }
 
     /**
      *
      *  rct2: 0x006EB15C
      */
-    void WindowDrawWidgets(WindowBase& w, DrawPixelInfo& dpi)
+    void WindowDrawWidgets(WindowBase& w, RenderTarget& rt)
     {
-        if ((w.flags & WF_TRANSPARENT) && !(w.flags & WF_NO_BACKGROUND))
-            GfxFilterRect(
-                dpi, { w.windowPos, w.windowPos + ScreenCoordsXY{ w.width - 1, w.height - 1 } }, FilterPaletteID::Palette51);
+        if (w.flags.has(WindowFlag::transparent) && !w.flags.has(WindowFlag::noBackground))
+            Rectangle::filter(
+                rt, { w.windowPos, w.windowPos + ScreenCoordsXY{ w.width - 1, w.height - 1 } }, FilterPaletteID::palette51);
 
         // todo: some code missing here? Between 006EB18C and 006EB260
         for (WidgetIndex widgetIndex = 0; widgetIndex < w.widgets.size(); widgetIndex++)
         {
             auto& widget = w.widgets[widgetIndex];
-            if (!widget.IsVisible())
+            if (!widget.isVisible())
             {
                 continue;
             }
 
             // Check if widget is outside the draw region
-            if (w.windowPos.x + widget.left < dpi.x + dpi.width && w.windowPos.x + widget.right >= dpi.x)
+            if (w.windowPos.x + widget.left < rt.x + rt.width && w.windowPos.x + widget.right >= rt.x)
             {
-                if (w.windowPos.y + widget.top < dpi.y + dpi.height && w.windowPos.y + widget.bottom >= dpi.y)
+                if (w.windowPos.y + widget.top < rt.y + rt.height && w.windowPos.y + widget.bottom >= rt.y)
                 {
-                    w.OnDrawWidget(widgetIndex, dpi);
+                    w.onDrawWidget(widgetIndex, rt);
                 }
             }
         }
 
         // todo: something missing here too? Between 006EC32B and 006EC369
 
-        if (w.flags & WF_WHITE_BORDER_MASK)
+        if (w.flashTimer > 0)
         {
-            GfxFillRectInset(
-                dpi, { w.windowPos, w.windowPos + ScreenCoordsXY{ w.width - 1, w.height - 1 } }, { COLOUR_WHITE },
-                INSET_RECT_FLAG_FILL_NONE);
+            Rectangle::fillInset(
+                rt, { w.windowPos, w.windowPos + ScreenCoordsXY{ w.width - 1, w.height - 1 } }, { Drawing::Colour::white },
+                Rectangle::BorderStyle::outset, Rectangle::FillBrightness::light, Rectangle::FillMode::none);
         }
     }
 
@@ -1124,7 +1091,7 @@ namespace OpenRCT2::Ui::Windows
         if (gLegacyScene == LegacyScene::titleSequence)
             return;
 
-        if (gLegacyScene == LegacyScene::scenarioEditor && GetGameState().EditorStep != EditorStep::LandscapeEditor)
+        if (gLegacyScene == LegacyScene::scenarioEditor && getGameState().editorStep != Editor::Step::landscapeEditor)
             return;
 
         if (gLegacyScene == LegacyScene::trackDesignsManager)
@@ -1135,5 +1102,4 @@ namespace OpenRCT2::Ui::Windows
         else
             WindowZoomOut(*mainWindow, atCursor);
     }
-
 } // namespace OpenRCT2::Ui::Windows

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,30 +9,32 @@
 
 #pragma once
 
-#include "../world/Climate.h"
+#include "../world/Weather.h"
 #include "Object.h"
 
-struct IReadObjectContext;
-
-using YearlyDistribution = std::array<uint8_t, EnumValue(WeatherType::Count)>;
-
-class ClimateObject final : public Object
+namespace OpenRCT2
 {
-private:
-    Climate _climate;
-    std::string _scriptName;
 
-public:
-    static constexpr ObjectType kObjectType = ObjectType::climate;
+    using YearlyDistribution = std::array<uint8_t, EnumValue(Weather::Type::count)>;
 
-    void ReadJson(IReadObjectContext* context, json_t& root) override;
-    void Load() override;
-    void Unload() override;
+    class ClimateObject final : public Object
+    {
+    private:
+        Weather::Climate _climate;
+        std::string _scriptName;
 
-    void DrawPreview(DrawPixelInfo& dpi, int32_t width, int32_t height) const override;
+    public:
+        static constexpr ObjectType kObjectType = ObjectType::climate;
 
-    const TemperatureThresholds& getItemThresholds() const;
-    const WeatherPattern& getPatternForMonth(uint8_t month) const;
-    std::string getScriptName() const;
-    YearlyDistribution getYearlyDistribution() const;
-};
+        void ReadJson(IReadObjectContext* context, json_t& root) override;
+        void Load() override;
+        void Unload() override;
+
+        void DrawPreview(Drawing::RenderTarget& rt, int32_t width, int32_t height) const override;
+
+        const Weather::TemperatureThresholds& getItemThresholds() const;
+        const Weather::Pattern& getPatternForMonth(uint8_t month) const;
+        std::string getScriptName() const;
+        YearlyDistribution getYearlyDistribution() const;
+    };
+} // namespace OpenRCT2

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,8 +10,6 @@
 #include "SurfaceSelection.h"
 
 #include "../../Context.h"
-#include "../../object/ObjectEntryManager.h"
-#include "../../object/ObjectList.h"
 #include "../../object/ObjectManager.h"
 #include "../../object/TerrainEdgeObject.h"
 #include "../../object/TerrainSurfaceObject.h"
@@ -63,7 +61,7 @@ namespace OpenRCT2::World::MapGenerator
 
         if (edgeTexture.empty())
         {
-            auto surfaceObject = objectManager.GetLoadedObject(ObjectType::terrainSurface, surfaceTextureId);
+            auto surfaceObject = objectManager.GetLoadedObject<TerrainSurfaceObject>(surfaceTextureId);
             auto surfaceTexture = surfaceObject->GetIdentifier();
 
             // Base edge type on surface type

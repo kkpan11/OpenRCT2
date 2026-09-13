@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,58 +8,97 @@
  *****************************************************************************/
 
 #include "../../../SpriteIds.h"
-#include "../../../drawing/Drawing.h"
-#include "../../../interface/Viewport.h"
-#include "../../../ride/RideData.h"
-#include "../../../ride/TrackData.h"
 #include "../../../ride/TrackPaint.h"
-#include "../../../world/Map.h"
 #include "../../../world/tile_element/TrackElement.h"
 #include "../../Paint.h"
 #include "../../support/MetalSupports.h"
 #include "../../tile_element/Segment.h"
 #include "../../track/Segment.h"
 #include "../../track/Support.h"
+#include "../../track_pieces/QuarterHelix.h"
 
-using namespace OpenRCT2;
-
-static constexpr TunnelGroup kTunnelGroup = TunnelGroup::Standard;
+static constexpr TunnelGroup kTunnelGroup = TunnelGroup::standard;
 
 namespace OpenRCT2::AlpineRC
 {
+    static constexpr bool kLeftQuarterBankedHelixLargeUpSpriteMapArray[kNumOrthogonalDirections][kQuarterHelixSequenceCount]
+                                                                      [kQuarterHelixSequenceSpriteCount]
+        = { { { true, true },
+              { false, false },
+              { true, false },
+              { true, false },
+              { false, false },
+              { true, false },
+              { true, false } },
+            { { false, true },
+              { false, false },
+              { false, true },
+              { false, false },
+              { false, false },
+              { false, true },
+              { false, true } },
+            { { true, false },
+              { false, false },
+              { true, false },
+              { true, false },
+              { false, false },
+              { true, false },
+              { true, true } },
+            { { true, false },
+              { false, false },
+              { true, false },
+              { true, false },
+              { false, false },
+              { true, false },
+              { true, false } } };
+
+    static constexpr uint64_t kLeftQuarterBankedHelixLargeUpSpriteMap = OpenRCT2::createSpriteMap<false>(
+        kLeftQuarterBankedHelixLargeUpSpriteMapArray);
+    static constexpr uint64_t kRightQuarterBankedHelixLargeUpSpriteMap = OpenRCT2::createSpriteMap<true>(
+        kLeftQuarterBankedHelixLargeUpSpriteMapArray);
+
+    static constexpr std::array<std::array<int8_t, kNumOrthogonalDirections>, kQuarterHelixSequenceCount>
+        kLeftQuarterHelixSupportHeights = { { { 4, 4, 4, 4 }, {}, {}, {}, {}, {}, { 8, 8, 8, 8 } } };
+    static constexpr std::array<std::array<int8_t, kNumOrthogonalDirections>, kQuarterHelixSequenceCount>
+        kRightQuarterHelixSupportHeights = { { { 4, 4, 4, 4 }, {}, {}, {}, {}, {}, { 8, 8, 8, 8 } } };
+    static constexpr std::array<std::array<int8_t, kNumOrthogonalDirections>, kQuarterHelixSequenceCount>
+        kLeftQuarterBankedHelixSupportHeights = { { { 5, 4, 4, 4 }, {}, {}, {}, {}, {}, { 8, 8, 8, 8 } } };
+    static constexpr std::array<std::array<int8_t, kNumOrthogonalDirections>, kQuarterHelixSequenceCount>
+        kRightQuarterBankedHelixSupportHeights = { { { 4, 4, 4, 5 }, {}, {}, {}, {}, {}, { 8, 8, 8, 8 } } };
+
     static void TrackFlat(
         PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
         const TrackElement& trackElement, SupportType supportType)
     {
-        if (trackElement.HasChain())
+        if (trackElement.hasChain())
         {
             switch (direction)
             {
                 case 0:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_FLAT + 0)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT + 0)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_FLAT + 1)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT + 1)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_FLAT + 2)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT + 2)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_FLAT + 3)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT + 3)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
             }
         }
         else
@@ -69,23 +108,23 @@ namespace OpenRCT2::AlpineRC
                 case 0:
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_FLAT + 0)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_FLAT + 0)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_FLAT + 1)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_FLAT + 1)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
             }
         }
-        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
         PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -96,13 +135,13 @@ namespace OpenRCT2::AlpineRC
         const TrackElement& trackElement, SupportType supportType)
     {
         static constexpr uint32_t imageIds[4][3] = {
-            { (SPR_G2_ALPINE_TRACK_FLAT + 0), (SPR_G2_ALPINE_TRACK_FLAT + 0), SPR_STATION_BASE_B_SW_NE },
-            { (SPR_G2_ALPINE_TRACK_FLAT + 1), (SPR_G2_ALPINE_TRACK_FLAT + 1), SPR_STATION_BASE_B_NW_SE },
-            { (SPR_G2_ALPINE_TRACK_FLAT + 0), (SPR_G2_ALPINE_TRACK_FLAT + 0), SPR_STATION_BASE_B_SW_NE },
-            { (SPR_G2_ALPINE_TRACK_FLAT + 1), (SPR_G2_ALPINE_TRACK_FLAT + 1), SPR_STATION_BASE_B_NW_SE },
+            { (SPR_TRACKS_ALPINE_TRACK_FLAT + 0), (SPR_TRACKS_ALPINE_TRACK_FLAT + 0), SPR_STATION_BASE_MEDIUM_SW_NE },
+            { (SPR_TRACKS_ALPINE_TRACK_FLAT + 1), (SPR_TRACKS_ALPINE_TRACK_FLAT + 1), SPR_STATION_BASE_MEDIUM_NW_SE },
+            { (SPR_TRACKS_ALPINE_TRACK_FLAT + 0), (SPR_TRACKS_ALPINE_TRACK_FLAT + 0), SPR_STATION_BASE_MEDIUM_SW_NE },
+            { (SPR_TRACKS_ALPINE_TRACK_FLAT + 1), (SPR_TRACKS_ALPINE_TRACK_FLAT + 1), SPR_STATION_BASE_MEDIUM_NW_SE },
         };
 
-        if (trackElement.GetTrackType() == TrackElemType::EndStation)
+        if (trackElement.getTrackType() == TrackElemType::endStation)
         {
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(imageIds[direction][1]), { 0, 0, height },
@@ -114,11 +153,15 @@ namespace OpenRCT2::AlpineRC
                 session, direction, session.TrackColours.WithIndex(imageIds[direction][0]), { 0, 0, height },
                 { { 0, 6, height + 3 }, { 32, 20, 1 } });
         }
-        PaintAddImageAsParentRotated(
-            session, direction, GetStationColourScheme(session, trackElement).WithIndex(imageIds[direction][2]),
-            { 0, 0, height - 2 }, { { 0, 2, height }, { 32, 28, 2 } });
-        DrawSupportsSideBySide(session, direction, height, session.SupportColours, MetalSupportType::Boxed);
-        TrackPaintUtilDrawStation2(session, ride, direction, height, trackElement, 4, 7);
+        if (TrackPaintUtilDrawStation2(session, ride, direction, height, trackElement, StationBaseType::b, -2, 4, 7))
+        {
+            DrawSupportsSideBySide(session, direction, height, session.SupportColours, MetalSupportType::boxed);
+        }
+        else if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
+        {
+            MetalASupportsPaintSetupRotated(
+                session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
+        }
         TrackPaintUtilDrawStationTunnel(session, direction, height);
         PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
         PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -128,35 +171,35 @@ namespace OpenRCT2::AlpineRC
         PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
         const TrackElement& trackElement, SupportType supportType)
     {
-        if (trackElement.HasChain())
+        if (trackElement.hasChain())
         {
             switch (direction)
             {
                 case 0:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 8)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 8)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 9)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 9)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 10)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 10)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 11)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 11)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height, session.SupportColours);
             }
         }
         else
@@ -165,38 +208,38 @@ namespace OpenRCT2::AlpineRC
             {
                 case 0:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 8)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 8)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 9)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 9)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 10)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 10)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 11)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 11)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height, session.SupportColours);
             }
         }
         if (direction == 0 || direction == 3)
         {
-            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
+            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::slopeStart);
         }
         else
         {
-            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
         }
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -207,35 +250,35 @@ namespace OpenRCT2::AlpineRC
         PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
         const TrackElement& trackElement, SupportType supportType)
     {
-        if (trackElement.HasChain())
+        if (trackElement.hasChain())
         {
             switch (direction)
             {
                 case 0:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 0)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 0)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 1)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 1)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 2)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 2)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 3)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 3)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
             }
         }
         else
@@ -244,38 +287,38 @@ namespace OpenRCT2::AlpineRC
             {
                 case 0:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 0)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 0)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 1)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 1)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 2)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 2)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 3)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 3)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
             }
         }
         if (direction == 0 || direction == 3)
         {
-            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         }
         else
         {
-            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::slopeEnd);
         }
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -286,35 +329,35 @@ namespace OpenRCT2::AlpineRC
         PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
         const TrackElement& trackElement, SupportType supportType)
     {
-        if (trackElement.HasChain())
+        if (trackElement.hasChain())
         {
             switch (direction)
             {
                 case 0:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 4)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 4)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 5)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 5)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 6)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 6)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE + 7)),
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE + 7)),
                         { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 6, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 6, height, session.SupportColours);
             }
         }
         else
@@ -323,38 +366,38 @@ namespace OpenRCT2::AlpineRC
             {
                 case 0:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 4)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 4)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 5)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 5)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 6)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 6)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
-                        session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE + 7)), { 0, 0, height },
-                        { { 0, 6, height }, { 32, 20, 3 } });
+                        session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE + 7)),
+                        { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                     break;
             }
             if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
             {
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 6, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 6, height, session.SupportColours);
             }
         }
         if (direction == 0 || direction == 3)
         {
-            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::Flat);
+            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::flat);
         }
         else
         {
-            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::FlatTo25Deg);
+            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::flatTo25Deg);
         }
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -393,30 +436,30 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 0)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 3)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 6)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 9)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -434,22 +477,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 1)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 4)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 7)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 10)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -466,35 +509,35 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 2)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 5)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 8)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE + 11)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 0, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 0, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -528,30 +571,30 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 0)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 5)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 10)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 15)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -569,22 +612,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 1)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 6)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 11)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 16)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 16)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -603,22 +646,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 2)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 7)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 12)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 17)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 17)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -639,22 +682,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 3)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 8)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 13)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 18)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 18)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -673,35 +716,35 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 4)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 9)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 14)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE + 19)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE + 19)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 0, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 0, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -735,30 +778,30 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 0)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 4)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 8)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 12)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -769,22 +812,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 1)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 5)),
                             { 0, 0, height }, { { 0, 0, height }, { 34, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 9)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 13)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -803,22 +846,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 2)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 6)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 10)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 14)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -846,27 +889,27 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 3)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 7)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 18, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 11)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 15)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, DirectionPrev(direction), 0, height,
+                    session, supportType.metal, MetalSupportPlace::leftCorner, DirectionPrev(direction), 0, height,
                     session.SupportColours);
 
                 PaintUtilSetSegmentSupportHeight(
@@ -893,30 +936,30 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 16)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 16)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 20)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 20)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 24)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 24)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 28)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 28)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -927,22 +970,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 17)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 17)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 21)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 21)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 25)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 25)),
                             { 0, 0, height }, { { 0, 0, height }, { 34, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 29)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 29)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -961,22 +1004,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 18)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 18)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 22)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 22)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 26)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 26)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 30)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 30)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -1005,27 +1048,27 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 19)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 19)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 23)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 23)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 27)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 27)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 18, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE + 31)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE + 31)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::BottomCorner, DirectionNext(direction), 0, height,
+                    session, supportType.metal, MetalSupportPlace::bottomCorner, DirectionNext(direction), 0, height,
                     session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -1061,14 +1104,14 @@ namespace OpenRCT2::AlpineRC
         const TrackElement& trackElement, SupportType supportType)
     {
         constexpr ImageIndex images[2][kNumOrthogonalDirections] = {
-            { SPR_G2_ALPINE_TRACK_FLAT_DIAGONAL, SPR_G2_ALPINE_TRACK_FLAT_DIAGONAL + 1, SPR_G2_ALPINE_TRACK_FLAT_DIAGONAL + 2,
-              SPR_G2_ALPINE_TRACK_FLAT_DIAGONAL + 3 },
-            { SPR_G2_ALPINE_LIFT_TRACK_FLAT_DIAGONAL, SPR_G2_ALPINE_LIFT_TRACK_FLAT_DIAGONAL + 1,
-              SPR_G2_ALPINE_LIFT_TRACK_FLAT_DIAGONAL + 2, SPR_G2_ALPINE_LIFT_TRACK_FLAT_DIAGONAL + 3 },
+            { SPR_TRACKS_ALPINE_TRACK_FLAT_DIAGONAL, SPR_TRACKS_ALPINE_TRACK_FLAT_DIAGONAL + 1,
+              SPR_TRACKS_ALPINE_TRACK_FLAT_DIAGONAL + 2, SPR_TRACKS_ALPINE_TRACK_FLAT_DIAGONAL + 3 },
+            { SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT_DIAGONAL, SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT_DIAGONAL + 1,
+              SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT_DIAGONAL + 2, SPR_TRACKS_ALPINE_LIFT_TRACK_FLAT_DIAGONAL + 3 },
         };
 
         TrackPaintUtilDiagTilesPaintExtra(
-            session, 3, height, direction, trackSequence, images[trackElement.HasChain()], supportType.metal);
+            session, 3, height, direction, trackSequence, images[trackElement.hasChain()], supportType.metal);
     }
 
     static void TrackDiag25DegUp(
@@ -1078,14 +1121,14 @@ namespace OpenRCT2::AlpineRC
         switch (trackSequence)
         {
             case 0:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 11)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 11)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1096,7 +1139,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 11)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 11)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1111,14 +1155,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 1:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 8)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 8)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1129,7 +1173,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 8)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 8)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1143,14 +1188,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 2:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 10)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 10)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1161,7 +1206,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 10)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 10)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1176,14 +1222,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 3:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 1)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 9)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1194,13 +1240,14 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 1)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 9)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 9, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 9, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -1219,14 +1266,14 @@ namespace OpenRCT2::AlpineRC
         switch (trackSequence)
         {
             case 0:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 7)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 7)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1237,7 +1284,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 7)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 7)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1252,14 +1300,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 1:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 4)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 4)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1270,7 +1318,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 4)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 4)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1284,14 +1333,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 2:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 6)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 6)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1302,7 +1351,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 6)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 6)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1317,14 +1367,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 3:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 5)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 5)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1335,13 +1385,14 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 5)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 5)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 6, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 6, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -1360,14 +1411,14 @@ namespace OpenRCT2::AlpineRC
         switch (trackSequence)
         {
             case 0:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 3)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 3)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1378,7 +1429,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 3)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 3)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1393,14 +1445,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 48);
                 break;
             case 1:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 0)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 0)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1411,7 +1463,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 0)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 0)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1425,14 +1478,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 48);
                 break;
             case 2:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 2)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 2)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1443,7 +1496,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 2)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 2)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1458,19 +1512,19 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 48);
                 break;
             case 3:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 1)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 1)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
                     MetalBSupportsPaintSetupRotated(
-                        session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0,
+                        session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0,
                         height + (direction & 1) ? 0 : 2, session.SupportColours);
                 }
                 else
@@ -1479,12 +1533,13 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 1)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 1)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
                     MetalBSupportsPaintSetupRotated(
-                        session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 2, height,
+                        session, supportType.metal, MetalSupportPlace::leftCorner, direction, 2, height,
                         session.SupportColours);
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -1505,14 +1560,14 @@ namespace OpenRCT2::AlpineRC
         switch (trackSequence)
         {
             case 0:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 9)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 9)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1523,7 +1578,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 9)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 9)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1538,14 +1594,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 1:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 10)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 10)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1556,7 +1612,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 10)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 10)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1570,14 +1627,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 2:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 8)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 8)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1588,7 +1645,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 8)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 8)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1603,14 +1661,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 56);
                 break;
             case 3:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 11)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 11)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1621,13 +1679,14 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 11)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 11)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 8, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 8, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -1646,14 +1705,14 @@ namespace OpenRCT2::AlpineRC
         switch (trackSequence)
         {
             case 0:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 5)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 5)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1664,7 +1723,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 5)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 5)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1678,14 +1738,14 @@ namespace OpenRCT2::AlpineRC
                     0xFFFF, 0);
                 break;
             case 1:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 6)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 6)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1696,7 +1756,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 6)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 6)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1709,14 +1770,14 @@ namespace OpenRCT2::AlpineRC
                     0xFFFF, 0);
                 break;
             case 2:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 4)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 4)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1727,7 +1788,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 4)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 4)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1741,14 +1803,14 @@ namespace OpenRCT2::AlpineRC
                     0xFFFF, 0);
                 break;
             case 3:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 7)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 7)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1759,13 +1821,14 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 7)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 7)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 4, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 4, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -1785,14 +1848,14 @@ namespace OpenRCT2::AlpineRC
         switch (trackSequence)
         {
             case 0:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 1)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 1)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1803,7 +1866,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 3:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 1)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 1)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1818,14 +1882,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 48);
                 break;
             case 1:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 2)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 2)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1836,7 +1900,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 0:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 2)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 2)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1850,14 +1915,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 48);
                 break;
             case 2:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 0)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 0)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1868,7 +1933,8 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 2:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 0)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 0)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1883,14 +1949,14 @@ namespace OpenRCT2::AlpineRC
                 PaintUtilSetGeneralSupportHeight(session, height + 48);
                 break;
             case 3:
-                if (trackElement.HasChain())
+                if (trackElement.hasChain())
                 {
                     switch (direction)
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
                                 session, direction,
-                                session.TrackColours.WithIndex((SPR_G2_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 3)),
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_LIFT_TRACK_GENTLE_DIAGONAL + 3)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
@@ -1901,13 +1967,14 @@ namespace OpenRCT2::AlpineRC
                     {
                         case 1:
                             PaintAddImageAsParentRotated(
-                                session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_DIAGONAL + 3)),
+                                session, direction,
+                                session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_DIAGONAL + 3)),
                                 { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                             break;
                     }
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -1927,37 +1994,37 @@ namespace OpenRCT2::AlpineRC
         {
             case 0:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 0)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 0)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 1)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 1)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 2)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 2)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 3)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 3)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 4)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 4)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 5)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 5)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
         }
-        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
         PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -1971,37 +2038,37 @@ namespace OpenRCT2::AlpineRC
         {
             case 0:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 6)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 6)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 7)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 7)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 8)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 8)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 9)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 9)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 10)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 10)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 11)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 11)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
         }
-        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
         PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -2029,43 +2096,43 @@ namespace OpenRCT2::AlpineRC
         {
             case 0:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 12)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 12)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 13)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 13)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 14)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 14)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 15)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 15)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 16)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 16)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 17)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 17)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
         }
         if (direction == 0 || direction == 3)
         {
-            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         }
         else
         {
-            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::slopeEnd);
         }
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -2080,43 +2147,43 @@ namespace OpenRCT2::AlpineRC
         {
             case 0:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 18)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 18)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 19)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 19)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 20)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 20)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 21)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 21)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 22)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 22)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 23)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 23)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
         }
         if (direction == 0 || direction == 3)
         {
-            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         }
         else
         {
-            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+            PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::slopeEnd);
         }
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -2131,43 +2198,43 @@ namespace OpenRCT2::AlpineRC
         {
             case 0:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 24)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 24)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 25)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 25)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 26)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 26)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 27)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 27)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 28)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 28)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 29)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 29)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 6, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 6, height, session.SupportColours);
         }
         if (direction == 0 || direction == 3)
         {
-            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::Flat);
+            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::flat);
         }
         else
         {
-            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::FlatTo25Deg);
+            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::flatTo25Deg);
         }
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -2182,43 +2249,43 @@ namespace OpenRCT2::AlpineRC
         {
             case 0:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 30)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 30)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 31)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 31)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 32)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 32)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 33)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 33)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 34)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 34)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 35)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 35)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 34 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 6, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 6, height, session.SupportColours);
         }
         if (direction == 0 || direction == 3)
         {
-            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::Flat);
+            PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::flat);
         }
         else
         {
-            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::FlatTo25Deg);
+            PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::flatTo25Deg);
         }
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -2261,31 +2328,31 @@ namespace OpenRCT2::AlpineRC
         {
             case 0:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 36)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 36)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 37)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 37)),
                     { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 38)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 38)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION + 39)),
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION + 39)),
                     { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
         }
-        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
         PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -2310,7 +2377,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 4)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 4)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2329,11 +2396,11 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 0)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 0)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 1)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 1)),
                             { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2351,7 +2418,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 3)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 3)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2370,12 +2437,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 2)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 2)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -2399,7 +2466,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 9)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 9)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2418,7 +2485,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 5)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 5)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2436,11 +2503,11 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 7)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 7)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 8)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 8)),
                             { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2459,12 +2526,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 6)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 6)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -2488,7 +2555,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 6)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 6)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2507,11 +2574,11 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 7)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 7)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 8)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 8)),
                             { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2529,7 +2596,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 5)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 5)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2548,12 +2615,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 9)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 9)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -2577,7 +2644,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 2)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 2)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2596,7 +2663,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 3)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 3)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2614,11 +2681,11 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 0)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 0)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 1)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 1)),
                             { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2637,12 +2704,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 4)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 4)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -2666,7 +2733,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 14)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 14)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2685,11 +2752,11 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 10)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 10)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 11)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 11)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2707,7 +2774,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 13)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 13)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2726,12 +2793,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 12)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 12)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -2755,7 +2822,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 19)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 19)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2774,7 +2841,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 15)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 15)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2792,11 +2859,11 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 17)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 17)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 18)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 18)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2815,12 +2882,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 16)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 16)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -2844,7 +2911,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 24)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 24)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2863,11 +2930,11 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 20)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 20)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 21)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 21)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2885,7 +2952,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 23)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 23)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2904,12 +2971,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 22)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 22)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 4, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 4, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -2933,7 +3000,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 29)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 29)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2952,7 +3019,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 25)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 25)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -2970,11 +3037,11 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 27)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 27)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 28)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 28)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -2993,12 +3060,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 26)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 26)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 4, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 4, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -3022,7 +3089,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 26)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 26)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3040,11 +3107,11 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 27)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 27)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 28)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 28)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -3061,7 +3128,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 25)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 25)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3079,12 +3146,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 29)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 29)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 4, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 4, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -3109,7 +3176,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 22)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 22)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3127,7 +3194,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 23)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 23)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3144,11 +3211,11 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 20)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 20)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 21)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 21)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -3166,12 +3233,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 24)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 24)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 4, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 4, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -3196,7 +3263,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 16)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 16)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3215,11 +3282,11 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 17)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 17)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 18)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 18)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -3237,7 +3304,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 15)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 15)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3256,12 +3323,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 19)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 19)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -3285,7 +3352,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 12)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 12)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3304,7 +3371,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 13)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 13)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3322,11 +3389,11 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 10)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 10)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 11)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 11)),
                             { -16, -16, height }, { { -16, -16, height + 35 }, { 32, 32, 0 } });
                         break;
                 }
@@ -3345,12 +3412,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 14)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 14)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalBSupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -3374,7 +3441,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 33)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 33)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3393,7 +3460,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 30)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 30)),
                             { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
                         break;
                 }
@@ -3411,7 +3478,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 32)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 32)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3430,12 +3497,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 31)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 31)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -3459,7 +3526,7 @@ namespace OpenRCT2::AlpineRC
                     case 3:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 31)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 31)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3478,7 +3545,7 @@ namespace OpenRCT2::AlpineRC
                     case 0:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 32)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 32)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
@@ -3496,7 +3563,7 @@ namespace OpenRCT2::AlpineRC
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 30)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 30)),
                             { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
                         break;
                 }
@@ -3515,12 +3582,12 @@ namespace OpenRCT2::AlpineRC
                     case 1:
                         PaintAddImageAsParentRotated(
                             session, direction,
-                            session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 33)),
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_BANK_TRANSITION_DIAGONAL + 33)),
                             { -16, -16, height }, { { -16, -16, height }, { 32, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::leftCorner, direction, 0, height, session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
                     PaintUtilRotateSegments(
@@ -3543,33 +3610,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 0)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 0)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 1)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 1)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 4)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 4)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 7)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 7)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 11)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 11)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 2, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 2, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -3587,23 +3659,27 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 2)),
-                            { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 2)), { 0, 0, height },
+                            { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 5)),
-                            { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 16, 1 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 5)), { 0, 0, height },
+                            { { 0, 0, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 8)),
-                            { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 8)), { 0, 0, height },
+                            { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 12)),
-                            { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 12)), { 0, 0, height },
+                            { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -3619,38 +3695,43 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 3)),
-                            { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 3)), { 0, 0, height },
+                            { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 6)),
-                            { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 6)), { 0, 0, height },
+                            { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 9)),
-                            { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 9)), { 0, 0, height },
+                            { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 10)),
-                            { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 10)), { 0, 0, height },
+                            { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_CURVE_BANKED + 13)),
-                            { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_CURVE_BANKED + 13)), { 0, 0, height },
+                            { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 2, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 2, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -3684,33 +3765,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 0)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 0)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 1)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 1)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 6)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 6)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 11)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 11)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 17)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 17)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 1, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 1, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -3728,22 +3814,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 2)),
-                            { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 2)), { 0, 0, height },
+                            { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 7)),
-                            { 0, 0, height }, { { 0, 0, height + 27 }, { 32, 16, 1 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 7)), { 0, 0, height },
+                            { { 0, 0, height + 27 }, { 32, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 12)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 12)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 18)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 18)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -3762,22 +3852,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 3)),
-                            { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 3)), { 0, 0, height },
+                            { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 8)),
-                            { 0, 0, height }, { { 16, 16, height + 27 }, { 16, 16, 1 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 8)), { 0, 0, height },
+                            { { 16, 16, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 13)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 13)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 19)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 19)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -3798,22 +3892,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 4)),
-                            { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 4)), { 0, 0, height },
+                            { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 9)),
-                            { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 32, 1 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 9)), { 0, 0, height },
+                            { { 0, 0, height + 27 }, { 16, 32, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 14)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 14)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 20)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 20)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -3832,38 +3930,43 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 5)),
-                            { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 5)), { 0, 0, height },
+                            { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 10)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 10)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 15)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 15)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 16)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 16)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 21)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_MEDIUM_CURVE_BANKED + 21)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 1, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 1, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -3897,30 +4000,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 0)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 0)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 4)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 4)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 8)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 8)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 12)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 12)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -3931,23 +4038,27 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 1)),
-                            { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 1)), { 0, 0, height },
+                            { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 5)),
-                            { 0, 0, height }, { { 0, 0, height + 27 }, { 34, 16, 0 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 5)), { 0, 0, height },
+                            { { 0, 0, height + 27 }, { 34, 16, 0 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 9)),
-                            { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 9)), { 0, 0, height },
+                            { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 13)),
-                            { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 13)), { 0, 0, height },
+                            { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -3965,23 +4076,27 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 2)),
-                            { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 2)), { 0, 0, height },
+                            { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 6)),
-                            { 0, 0, height }, { { 16, 16, height + 27 }, { 16, 16, 0 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 6)), { 0, 0, height },
+                            { { 16, 16, height + 27 }, { 16, 16, 0 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 10)),
-                            { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 10)), { 0, 0, height },
+                            { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 14)),
-                            { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 14)), { 0, 0, height },
+                            { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -4008,27 +4123,31 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 3)),
-                            { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 3)), { 0, 0, height },
+                            { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 7)),
-                            { 0, 0, height }, { { 0, 16, height + 27 }, { 16, 18, 0 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 7)), { 0, 0, height },
+                            { { 0, 16, height + 27 }, { 16, 18, 0 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 11)),
-                            { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 11)), { 0, 0, height },
+                            { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 15)),
-                            { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 15)), { 0, 0, height },
+                            { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::LeftCorner, DirectionPrev(direction), 0, height,
+                    session, supportType.metal, MetalSupportPlace::leftCorner, DirectionPrev(direction), 0, height,
                     session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -4054,30 +4173,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 16)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 16)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 20)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 20)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 24)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 24)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 28)),
-                            { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 28)), { 0, 0, height },
+                            { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
@@ -4088,23 +4211,27 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 17)),
-                            { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 17)), { 0, 0, height },
+                            { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 21)),
-                            { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 21)), { 0, 0, height },
+                            { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 25)),
-                            { 0, 0, height }, { { 0, 0, height + 27 }, { 34, 16, 0 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 25)), { 0, 0, height },
+                            { { 0, 0, height + 27 }, { 34, 16, 0 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 29)),
-                            { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 29)), { 0, 0, height },
+                            { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -4122,23 +4249,27 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 18)),
-                            { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 18)), { 0, 0, height },
+                            { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 22)),
-                            { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 22)), { 0, 0, height },
+                            { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 26)),
-                            { 0, 0, height }, { { 4, 4, height + 27 }, { 28, 28, 0 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 26)), { 0, 0, height },
+                            { { 4, 4, height + 27 }, { 28, 28, 0 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 30)),
-                            { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 30)), { 0, 0, height },
+                            { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -4166,27 +4297,31 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 19)),
-                            { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 19)), { 0, 0, height },
+                            { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 23)),
-                            { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 23)), { 0, 0, height },
+                            { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 27)),
-                            { 0, 0, height }, { { 0, 16, height + 27 }, { 16, 18, 0 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 27)), { 0, 0, height },
+                            { { 0, 16, height + 27 }, { 16, 18, 0 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_CURVE_BANKED + 31)),
-                            { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_CURVE_BANKED + 31)), { 0, 0, height },
+                            { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::BottomCorner, DirectionNext(direction), 0, height,
+                    session, supportType.metal, MetalSupportPlace::bottomCorner, DirectionNext(direction), 0, height,
                     session.SupportColours);
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -4228,30 +4363,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 0)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 0)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 2)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 2)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 4)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 4)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 6)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 6)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
+                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::slopeStart);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -4272,35 +4411,39 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 1)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 1)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 3)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 3)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 5)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 5)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 7)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 7)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 8, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 8, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -4326,30 +4469,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 8)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 8)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 10)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 10)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 12)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 12)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 14)),
-                            { 0, 6, height }, { 32, 20, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 14)), { 0, 6, height },
+                            { 32, 20, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
+                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::slopeStart);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -4371,35 +4518,39 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 9)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 9)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 11)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 11)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 13)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 13)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_SMALL_CURVE + 15)),
-                            { 6, 0, height }, { 20, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_SMALL_CURVE + 15)), { 6, 0, height },
+                            { 20, 32, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), direction == 2 ? 10 : 8,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), direction == 2 ? 10 : 8,
                     height, session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -4441,30 +4592,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 0)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 0)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 5)),
-                            { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 5)), { 0, 0, height },
+                            { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 10)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 10)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 15)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 15)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
+                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::slopeStart);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -4482,22 +4637,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 1)),
-                            { 0, 0, height }, { 32, 16, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 1)), { 0, 0, height },
+                            { 32, 16, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 6)),
-                            { 0, 0, height }, { 32, 16, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 6)), { 0, 0, height },
+                            { 32, 16, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 11)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 11)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 16)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 16)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -4516,22 +4675,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 2)),
-                            { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 2)), { 0, 0, height },
+                            { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 7)),
-                            { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 7)), { 0, 0, height },
+                            { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 12)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 12)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 17)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 17)),
                             { 0, 0, height }, { 16, 16, 3 });
                         break;
                 }
@@ -4552,22 +4715,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 3)),
-                            { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 3)), { 0, 0, height },
+                            { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 8)),
-                            { 0, 0, height }, { 16, 32, 3 });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 8)), { 0, 0, height },
+                            { 16, 32, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 13)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 13)),
                             { 0, 0, height }, { 16, 32, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 18)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 18)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -4586,35 +4753,39 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 4)),
-                            { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 4)), { 0, 0, height },
+                            { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 9)),
-                            { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 9)), { 0, 0, height },
+                            { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 14)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 14)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 19)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 19)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 8, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 8, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -4640,30 +4811,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 20)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 20)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 25)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 25)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 30)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 30)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 35)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 35)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
+                    PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::slopeStart);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -4682,22 +4857,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 21)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 21)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 26)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 26)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 31)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 31)),
                             { 0, 0, height }, { 32, 16, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 36)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 36)),
                             { 0, 0, height }, { 32, 16, 3 });
                         break;
                 }
@@ -4716,22 +4895,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 22)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 22)),
                             { 0, 0, height }, { 16, 16, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 27)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 27)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 32)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 32)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 37)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 37)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -4751,22 +4934,26 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 23)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 23)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 28)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 28)),
                             { 0, 0, height }, { 16, 32, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 33)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 33)),
                             { 0, 0, height }, { 16, 32, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 38)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 38)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -4785,35 +4972,39 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 24)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 24)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 29)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 29)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 34)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 34)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 39)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_GENTLE_MEDIUM_CURVE + 39)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), 8, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), 8, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -4855,29 +5046,29 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 0)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 4)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 3)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 7)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 DrawSBendLeftSupports(session, supportType.metal, trackSequence, direction, height, 0, 0);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -4892,22 +5083,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 1)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 5)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 2)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 6)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                 }
@@ -4928,22 +5119,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 2)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 6)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 1)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 5)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                 }
@@ -4964,22 +5155,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 3)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 7)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 0)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 4)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
@@ -4987,10 +5178,10 @@ namespace OpenRCT2::AlpineRC
                 switch (direction)
                 {
                     case 1:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 2:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5016,29 +5207,29 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 8)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 12)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 11)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 15)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 DrawSBendRightSupports(session, supportType.metal, trackSequence, direction, height, 0, 0);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -5054,22 +5245,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 9)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 13)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 10)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 14)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                 }
@@ -5089,22 +5280,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 10)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 14)),
                             { 0, 0, height }, { 32, 26, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 9)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 13)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 26, 3 } });
                         break;
                 }
@@ -5124,22 +5315,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 11)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 15)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 8)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_S_BEND + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_S_BEND + 12)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
@@ -5147,10 +5338,10 @@ namespace OpenRCT2::AlpineRC
                 switch (direction)
                 {
                     case 1:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 2:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5176,33 +5367,33 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 0)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 1)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 4)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 7)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 11)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 5, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 5, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -5222,22 +5413,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 2)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 5)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 8)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 12)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -5254,38 +5445,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 3)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 6)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 9)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 10)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 13)),
                             { 0, 0, height }, { { 6, 0, height + 8 }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 9, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 9, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5303,38 +5494,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 11)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 0)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 1)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 4)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 7)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 5, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 5, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5355,22 +5546,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 12)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 2)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 5)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 8)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -5388,33 +5579,33 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 13)),
                             { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 3)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 6)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 9)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 10)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 9, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 9, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -5440,33 +5631,33 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 14)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 17)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 17)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 21)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 21)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 24)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 24)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 25)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 25)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 5, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 5, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -5486,22 +5677,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 15)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 18)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 18)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 22)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 22)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 26)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 26)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -5519,38 +5710,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 16)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 16)),
                             { 0, 0, height }, { { 6, 0, height + 8 }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 19)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 19)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 20)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 20)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 23)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 23)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 27)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 27)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), 9, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), 9, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5568,38 +5759,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 17)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 17)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 21)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 21)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 24)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 24)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 25)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 25)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 14)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), 5, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), 5, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5620,22 +5811,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 18)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 18)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 22)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 22)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 26)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 26)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 15)),
                             { 0, 0, height }, { { 16, 16, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -5652,33 +5843,33 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 19)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 19)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 20)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 20)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 23)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 23)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 27)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 27)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_SMALL_HELIX + 16)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_SMALL_HELIX + 16)),
                             { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 9, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 9, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -5730,33 +5921,33 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 0)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 1)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 6)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 11)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 17)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 17)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -5776,22 +5967,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 2)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 7)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 32, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 12)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 18)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 18)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -5810,22 +6001,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 3)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 8)),
                             { 0, 0, height }, { { 16, 16, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 13)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 19)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 19)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -5846,22 +6037,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 4)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 9)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 32, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 14)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 20)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 20)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -5880,38 +6071,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 5)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 10)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 15)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 16)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 16)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 21)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 21)),
                             { 0, 0, height }, { { 6, 0, height + 8 }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 9, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 9, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5929,38 +6120,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 17)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 17)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 0)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 0)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 1)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 1)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 6)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 6)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 11)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 11)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 3, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 3, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -5981,22 +6172,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 18)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 18)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 2)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 2)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 7)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 7)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 32, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 12)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 12)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -6015,22 +6206,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 19)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 19)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 3)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 3)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 8)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 8)),
                             { 0, 0, height }, { { 16, 16, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 13)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 13)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -6050,22 +6241,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 20)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 20)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 4)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 4)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 9)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 9)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 32, 16, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 14)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 14)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -6084,33 +6275,33 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 21)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 21)),
                             { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 5)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 5)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 10)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 10)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 15)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 15)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 16)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 16)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 9, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 9, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -6135,33 +6326,33 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 22)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 22)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 27)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 27)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 33)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 33)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 38)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 38)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 39)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 39)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -6181,22 +6372,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 23)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 23)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 28)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 28)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 34)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 34)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 32, 16, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 40)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 40)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -6215,22 +6406,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 24)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 24)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 29)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 29)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 35)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 35)),
                             { 0, 0, height }, { { 16, 16, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 41)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 41)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -6250,22 +6441,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 25)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 25)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 30)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 30)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 36)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 36)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 32, 1 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 42)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 42)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -6284,38 +6475,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 26)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 26)),
                             { 0, 0, height }, { { 6, 0, height + 8 }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 31)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 31)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 32)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 32)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 37)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 37)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 43)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 43)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), direction == 1 ? 5 : 9,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), direction == 1 ? 5 : 9,
                     height, session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height + 8, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -6333,38 +6524,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 27)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 27)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 33)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 33)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 38)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 38)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 39)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 39)),
                             { 0, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 22)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 22)),
                             { 0, 0, height }, { { 6, 0, height }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), 3, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), 3, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -6385,22 +6576,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 28)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 28)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 34)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 34)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 16, 32, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 40)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 40)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 23)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 23)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 32, 3 } });
                         break;
                 }
@@ -6419,22 +6610,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 29)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 29)),
                             { 0, 0, height }, { { 0, 16, height }, { 16, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 35)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 35)),
                             { 0, 0, height }, { { 16, 16, height + 27 }, { 16, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 41)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 41)),
                             { 0, 0, height }, { { 16, 0, height }, { 16, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 24)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 24)),
                             { 0, 0, height }, { { 0, 0, height }, { 16, 16, 3 } });
                         break;
                 }
@@ -6455,22 +6646,22 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 30)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 30)),
                             { 0, 0, height }, { { 0, 0, height }, { 32, 16, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 36)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 36)),
                             { 0, 0, height }, { { 0, 0, height + 27 }, { 32, 16, 1 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 42)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 42)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 25)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 25)),
                             { 0, 0, height }, { { 0, 16, height }, { 32, 16, 3 } });
                         break;
                 }
@@ -6489,34 +6680,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 31)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 31)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 32)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 32)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 37)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 37)),
                             { 0, 0, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 43)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 43)),
                             { 0, 0, height }, { { 0, 6, height }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_LARGE_HELIX + 26)),
+                            session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_LARGE_HELIX + 26)),
                             { 0, 0, height }, { { 0, 6, height + 8 }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, direction == 0 ? 5 : 9, height,
+                    session, supportType.metal, MetalSupportPlace::centre, direction, direction == 0 ? 5 : 9, height,
                     session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -6566,22 +6757,22 @@ namespace OpenRCT2::AlpineRC
             case 0:
             case 2:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_FLAT + 0)), { 0, 0, height },
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_FLAT + 0)), { 0, 0, height },
                     { { 0, 6, height }, { 32, 20, 3 } });
                 break;
             case 1:
             case 3:
                 PaintAddImageAsParentRotated(
-                    session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_FLAT + 1)), { 0, 0, height },
+                    session, direction, session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_FLAT + 1)), { 0, 0, height },
                     { { 0, 6, height }, { 32, 20, 3 } });
                 break;
         }
         if (TrackPaintUtilShouldPaintSupports(session.MapPosition))
         {
             MetalASupportsPaintSetupRotated(
-                session, supportType.metal, MetalSupportPlace::Centre, direction, 0, height, session.SupportColours);
+                session, supportType.metal, MetalSupportPlace::centre, direction, 0, height, session.SupportColours);
         }
-        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
         PaintUtilSetSegmentSupportHeight(
             session, PaintUtilRotateSegments(BlockedSegments::kStraightFlat, direction), 0xFFFF, 0);
         PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -6598,33 +6789,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 0)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 0)),
                             { 0, 6, height }, { 32, 20, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 2)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 2)),
                             { 0, 6, height }, { 32, 20, 3 });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 3)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 3)),
                             { 0, 6, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 5)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 5)),
                             { 0, 6, height }, { 32, 20, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 7)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 7)),
                             { 0, 6, height }, { 32, 20, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -6645,35 +6841,39 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 1)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 1)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 4)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 4)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 6)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 6)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 8)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 8)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 10, height - 6,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 10, height - 6,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -6699,33 +6899,38 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 9)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 9)),
                             { 0, 6, height }, { 32, 20, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 11)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 11)),
                             { 0, 6, height }, { 32, 20, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 13)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 13)),
                             { 0, 6, height }, { 32, 20, 3 });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 14)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 14)),
                             { 0, 6, height }, { { 0, 27, height }, { 32, 1, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 16)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 16)),
                             { 0, 6, height }, { 32, 20, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 3, height, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 3, height, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::flat);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -6747,35 +6952,39 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 10)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 10)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 12)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 12)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 15)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 15)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 17)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 17)),
                             { 6, 0, height }, { { 0, 6, height - 6 }, { 20, 32, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), 10, height - 6,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), 10, height - 6,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::slopeEnd);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -6801,30 +7010,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 12)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 12)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 15)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 15)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 17)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 17)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 10)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 10)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height - 6, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height - 6, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::slopeEnd);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -6845,38 +7058,43 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 11)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 11)),
                             { 6, 0, height }, { 20, 32, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 13)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 13)),
                             { 6, 0, height }, { 20, 32, 3 });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 14)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 14)),
                             { 6, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 16)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 16)),
                             { 6, 0, height }, { 20, 32, 3 });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 9)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 9)),
                             { 6, 0, height }, { 20, 32, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionPrev(direction), 5, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionPrev(direction), 5, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 2:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 3:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -6902,30 +7120,34 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 8)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 8)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 1)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 1)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 4)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 4)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 6)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 6)),
                             { 0, 6, height }, { { 0, 6, height - 6 }, { 32, 20, 3 } });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, direction, 8, height - 6, session.SupportColours);
+                    session, supportType.metal, MetalSupportPlace::centre, direction, 8, height - 6, session.SupportColours);
                 if (direction == 0 || direction == 3)
                 {
-                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::SlopeEnd);
+                    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::slopeEnd);
                 }
                 PaintUtilSetSegmentSupportHeight(
                     session,
@@ -6947,38 +7169,43 @@ namespace OpenRCT2::AlpineRC
                 {
                     case 0:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 7)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 7)),
                             { 6, 0, height }, { 20, 32, 3 });
                         break;
                     case 1:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 0)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 0)),
                             { 6, 0, height }, { 20, 32, 3 });
                         break;
                     case 2:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 2)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 2)),
                             { 6, 0, height }, { 20, 32, 3 });
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 3)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 3)),
                             { 6, 0, height }, { { 27, 0, height }, { 1, 32, 26 } });
                         break;
                     case 3:
                         PaintAddImageAsParentRotated(
-                            session, direction, session.TrackColours.WithIndex((SPR_G2_ALPINE_TRACK_TURN_BANK_TRANSITION + 5)),
+                            session, direction,
+                            session.TrackColours.WithIndex((SPR_TRACKS_ALPINE_TRACK_TURN_BANK_TRANSITION + 5)),
                             { 6, 0, height }, { 20, 32, 3 });
                         break;
                 }
                 MetalASupportsPaintSetupRotated(
-                    session, supportType.metal, MetalSupportPlace::Centre, DirectionNext(direction), 5, height,
+                    session, supportType.metal, MetalSupportPlace::centre, DirectionNext(direction), 5, height,
                     session.SupportColours);
                 switch (direction)
                 {
                     case 0:
-                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                     case 1:
-                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
+                        PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::flat);
                         break;
                 }
                 PaintUtilSetSegmentSupportHeight(
@@ -6993,176 +7220,208 @@ namespace OpenRCT2::AlpineRC
         }
     }
 
-    TrackPaintFunction GetTrackPaintFunction(OpenRCT2::TrackElemType trackType)
+    TrackPaintFunction GetTrackPaintFunction(TrackElemType trackType)
     {
         switch (trackType)
         {
-            case TrackElemType::Flat:
+            case TrackElemType::flat:
                 return TrackFlat;
-            case TrackElemType::EndStation:
-            case TrackElemType::BeginStation:
-            case TrackElemType::MiddleStation:
+            case TrackElemType::endStation:
+            case TrackElemType::beginStation:
+            case TrackElemType::middleStation:
                 return TrackStation;
-            case TrackElemType::Up25:
+            case TrackElemType::up25:
                 return Track25DegUp;
-            case TrackElemType::FlatToUp25:
+            case TrackElemType::flatToUp25:
                 return TrackFlatTo25DegUp;
-            case TrackElemType::Up25ToFlat:
+            case TrackElemType::up25ToFlat:
                 return Track25DegUpToFlat;
-            case TrackElemType::Down25:
+            case TrackElemType::down25:
                 return Track25DegDown;
-            case TrackElemType::FlatToDown25:
+            case TrackElemType::flatToDown25:
                 return TrackFlatTo25DegDown;
-            case TrackElemType::Down25ToFlat:
+            case TrackElemType::down25ToFlat:
                 return Track25DegDownToFlat;
-            case TrackElemType::LeftQuarterTurn5Tiles:
+            case TrackElemType::leftQuarterTurn5Tiles:
                 return TrackLeftQuarterTurn5;
-            case TrackElemType::RightQuarterTurn5Tiles:
+            case TrackElemType::rightQuarterTurn5Tiles:
                 return TrackRightQuarterTurn5;
-            case TrackElemType::FlatToLeftBank:
+            case TrackElemType::flatToLeftBank:
                 return TrackFlatToLeftBank;
-            case TrackElemType::FlatToRightBank:
+            case TrackElemType::flatToRightBank:
                 return TrackFlatToRightBank;
-            case TrackElemType::LeftBankToFlat:
+            case TrackElemType::leftBankToFlat:
                 return TrackLeftBankToFlat;
-            case TrackElemType::RightBankToFlat:
+            case TrackElemType::rightBankToFlat:
                 return TrackRightBankToFlat;
-            case TrackElemType::BankedLeftQuarterTurn5Tiles:
+            case TrackElemType::bankedLeftQuarterTurn5Tiles:
                 return TrackBankedLeftQuarterTurn5;
-            case TrackElemType::BankedRightQuarterTurn5Tiles:
+            case TrackElemType::bankedRightQuarterTurn5Tiles:
                 return TrackBankedRightQuarterTurn5;
-            case TrackElemType::LeftBankToUp25:
+            case TrackElemType::leftBankToUp25:
                 return TrackLeftBankTo25DegUp;
-            case TrackElemType::RightBankToUp25:
+            case TrackElemType::rightBankToUp25:
                 return TrackRightBankTo25DegUp;
-            case TrackElemType::Up25ToLeftBank:
+            case TrackElemType::up25ToLeftBank:
                 return Track25DegUpToLeftBank;
-            case TrackElemType::Up25ToRightBank:
+            case TrackElemType::up25ToRightBank:
                 return Track25DegUpToRightBank;
-            case TrackElemType::LeftBankToDown25:
+            case TrackElemType::leftBankToDown25:
                 return TrackLeftBankTo25DegDown;
-            case TrackElemType::RightBankToDown25:
+            case TrackElemType::rightBankToDown25:
                 return TrackRightBankTo25DegDown;
-            case TrackElemType::Down25ToLeftBank:
+            case TrackElemType::down25ToLeftBank:
                 return Track25DegDownToLeftBank;
-            case TrackElemType::Down25ToRightBank:
+            case TrackElemType::down25ToRightBank:
                 return Track25DegDownToRightBank;
-            case TrackElemType::LeftBank:
+            case TrackElemType::leftBank:
                 return TrackLeftBank;
-            case TrackElemType::RightBank:
+            case TrackElemType::rightBank:
                 return TrackRightBank;
-            case TrackElemType::LeftQuarterTurn5TilesUp25:
+            case TrackElemType::leftQuarterTurn5TilesUp25:
                 return TrackLeftQuarterTurn525DegUp;
-            case TrackElemType::RightQuarterTurn5TilesUp25:
+            case TrackElemType::rightQuarterTurn5TilesUp25:
                 return TrackRightQuarterTurn525DegUp;
-            case TrackElemType::LeftQuarterTurn5TilesDown25:
+            case TrackElemType::leftQuarterTurn5TilesDown25:
                 return TrackLeftQuarterTurn525DegDown;
-            case TrackElemType::RightQuarterTurn5TilesDown25:
+            case TrackElemType::rightQuarterTurn5TilesDown25:
                 return TrackRightQuarterTurn525DegDown;
-            case TrackElemType::SBendLeft:
+            case TrackElemType::sBendLeft:
                 return TrackSBendLeft;
-            case TrackElemType::SBendRight:
+            case TrackElemType::sBendRight:
                 return TrackSBendRight;
-            case TrackElemType::LeftQuarterTurn3Tiles:
+            case TrackElemType::leftQuarterTurn3Tiles:
                 return TrackLeftQuarterTurn3;
-            case TrackElemType::RightQuarterTurn3Tiles:
+            case TrackElemType::rightQuarterTurn3Tiles:
                 return TrackRightQuarterTurn3;
-            case TrackElemType::LeftBankedQuarterTurn3Tiles:
+            case TrackElemType::leftBankedQuarterTurn3Tiles:
                 return TrackLeftQuarterTurn3Bank;
-            case TrackElemType::RightBankedQuarterTurn3Tiles:
+            case TrackElemType::rightBankedQuarterTurn3Tiles:
                 return TrackRightQuarterTurn3Bank;
-            case TrackElemType::LeftQuarterTurn3TilesUp25:
+            case TrackElemType::leftQuarterTurn3TilesUp25:
                 return TrackLeftQuarterTurn3Tile25DegUp;
-            case TrackElemType::RightQuarterTurn3TilesUp25:
+            case TrackElemType::rightQuarterTurn3TilesUp25:
                 return TrackRightQuarterTurn3Tile25DegUp;
-            case TrackElemType::LeftQuarterTurn3TilesDown25:
+            case TrackElemType::leftQuarterTurn3TilesDown25:
                 return TrackLeftQuarterTurn3Tile25DegDown;
-            case TrackElemType::RightQuarterTurn3TilesDown25:
+            case TrackElemType::rightQuarterTurn3TilesDown25:
                 return TrackRightQuarterTurn3Tile25DegDown;
-            case TrackElemType::LeftHalfBankedHelixUpSmall:
+            case TrackElemType::leftHalfBankedHelixUpSmall:
                 return TrackLeftHalfBankedHelixUpSmall;
-            case TrackElemType::RightHalfBankedHelixUpSmall:
+            case TrackElemType::rightHalfBankedHelixUpSmall:
                 return TrackRightHalfBankedHelixUpSmall;
-            case TrackElemType::LeftHalfBankedHelixDownSmall:
+            case TrackElemType::leftHalfBankedHelixDownSmall:
                 return TrackLeftHalfBankedHelixDownSmall;
-            case TrackElemType::RightHalfBankedHelixDownSmall:
+            case TrackElemType::rightHalfBankedHelixDownSmall:
                 return TrackRightHalfBankedHelixDownSmall;
-            case TrackElemType::LeftHalfBankedHelixUpLarge:
+            case TrackElemType::leftHalfBankedHelixUpLarge:
                 return TrackLeftHalfBankedHelixUpLarge;
-            case TrackElemType::RightHalfBankedHelixUpLarge:
+            case TrackElemType::rightHalfBankedHelixUpLarge:
                 return TrackRightHalfBankedHelixUpLarge;
-            case TrackElemType::LeftHalfBankedHelixDownLarge:
+            case TrackElemType::leftHalfBankedHelixDownLarge:
                 return TrackLeftHalfBankedHelixDownLarge;
-            case TrackElemType::RightHalfBankedHelixDownLarge:
+            case TrackElemType::rightHalfBankedHelixDownLarge:
                 return TrackRightHalfBankedHelixDownLarge;
-            case TrackElemType::Brakes:
+            case TrackElemType::brakes:
                 return TrackBrakes;
-            case TrackElemType::LeftEighthToDiag:
+            case TrackElemType::leftEighthToDiag:
                 return TrackLeftEighthToDiag;
-            case TrackElemType::RightEighthToDiag:
+            case TrackElemType::rightEighthToDiag:
                 return TrackRightEighthToDiag;
-            case TrackElemType::LeftEighthToOrthogonal:
+            case TrackElemType::leftEighthToOrthogonal:
                 return TrackLeftEighthToOrthogonal;
-            case TrackElemType::RightEighthToOrthogonal:
+            case TrackElemType::rightEighthToOrthogonal:
                 return TrackRightEighthToOrthogonal;
-            case TrackElemType::LeftEighthBankToDiag:
+            case TrackElemType::leftEighthBankToDiag:
                 return TrackLeftEighthBankToDiag;
-            case TrackElemType::RightEighthBankToDiag:
+            case TrackElemType::rightEighthBankToDiag:
                 return TrackRightEighthBankToDiag;
-            case TrackElemType::LeftEighthBankToOrthogonal:
+            case TrackElemType::leftEighthBankToOrthogonal:
                 return TrackLeftEighthBankToOrthogonal;
-            case TrackElemType::RightEighthBankToOrthogonal:
+            case TrackElemType::rightEighthBankToOrthogonal:
                 return TrackRightEighthBankToOrthogonal;
-            case TrackElemType::DiagFlat:
+            case TrackElemType::diagFlat:
                 return TrackDiagFlat;
-            case TrackElemType::DiagUp25:
+            case TrackElemType::diagUp25:
                 return TrackDiag25DegUp;
-            case TrackElemType::DiagFlatToUp25:
+            case TrackElemType::diagFlatToUp25:
                 return TrackDiagFlatTo25DegUp;
-            case TrackElemType::DiagUp25ToFlat:
+            case TrackElemType::diagUp25ToFlat:
                 return TrackDiag25DegUpToFlat;
-            case TrackElemType::DiagDown25:
+            case TrackElemType::diagDown25:
                 return TrackDiag25DegDown;
-            case TrackElemType::DiagFlatToDown25:
+            case TrackElemType::diagFlatToDown25:
                 return TrackDiagFlatTo25DegDown;
-            case TrackElemType::DiagDown25ToFlat:
+            case TrackElemType::diagDown25ToFlat:
                 return TrackDiag25DegDownToFlat;
-            case TrackElemType::DiagFlatToLeftBank:
+            case TrackElemType::diagFlatToLeftBank:
                 return TrackDiagFlatToLeftBank;
-            case TrackElemType::DiagFlatToRightBank:
+            case TrackElemType::diagFlatToRightBank:
                 return TrackDiagFlatToRightBank;
-            case TrackElemType::DiagLeftBankToFlat:
+            case TrackElemType::diagLeftBankToFlat:
                 return TrackDiagLeftBankToFlat;
-            case TrackElemType::DiagRightBankToFlat:
+            case TrackElemType::diagRightBankToFlat:
                 return TrackDiagRightBankToFlat;
-            case TrackElemType::DiagLeftBankToUp25:
+            case TrackElemType::diagLeftBankToUp25:
                 return TrackDiagLeftBankTo25DegUp;
-            case TrackElemType::DiagRightBankToUp25:
+            case TrackElemType::diagRightBankToUp25:
                 return TrackDiagRightBankTo25DegUp;
-            case TrackElemType::DiagUp25ToLeftBank:
+            case TrackElemType::diagUp25ToLeftBank:
                 return TrackDiag25DegUpToLeftBank;
-            case TrackElemType::DiagUp25ToRightBank:
+            case TrackElemType::diagUp25ToRightBank:
                 return TrackDiag25DegUpToRightBank;
-            case TrackElemType::DiagLeftBankToDown25:
+            case TrackElemType::diagLeftBankToDown25:
                 return TrackDiagLeftBankTo25DegDown;
-            case TrackElemType::DiagRightBankToDown25:
+            case TrackElemType::diagRightBankToDown25:
                 return TrackDiagRightBankTo25DegDown;
-            case TrackElemType::DiagDown25ToLeftBank:
+            case TrackElemType::diagDown25ToLeftBank:
                 return TrackDiag25DegDownToLeftBank;
-            case TrackElemType::DiagDown25ToRightBank:
+            case TrackElemType::diagDown25ToRightBank:
                 return TrackDiag25DegDownToRightBank;
-            case TrackElemType::DiagLeftBank:
+            case TrackElemType::diagLeftBank:
                 return TrackDiagLeftBank;
-            case TrackElemType::DiagRightBank:
+            case TrackElemType::diagRightBank:
                 return TrackDiagRightBank;
-            case TrackElemType::LeftBankToLeftQuarterTurn3TilesUp25:
+            case TrackElemType::leftBankToLeftQuarterTurn3TilesUp25:
                 return TrackLeftBankToLeftQuarterTurn3Tile25DegUp;
-            case TrackElemType::RightBankToRightQuarterTurn3TilesUp25:
+            case TrackElemType::rightBankToRightQuarterTurn3TilesUp25:
                 return TrackRightBankToRightQuarterTurn3Tile25DegUp;
-            case TrackElemType::LeftQuarterTurn3TilesDown25ToLeftBank:
+            case TrackElemType::leftQuarterTurn3TilesDown25ToLeftBank:
                 return TrackLeftQuarterTurn3Tile25DegDownToLeftBank;
-            case TrackElemType::RightQuarterTurn3TilesDown25ToRightBank:
+            case TrackElemType::rightQuarterTurn3TilesDown25ToRightBank:
                 return TrackRightQuarterTurn3Tile25DegDownToRightBank;
+            case TrackElemType::leftQuarterHelixLargeUp:
+                return OpenRCT2::trackPaintLeftQuarterHelixLargeUp<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_LEFT, kLeftQuarterHelixLargeUpSpriteMap, false,
+                    kLeftQuarterHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
+            case TrackElemType::rightQuarterHelixLargeUp:
+                return OpenRCT2::trackPaintRightQuarterHelixLargeUp<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_RIGHT, kRightQuarterHelixLargeUpSpriteMap, false,
+                    kRightQuarterHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
+            case TrackElemType::leftQuarterHelixLargeDown:
+                return OpenRCT2::trackPaintLeftQuarterHelixLargeDown<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_RIGHT, kRightQuarterHelixLargeUpSpriteMap, false,
+                    kRightQuarterHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
+            case TrackElemType::rightQuarterHelixLargeDown:
+                return OpenRCT2::trackPaintRightQuarterHelixLargeDown<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_LEFT, kLeftQuarterHelixLargeUpSpriteMap, false,
+                    kLeftQuarterHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
+            case TrackElemType::leftQuarterBankedHelixLargeUp:
+                return OpenRCT2::trackPaintLeftQuarterBankedHelixLargeUp<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_LEFT_BANKED, kLeftQuarterBankedHelixLargeUpSpriteMap, false,
+                    kLeftQuarterBankedHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
+            case TrackElemType::rightQuarterBankedHelixLargeUp:
+                return OpenRCT2::trackPaintRightQuarterBankedHelixLargeUp<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_RIGHT_BANKED, kRightQuarterBankedHelixLargeUpSpriteMap, false,
+                    kRightQuarterBankedHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
+            case TrackElemType::leftQuarterBankedHelixLargeDown:
+                return OpenRCT2::trackPaintLeftQuarterBankedHelixLargeDown<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_RIGHT_BANKED, kRightQuarterBankedHelixLargeUpSpriteMap, false,
+                    kRightQuarterBankedHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
+            case TrackElemType::rightQuarterBankedHelixLargeDown:
+                return OpenRCT2::trackPaintRightQuarterBankedHelixLargeDown<
+                    SPR_TRACKS_ALPINE_TRACK_QUARTER_HELIX_LEFT_BANKED, kLeftQuarterBankedHelixLargeUpSpriteMap, false,
+                    kLeftQuarterBankedHelixSupportHeights, OpenRCT2::BlockedSegmentsType::narrow, kTunnelGroup, false>;
             default:
                 return TrackPaintFunctionDummy;
         }

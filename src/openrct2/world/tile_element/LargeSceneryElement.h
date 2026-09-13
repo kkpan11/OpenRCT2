@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,55 +10,64 @@
 #pragma once
 
 #include "../../Identifiers.h"
+#include "../../drawing/Colour.h"
 #include "../../object/LargeSceneryEntry.h"
-#include "../../object/LargeSceneryObject.h"
 #include "TileElementBase.h"
 
 struct Banner;
 
-enum
+namespace OpenRCT2
 {
-    LARGE_SCENERY_ELEMENT_FLAGS2_ACCOUNTED = 1 << 0,
-};
+    class LargeSceneryObject;
+
+    enum class LargeSceneryElementFlag : uint8_t
+    {
+        /**
+         * Tile has been accounted for during operations on the whole piece.
+         */
+        accounted,
+    };
+    using LargeSceneryElementFlags = FlagHolder<uint8_t, LargeSceneryElementFlag>;
 
 #pragma pack(push, 1)
-struct LargeSceneryElement : TileElementBase
-{
-    static constexpr TileElementType kElementType = TileElementType::LargeScenery;
+    struct LargeSceneryElement : TileElementBase
+    {
+        static constexpr TileElementType kElementType = TileElementType::largeScenery;
 
-private:
-    ObjectEntryIndex EntryIndex;
-    ::BannerIndex BannerIndex;
-    uint8_t SequenceIndex;
-    uint8_t Colour[3];
-    uint8_t Flags2;
+    private:
+        ObjectEntryIndex entryIndex;
+        ::BannerIndex bannerIndex;
+        uint8_t sequenceIndex;
+        Drawing::Colour colour[3];
+        LargeSceneryElementFlags flags2;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-private-field"
-    uint8_t pad[2];
+        uint8_t pad[2];
 #pragma clang diagnostic pop
 
-public:
-    ObjectEntryIndex GetEntryIndex() const;
-    void SetEntryIndex(ObjectEntryIndex newIndex);
-    const LargeSceneryEntry* GetEntry() const;
-    const LargeSceneryObject* GetObject() const;
+    public:
+        ObjectEntryIndex getEntryIndex() const;
+        void setEntryIndex(ObjectEntryIndex newIndex);
+        const LargeSceneryEntry* getEntry() const;
 
-    uint8_t GetSequenceIndex() const;
-    void SetSequenceIndex(uint8_t newIndex);
+        uint8_t getSequenceIndex() const;
+        void setSequenceIndex(uint8_t newIndex);
 
-    colour_t GetPrimaryColour() const;
-    void SetPrimaryColour(colour_t colour);
-    colour_t GetSecondaryColour() const;
-    void SetSecondaryColour(colour_t colour);
-    colour_t GetTertiaryColour() const;
-    void SetTertiaryColour(colour_t colour);
+        Drawing::Colour getPrimaryColour() const;
+        void setPrimaryColour(Drawing::Colour colour);
+        Drawing::Colour getSecondaryColour() const;
+        void setSecondaryColour(Drawing::Colour colour);
+        Drawing::Colour getTertiaryColour() const;
+        void setTertiaryColour(Drawing::Colour colour);
 
-    Banner* GetBanner() const;
-    ::BannerIndex GetBannerIndex() const;
-    void SetBannerIndex(::BannerIndex newIndex);
+        Banner* getBanner() const;
+        ::BannerIndex getBannerIndex() const;
+        void setBannerIndex(::BannerIndex newIndex);
 
-    bool IsAccounted() const;
-    void SetIsAccounted(bool isAccounted);
-};
-static_assert(sizeof(LargeSceneryElement) == kTileElementSize);
+        bool isAccounted() const;
+        void setIsAccounted(bool isAccounted);
+    };
+    static_assert(sizeof(LargeSceneryElement) == kTileElementSize);
 #pragma pack(pop)
+
+} // namespace OpenRCT2

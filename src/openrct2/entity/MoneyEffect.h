@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,26 +15,30 @@
 
 #include <utility>
 
-class DataSerialiser;
 struct CoordsXYZ;
 struct PaintSession;
 
-struct MoneyEffect : EntityBase
+namespace OpenRCT2
 {
-    static constexpr auto cEntityType = EntityType::MoneyEffect;
+    class DataSerialiser;
 
-    uint16_t frame;
-    uint16_t MoveDelay;
-    uint8_t NumMovements;
-    uint8_t GuestPurchase;
-    money64 Value;
-    int16_t OffsetX;
-    uint16_t Wiggle;
+    struct MoneyEffect : EntityBase
+    {
+        static constexpr auto kEntityType = EntityType::moneyEffect;
 
-    static void CreateAt(money64 value, const CoordsXYZ& effectPos, bool guestPurchase);
-    static void Create(money64 value, const CoordsXYZ& loc);
-    void Update();
-    std::pair<StringId, money64> GetStringId() const;
-    void Serialise(DataSerialiser& stream);
-    void Paint(PaintSession& session, int32_t imageDirection) const;
-};
+        uint16_t frame;
+        uint16_t moveDelay;
+        uint8_t numMovements;
+        uint8_t guestPurchase;
+        money64 value;
+        int16_t offsetX;
+        uint16_t wiggle;
+
+        static void createAt(money64 value, const CoordsXYZ& effectPos, bool guestPurchase);
+        static void create(money64 value, const CoordsXYZ& loc);
+        void setValue(money64 value);
+        void update();
+        std::pair<StringId, money64> getStringId() const;
+        void serialise(DataSerialiser& stream);
+    };
+} // namespace OpenRCT2

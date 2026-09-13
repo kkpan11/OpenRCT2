@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -13,14 +13,13 @@
 #include "../../core/Guard.hpp"
 #include "../../object/ObjectEntryManager.h"
 #include "../../object/ObjectList.h"
-#include "../../object/ObjectManager.h"
 #include "../../object/SmallSceneryEntry.h"
 #include "../../object/TerrainSurfaceObject.h"
 #include "../../util/Util.h"
 #include "../Map.h"
 #include "../tile_element/SmallSceneryElement.h"
 #include "../tile_element/SurfaceElement.h"
-#include "../tile_element/TileElement.h"
+#include "../tile_element/TileElementBase.h"
 #include "MapGen.h"
 #include "SimplexNoise.h"
 
@@ -64,22 +63,22 @@ namespace OpenRCT2::World::MapGenerator
 
     static void placeTree(ObjectEntryIndex type, const CoordsXY& loc)
     {
-        auto* sceneryEntry = ObjectManager::GetObjectEntry<SmallSceneryEntry>(type);
+        auto* sceneryEntry = ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(type);
         if (sceneryEntry == nullptr)
         {
             return;
         }
 
-        int32_t surfaceZ = TileElementHeight(loc.ToTileCentre());
+        int32_t surfaceZ = TileElementHeight(loc.toTileCentre());
 
         auto* sceneryElement = TileElementInsert<SmallSceneryElement>({ loc, surfaceZ }, 0b1111);
         Guard::Assert(sceneryElement != nullptr);
 
-        sceneryElement->SetClearanceZ(surfaceZ + sceneryEntry->height);
-        sceneryElement->SetDirection(UtilRand() & 3);
-        sceneryElement->SetEntryIndex(type);
-        sceneryElement->SetAge(0);
-        sceneryElement->SetPrimaryColour(COLOUR_YELLOW);
+        sceneryElement->setClearanceZ(surfaceZ + sceneryEntry->height);
+        sceneryElement->setDirection(UtilRand() & 3);
+        sceneryElement->setEntryIndex(type);
+        sceneryElement->setAge(0);
+        sceneryElement->setPrimaryColour(Drawing::Colour::yellow);
     }
 
     static bool surfaceTakesGrassTrees(const TerrainSurfaceObject& surface)
@@ -124,7 +123,7 @@ namespace OpenRCT2::World::MapGenerator
 
         for (auto i = 0u; i < getObjectEntryGroupCount(ObjectType::smallScenery); i++)
         {
-            auto* sceneryEntry = OpenRCT2::ObjectManager::GetObjectEntry<SmallSceneryEntry>(i);
+            auto* sceneryEntry = OpenRCT2::ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(i);
             auto entry = ObjectEntryGetObject(ObjectType::smallScenery, i);
 
             if (sceneryEntry == nullptr)
@@ -150,10 +149,10 @@ namespace OpenRCT2::World::MapGenerator
         // Randomise simplex noise
         NoiseRand();
 
-        auto& gameState = GetGameState();
-        for (int32_t y = 1; y < gameState.MapSize.y - 1; y++)
+        auto& gameState = getGameState();
+        for (int32_t y = 1; y < gameState.mapSize.y - 1; y++)
         {
-            for (int32_t x = 1; x < gameState.MapSize.x - 1; x++)
+            for (int32_t x = 1; x < gameState.mapSize.x - 1; x++)
             {
                 auto pos = CoordsXY{ x, y } * kCoordsXYStep;
                 auto* surfaceElement = MapGetSurfaceElementAt(pos);
@@ -161,18 +160,18 @@ namespace OpenRCT2::World::MapGenerator
                     continue;
 
                 // Don't place on water
-                if (surfaceElement->GetWaterHeight() > 0)
+                if (surfaceElement->getWaterHeight() > 0)
                     continue;
 
-                if (settings->minTreeAltitude > surfaceElement->BaseHeight
-                    || settings->maxTreeAltitude < surfaceElement->BaseHeight)
+                if (settings->minTreeAltitude > surfaceElement->baseHeight
+                    || settings->maxTreeAltitude < surfaceElement->baseHeight)
                     continue;
 
                 // On sand surfaces, give the tile a score based on nearby water, to be used to determine whether to spawn
                 // vegetation
                 float oasisScore = 0.0f;
                 ObjectEntryIndex treeObjectEntryIndex = kObjectEntryIndexNull;
-                const auto& surfaceStyleObject = *TerrainSurfaceObject::GetById(surfaceElement->GetSurfaceObjectIndex());
+                const auto& surfaceStyleObject = *TerrainSurfaceObject::GetById(surfaceElement->getSurfaceObjectIndex());
                 if (surfaceTakesSandTrees(surfaceStyleObject))
                 {
                     oasisScore = -0.5f;
@@ -185,12 +184,12 @@ namespace OpenRCT2::World::MapGenerator
                             const auto offset = CoordsXY{ offsetX * kCoordsXYStep, offsetY * kCoordsXYStep };
                             auto neighbourPos = pos + offset;
                             neighbourPos.x = std::clamp(
-                                neighbourPos.x, kCoordsXYStep, kCoordsXYStep * (gameState.MapSize.x - 1));
+                                neighbourPos.x, kCoordsXYStep, kCoordsXYStep * (gameState.mapSize.x - 1));
                             neighbourPos.y = std::clamp(
-                                neighbourPos.y, kCoordsXYStep, kCoordsXYStep * (gameState.MapSize.y - 1));
+                                neighbourPos.y, kCoordsXYStep, kCoordsXYStep * (gameState.mapSize.y - 1));
 
                             const auto neighboutSurface = MapGetSurfaceElementAt(neighbourPos);
-                            if (neighboutSurface != nullptr && neighboutSurface->GetWaterHeight() > 0)
+                            if (neighboutSurface != nullptr && neighboutSurface->getWaterHeight() > 0)
                             {
                                 float distance = std::sqrt(offsetX * offsetX + offsetY * offsetY);
                                 oasisScore += 0.5f / (maxOasisDistance * distance);

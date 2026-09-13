@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -17,6 +17,10 @@
 
     #include <cstdio>
     #include <stdexcept>
+
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
     #include <windows.h>
     #include <winhttp.h>
 
@@ -35,11 +39,11 @@ namespace OpenRCT2::Http
     {
         switch (method)
         {
-            case Method::GET:
+            case Method::get:
                 return L"GET";
-            case Method::POST:
+            case Method::post:
                 return L"POST";
-            case Method::PUT:
+            case Method::put:
                 return L"PUT";
             default:
                 throw std::runtime_error("Unsupported verb.");
@@ -86,7 +90,7 @@ namespace OpenRCT2::Http
             {
                 // Ignore first header as that is the HTTP version which
                 // we don't really count as a header.
-                if (index != 0 && wKey.size() != 0)
+                if (index != 0 && !wKey.empty())
                 {
                     auto key = String::toUtf8(wKey);
                     auto value = String::toUtf8(wValue);
@@ -226,13 +230,17 @@ namespace OpenRCT2::Http
         }
         catch ([[maybe_unused]] const std::exception& e)
         {
-    #ifdef DEBUG
+    #if DEBUG > 0
             Console::Error::WriteLine("HTTP request failed: %s", e.what());
     #endif
             WinHttpCloseHandle(hSession);
             WinHttpCloseHandle(hConnect);
             WinHttpCloseHandle(hRequest);
-            throw;
+
+            Response response;
+            response.status = Status::error;
+            response.error = e.what();
+            return response;
         }
     }
 } // namespace OpenRCT2::Http

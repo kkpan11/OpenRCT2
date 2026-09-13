@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,219 +9,226 @@
 
 #pragma once
 
-#include "../Diagnostic.h"
 #include "../core/FixedPoint.hpp"
 #include "../rct12/RCT12.h"
+#include "../ride/Angles.h"
 #include "../ride/RideRatings.h"
-#include "../world/Park.h"
+#include "../world/ParkData.h"
 #include "Limits.h"
 
+enum class Breakdown : uint8_t;
+enum class MechanicStatus : uint8_t;
 enum class VehicleColourSettings : uint8_t;
+
+namespace OpenRCT2::Scenario
+{
+    enum class ObjectiveType : uint8_t;
+}
 
 namespace OpenRCT2::RCT1
 {
-    constexpr uint8_t RCT1ResearchFlagsSeparator = 0xFF;
+    constexpr uint8_t kRCT1ResearchFlagsSeparator = 0xFF;
 
     enum class RideType : uint8_t
     {
-        WoodenRollerCoaster = 0,
-        StandUpSteelRollerCoaster,
-        SuspendedRollerCoaster,
-        InvertedRollerCoaster,
-        SteelMiniRollerCoaster,
-        MiniatureRailway,
-        Monorail,
-        SuspendedSingleRailRollerCoaster,
-        BoatHire,
-        WoodenCrazyRodentRollerCoaster,
-        SingleRailRollerCoaster,
-        CarRide,
-        LaunchedFreefall,
-        BobsledRollerCoaster,
-        ObservationTower,
-        SteelRollerCoaster,
-        WaterSlide,
-        MineTrainRollerCoaster,
-        Chairlift,
-        SteelCorkscrewRollerCoaster,
-        HedgeMaze,
-        SpiralSlide,
-        GoKarts,
-        LogFlume,
-        RiverRapids,
-        Dodgems,
-        SwingingShip,
-        SwingingInverterShip,
-        IceCreamStall,
-        ChipsStall,
-        DrinkStall,
-        CandyflossStall,
-        BurgerBar,
-        MerryGoRound,
-        BalloonStall,
-        InformationKiosk,
-        Toilets,
-        FerrisWheel,
-        MotionSimulator,
+        woodenRollerCoaster = 0,
+        standUpSteelRollerCoaster,
+        suspendedRollerCoaster,
+        invertedRollerCoaster,
+        steelMiniRollerCoaster,
+        miniatureRailway,
+        monorail,
+        suspendedSingleRailRollerCoaster,
+        boatHire,
+        woodenCrazyRodentRollerCoaster,
+        singleRailRollerCoaster,
+        carRide,
+        launchedFreefall,
+        bobsledRollerCoaster,
+        observationTower,
+        steelRollerCoaster,
+        waterSlide,
+        mineTrainRollerCoaster,
+        chairlift,
+        steelCorkscrewRollerCoaster,
+        hedgeMaze,
+        spiralSlide,
+        goKarts,
+        logFlume,
+        riverRapids,
+        dodgems,
+        swingingShip,
+        swingingInverterShip,
+        iceCreamStall,
+        chipsStall,
+        drinkStall,
+        candyflossStall,
+        burgerBar,
+        merryGoRound,
+        balloonStall,
+        informationKiosk,
+        toilets,
+        ferrisWheel,
+        motionSimulator,
         _3DCinema,
-        TopSpin,
-        SpaceRings,
-        ReverseFreefallRollerCoaster,
-        SouvenirStall,
-        VerticalRollerCoaster,
-        PizzaStall,
-        Twist,
-        HauntedHouse,
-        PopcornStall,
-        Circus,
-        GhostTrain,
-        SteelTwisterRollerCoaster,
-        WoodenTwisterRollerCoaster,
-        WoodenSideFrictionRollerCoaster,
-        SteelWildMouseRollerCoaster,
-        HotDogStall,
-        ExoticSeaFoodStall,
-        HatStall,
-        ToffeeAppleStall,
-        VirginiaReel,
-        RiverRide,
-        CycleMonorail,
-        FlyingRollerCoaster,
-        SuspendedMonorail,
+        topSpin,
+        spaceRings,
+        reverseFreefallRollerCoaster,
+        souvenirStall,
+        verticalRollerCoaster,
+        pizzaStall,
+        twist,
+        hauntedHouse,
+        popcornStall,
+        circus,
+        ghostTrain,
+        steelTwisterRollerCoaster,
+        woodenTwisterRollerCoaster,
+        woodenSideFrictionRollerCoaster,
+        steelWildMouseRollerCoaster,
+        hotDogStall,
+        exoticSeaFoodStall,
+        hatStall,
+        toffeeAppleStall,
+        virginiaReel,
+        riverRide,
+        cycleMonorail,
+        flyingRollerCoaster,
+        suspendedMonorail,
         _40,
-        WoodenReverseRollerCoaster,
-        HeartlineTwisterRollerCoaster,
-        MiniatureGolf,
+        woodenReverseRollerCoaster,
+        heartlineTwisterRollerCoaster,
+        miniatureGolf,
         _44,
-        RotoDrop,
-        FlyingSaucers,
-        CrookedHouse,
-        CycleRailway,
-        SuspendedLoopingRollerCoaster,
-        WaterCoaster,
-        AirPoweredVerticalCoaster,
-        InvertedWildMouseCoaster,
-        JetSkis,
-        TShirtStall,
-        RaftRide,
-        DoughnutShop,
-        Enterprise,
-        CoffeeShop,
-        FriedChickenStall,
-        LemonadeStall,
+        rotoDrop,
+        flyingSaucers,
+        crookedHouse,
+        cycleRailway,
+        suspendedLoopingRollerCoaster,
+        waterCoaster,
+        airPoweredVerticalCoaster,
+        invertedWildMouseCoaster,
+        jetSkis,
+        tShirtStall,
+        raftRide,
+        doughnutShop,
+        enterprise,
+        coffeeShop,
+        friedChickenStall,
+        lemonadeStall,
 
-        Count,
-        Null = 255,
+        count,
+        null = 255,
     };
 
     enum class VehicleType : uint8_t
     {
-        SteelRollerCoasterTrain,
-        SteelRollerCoasterTrainBackwards,
-        WoodenRollerCoasterTrain,
-        InvertedCoasterTrain, // Not in RCT2
-        SuspendedSwingingCars,
-        LadybirdCars,
-        StandUpRollerCoasterCars,
-        SpinningCars,
-        SinglePersonSwingingChairs,
-        SwansPedalBoats,
-        LargeMonorailTrain,
-        Canoes,
-        RowingBoats,
-        SteamTrain,
-        WoodenMouseCars,
-        BumperBoats,
-        WoodenRollerCoasterTrainBackwards,
-        RocketCars,
-        Horses, // Steeplechase
-        Sportscars,
-        LyingDownSwingingCars, // Inverted single-rail
-        WoodenMineCars,
-        SuspendedSwingingAirplaneCars,
-        SmallMonorailCars,
-        WaterTricycles,
-        LaunchedFreefallCar,
-        BobsleighCars,
-        Dinghies,
-        RotatingCabin,
-        MineTrain,
-        ChairliftCars,
-        CorkscrewRollerCoasterTrain,
-        Motorbikes,
-        RacingCars,
-        Trucks,
-        GoKarts,
-        RapidsBoats,
-        LogFlumeBoats,
-        Dodgems,
-        SwingingShip,
-        SwingingInverterShip,
-        MerryGoRound,
-        FerrisWheel,
-        SimulatorPod,
-        CinemaBuilding,
-        TopspinCar,
-        SpaceRings,
-        ReverseFreefallRollerCoasterCar,
-        VerticalRollerCoasterCars,
-        CatCars,
-        TwistArmsAndCars,
-        HauntedHouseBuilding,
-        LogCars,
-        CircusTent,
-        GhostTrainCars,
-        SteelTwisterRollerCoasterTrain,
-        WoodenTwisterRollerCoasterTrain,
-        WoodenSideFrictionCars,
-        VintageCars,
-        SteamTrainCoveredCars,
-        StandUpSteelTwisterRollerCoasterTrain,
-        FloorlessSteelTwisterRollerCoasterTrain,
-        SteelMouseCars,
-        ChairliftCarsAlternative,
-        SuspendedMonorailTrain,
-        HelicopterCars,
-        VirginiaReelTubs,
-        ReverserCars,
-        Golfers,
-        RiverRideBoats,
-        FlyingRollerCoasterTrain,
-        NonLoopingSteelTwisterRollerCoasterTrain,
-        HeartlineTwisterCars,
-        HeartlineTwisterCarsReversed,
-        Reserved,
-        RotodropCar,
-        FlyingSaucers,
-        CrookedHouseBuilding,
-        Bicycles,
-        HypercoasterTrain,
+        steelRollerCoasterTrain,
+        steelRollerCoasterTrainBackwards,
+        woodenRollerCoasterTrain,
+        invertedCoasterTrain, // Not in RCT2
+        suspendedSwingingCars,
+        ladybirdCars,
+        standUpRollerCoasterCars,
+        spinningCars,
+        singlePersonSwingingChairs,
+        swansPedalBoats,
+        largeMonorailTrain,
+        canoes,
+        rowingBoats,
+        steamTrain,
+        woodenMouseCars,
+        bumperBoats,
+        woodenRollerCoasterTrainBackwards,
+        rocketCars,
+        horses, // Steeplechase
+        sportscars,
+        lyingDownSwingingCars, // Inverted single-rail
+        woodenMineCars,
+        suspendedSwingingAirplaneCars,
+        smallMonorailCars,
+        waterTricycles,
+        launchedFreefallCar,
+        bobsleighCars,
+        dinghies,
+        rotatingCabin,
+        mineTrain,
+        chairliftCars,
+        corkscrewRollerCoasterTrain,
+        motorbikes,
+        racingCars,
+        trucks,
+        goKarts,
+        rapidsBoats,
+        logFlumeBoats,
+        dodgems,
+        swingingShip,
+        swingingInverterShip,
+        merryGoRound,
+        ferrisWheel,
+        simulatorPod,
+        cinemaBuilding,
+        topspinCar,
+        spaceRings,
+        reverseFreefallRollerCoasterCar,
+        verticalRollerCoasterCars,
+        catCars,
+        twistArmsAndCars,
+        hauntedHouseBuilding,
+        logCars,
+        circusTent,
+        ghostTrainCars,
+        steelTwisterRollerCoasterTrain,
+        woodenTwisterRollerCoasterTrain,
+        woodenSideFrictionCars,
+        vintageCars,
+        steamTrainCoveredCars,
+        standUpSteelTwisterRollerCoasterTrain,
+        floorlessSteelTwisterRollerCoasterTrain,
+        steelMouseCars,
+        chairliftCarsAlternative,
+        suspendedMonorailTrain,
+        helicopterCars,
+        virginiaReelTubs,
+        reverserCars,
+        golfers,
+        riverRideBoats,
+        flyingRollerCoasterTrain,
+        nonLoopingSteelTwisterRollerCoasterTrain,
+        heartlineTwisterCars,
+        heartlineTwisterCarsReversed,
+        reserved,
+        rotodropCar,
+        flyingSaucers,
+        crookedHouseBuilding,
+        bicycles,
+        hypercoasterTrain,
         _4AcrossInvertedCoasterTrain,
-        WaterCoasterBoats,
-        FaceoffCars,
-        JetSkis,
-        RaftBoats,
-        AmericanStyleSteamTrain,
-        AirPoweredCoasterTrain,
-        SuspendedWildMouseCars, // Inverted Hairpin in RCT2
-        EnterpriseWheel,
+        waterCoasterBoats,
+        faceoffCars,
+        jetSkis,
+        raftBoats,
+        americanStyleSteamTrain,
+        airPoweredCoasterTrain,
+        suspendedWildMouseCars, // Inverted Hairpin in RCT2
+        enterpriseWheel,
 
-        Count,
+        count,
     };
 
     enum class BannerType : uint8_t
     {
-        Plain = 0,
-        Jungle,
-        Roman,
-        Egyptian,
-        Mine,
-        Jurassic,
-        Oriental,
-        Snow,
-        Space,
+        plain = 0,
+        jungle,
+        roman,
+        egyptian,
+        mine,
+        jurassic,
+        oriental,
+        snow,
+        space,
 
-        Null = 255,
+        null = 255,
     };
 
 #pragma pack(push, 1)
@@ -242,17 +249,17 @@ namespace OpenRCT2::RCT1
     {
         RideType type;                               // 0x000
         RCT1::VehicleType vehicleType;               // 0x001
-        uint16_t lifecycleFlags;                     // 0x002
+        uint16_t flags;                              // 0x002
         uint8_t operatingMode;                       // 0x004
         VehicleColourSettings vehicleColourSettings; // 0x005
         struct
         {
-            colour_t body;
-            colour_t trim;
+            uint8_t body;
+            uint8_t trim;
         } vehicleColours[Limits::kMaxTrainsPerRide];           // 0x006
-        colour_t trackPrimaryColour;                           // 0x01E
-        colour_t trackSecondaryColour;                         // 0x01F
-        colour_t trackSupportColour;                           // 0x020
+        uint8_t trackPrimaryColour;                            // 0x01E
+        uint8_t trackSecondaryColour;                          // 0x01F
+        uint8_t trackSupportColour;                            // 0x020
         uint8_t status;                                        // 0x021
         uint16_t name;                                         // 0x022
         uint16_t nameArgumentRide;                             // 0x024
@@ -325,7 +332,7 @@ namespace OpenRCT2::RCT1
         money16 price;                                       // 0x0E8
         RCT12xy8 chairliftBullwheelLocation[2];              // 0x0EA
         uint8_t chairliftBullwheelZ[2];                      // 0x0EE
-        RatingTuple ratings;                                 // 0x0F0
+        RideRating::Tuple ratings;                           // 0x0F0
         money16 value;                                       // 0x0F6
         uint16_t chairliftBullwheelRotation;                 // 0x0F8
         uint8_t satisfaction;                                // 0x0FA
@@ -346,24 +353,24 @@ namespace OpenRCT2::RCT1
             uint16_t slidePeep; // 0x10E
             uint16_t mazeTiles; // 0x10E
         };
-        uint8_t pad110[0xE];            // 0x110
-        uint8_t slidePeepTshirtColour;  // 0x11E
-        uint8_t pad11F[0x7];            // 0x11F
-        uint8_t spiralSlideProgress;    // 0x126
-        uint8_t pad127[0x9];            // 0x127
-        int16_t buildDate;              // 0x130
-        money16 upkeepCost;             // 0x131
-        uint16_t raceWinner;            // 0x132
-        uint8_t unk134[2];              // 0x134
-        uint32_t musicPosition;         // 0x138
-        uint8_t breakdownReasonPending; // 0x13C
-        uint8_t mechanicStatus;         // 0x13D
-        uint16_t mechanic;              // 0x13E
-        uint8_t inspectionStation;      // 0x140
-        uint8_t brokenTrain;            // 0x141
-        uint8_t brokenCar;              // 0x142
-        uint8_t breakdownReason;        // 0x143
-        money16 priceSecondary;         // 0x144
+        uint8_t pad110[0xE];              // 0x110
+        uint8_t slidePeepTshirtColour;    // 0x11E
+        uint8_t pad11F[0x7];              // 0x11F
+        uint8_t spiralSlideProgress;      // 0x126
+        uint8_t pad127[0x9];              // 0x127
+        int16_t buildDate;                // 0x130
+        money16 upkeepCost;               // 0x131
+        uint16_t raceWinner;              // 0x132
+        uint8_t unk134[2];                // 0x134
+        uint32_t musicPosition;           // 0x138
+        Breakdown breakdownReasonPending; // 0x13C
+        MechanicStatus mechanicStatus;    // 0x13D
+        uint16_t mechanic;                // 0x13E
+        uint8_t inspectionStation;        // 0x140
+        uint8_t brokenTrain;              // 0x141
+        uint8_t brokenCar;                // 0x142
+        Breakdown breakdownReason;        // 0x143
+        money16 priceSecondary;           // 0x144
         union
         {
             struct
@@ -381,9 +388,9 @@ namespace OpenRCT2::RCT1
         money32 incomePerHour;                          // 0x160
         money32 profit;                                 // 0x164
         uint8_t queueTime[Limits::kMaxStationsPerRide]; // 0x168
-        colour_t trackColourMain[4];                    // 0x16C
-        colour_t trackColourAdditional[4];              // 0x170
-        colour_t trackColourSupports[4];                // 0x174
+        uint8_t trackColourMain[4];                     // 0x16C
+        uint8_t trackColourAdditional[4];               // 0x170
+        uint8_t trackColourSupports[4];                 // 0x174
         uint8_t music;                                  // 0x178
         uint8_t entranceStyle;                          // 0x179
         uint8_t unk17A[230];                            // 0x17A
@@ -404,8 +411,8 @@ namespace OpenRCT2::RCT1
 
     struct Vehicle : RCT12EntityBase
     {
-        uint8_t Pitch;        // 0x1F
-        uint8_t BankRotation; // 0x20
+        VehiclePitch pitch; // 0x1F
+        VehicleRoll roll;   // 0x20
         uint8_t Pad21[3];
         int32_t RemainingDistance;  // 0x24
         int32_t Velocity;           // 0x28
@@ -498,54 +505,54 @@ namespace OpenRCT2::RCT1
         uint8_t RideSubtype;     // 0xD6
         uint8_t ColoursExtended; // 0xD7
 
-        OpenRCT2::RCT12::TrackElemType GetTrackType() const
+        RCT12::TrackElemType GetTrackType() const
         {
-            return static_cast<OpenRCT2::RCT12::TrackElemType>(TrackTypeAndDirection >> 2);
+            return static_cast<RCT12::TrackElemType>(TrackTypeAndDirection >> 2);
         }
 
         uint8_t GetTrackDirection() const
         {
-            return TrackTypeAndDirection & RCT12VehicleTrackDirectionMask;
+            return TrackTypeAndDirection & kRCT12VehicleTrackDirectionMask;
         }
     };
 
     enum class PeepAnimationGroup : uint8_t
     {
-        Normal = 0,
-        Handyman = 1,
-        Mechanic = 2,
-        Security = 3,
-        EntertainerPanda = 4,
-        EntertainerTiger = 5,
-        EntertainerElephant = 6,
-        EntertainerRoman = 7,
-        EntertainerGorilla = 8,
-        EntertainerSnowman = 9,
-        EntertainerKnight = 10,
-        EntertainerAstronaut = 11,
-        IceCream = 12,
-        Chips = 13,
-        Burger = 14,
-        Drink = 15,
-        Balloon = 16,
-        Candyfloss = 17,
-        Umbrella = 18,
-        Pizza = 19,
-        SecurityAlt = 20,
-        Popcorn = 21,
-        ArmsCrossed = 22,
-        HeadDown = 23,
-        Nauseous = 24,
-        VeryNauseous = 25,
-        RequireToilet = 26,
-        Hat = 27,
-        HotDog = 28,
-        Tentacle = 29,
-        ToffeeApple = 30,
-        Doughnut = 31,
-        Coffee = 32,
-        Chicken = 33,
-        Lemonade = 34,
+        normal = 0,
+        handyman = 1,
+        mechanic = 2,
+        security = 3,
+        entertainerPanda = 4,
+        entertainerTiger = 5,
+        entertainerElephant = 6,
+        entertainerRoman = 7,
+        entertainerGorilla = 8,
+        entertainerSnowman = 9,
+        entertainerKnight = 10,
+        entertainerAstronaut = 11,
+        iceCream = 12,
+        chips = 13,
+        burger = 14,
+        drink = 15,
+        balloon = 16,
+        candyfloss = 17,
+        umbrella = 18,
+        pizza = 19,
+        securityAlt = 20,
+        popcorn = 21,
+        armsCrossed = 22,
+        headDown = 23,
+        nauseous = 24,
+        veryNauseous = 25,
+        requireToilet = 26,
+        hat = 27,
+        hotDog = 28,
+        tentacle = 29,
+        toffeeApple = 30,
+        doughnut = 31,
+        coffee = 32,
+        chicken = 33,
+        lemonade = 34,
     };
 
     struct Peep : RCT12EntityBase
@@ -652,8 +659,16 @@ namespace OpenRCT2::RCT1
             uint8_t StaffOrders;         // 0xC6
             uint8_t PeepIsLostCountdown; // 0xC6
         };
-        RCT12RideId Photo1RideRef;     // 0xC7
-        uint32_t PeepFlags;            // 0xC8
+        RCT12RideId Photo1RideRef; // 0xC7
+        union
+        {
+            uint32_t peepFlagsLL; // 0xC8
+            struct
+            {
+                uint16_t peepFlagsBaseAA; // 0xC8
+                uint16_t itemFlagsBase;   // 0xCA
+            };
+        };
         RCT12xyzd8 PathfindGoal;       // 0xCC
         RCT12xyzd8 PathfindHistory[4]; // 0xD0
         uint8_t NoActionFrameNum;      // 0xE0
@@ -686,10 +701,15 @@ namespace OpenRCT2::RCT1
         RCT12RideId FavouriteRide;   // 0xF9
         uint8_t FavouriteRideRating; // 0xFA
         uint8_t PadFB;
-        uint32_t ItemStandardFlags; // 0xFC
-        uint64_t GetItemFlags() const
+        uint32_t itemFlagsAALL; // 0xFC
+
+        uint64_t GetItemFlags(bool isBase) const
         {
-            return ItemStandardFlags;
+            return isBase ? itemFlagsBase : itemFlagsAALL;
+        }
+        uint32_t getPeepFlags(bool isLL) const
+        {
+            return isLL ? peepFlagsLL : peepFlagsBaseAA;
         }
     };
     static_assert(sizeof(Peep) == 0x100);
@@ -703,7 +723,7 @@ namespace OpenRCT2::RCT1
         RCT12EntityLitter Litter;
         RCT12EntityBalloon Balloon;
         RCT12EntityDuck Duck;
-        RCT12EntityJumpingFountain JumpingFountain;
+        RCT12EntityJumpingFountain JumpingFountain{};
         RCT12EntityMoneyEffect MoneyEffect;
         RCT12EntityCrashedVehicleParticle CrashedVehicleParticle;
         RCT12EntityCrashSplash CrashSplash;
@@ -720,6 +740,28 @@ namespace OpenRCT2::RCT1
         uint8_t Category;
     };
     static_assert(sizeof(ResearchItem) == 5);
+
+    enum class ParkFlag : uint32_t
+    {
+        parkOpen = 0,
+        scenarioCompleteNameInput = 1,
+        forbidLandscapeChanges = 2,
+        forbidTreeRemoval = 3,
+        showRealGuestNames = 4,
+        forbidHighConstruction = 5, // Below tree height
+        guestPreferLessIntenseRides = 6,
+        forbidMarketingCampaigns = 7,
+        antiCheatDeprecated = 8, // Used for cheat detection. Should be cleared on import.
+        guestPreferMoreIntenseRides = 9,
+        noMoney = 11, // Used for both scenarios and saved games, unlike RCT2
+        difficultGuestGeneration = 12,
+        parkEntryLockedAtFree = 13, // Off: rides and park entry chargeable. On: only rides
+                                    // chargeable.
+        difficultParkRating = 14,
+        lockRealNamesOptionDeprecated = 15, // Deprecated now we use a persistent 'real names'
+                                            // setting
+    };
+    using ParkFlags = FlagHolder<uint32_t, ParkFlag>;
 
     /**
      * RCT1,AA,LL scenario / saved game structure.
@@ -751,7 +793,7 @@ namespace OpenRCT2::RCT1
         uint32_t Unk198830;
         money32 Cash;
         money32 Loan;
-        uint32_t ParkFlags;
+        ParkFlags parkFlags;
         money16 ParkEntranceFee;
         Entrance ParkEntrance;
         uint8_t Unk198849;
@@ -768,9 +810,9 @@ namespace OpenRCT2::RCT1
         money32 Expenditure[Limits::kExpenditureTableMonthCount][Limits::kExpenditureTypeCount];
         uint32_t GuestsInPark2;
         uint8_t Unk199024;
-        colour_t HandymanColour;
-        colour_t MechanicColour;
-        colour_t SecurityGuardColour;
+        uint8_t HandymanColour;
+        uint8_t MechanicColour;
+        uint8_t SecurityGuardColour;
         uint8_t AvailableScenery[128];
         uint16_t AvailableBanners;
         uint8_t Unk1990AA[94];
@@ -800,7 +842,7 @@ namespace OpenRCT2::RCT1
         money16 GuestInitialCash;
         uint8_t GuestInitialHunger;
         uint8_t GuestInitialThirst;
-        uint8_t ScenarioObjectiveType;
+        Scenario::ObjectiveType ScenarioObjectiveType;
         uint8_t ScenarioObjectiveYears;
         uint16_t Unk199552;
         money32 ScenarioObjectiveCurrency;
@@ -1184,27 +1226,6 @@ namespace OpenRCT2::RCT1
 
     enum
     {
-        RCT1_PARK_FLAGS_PARK_OPEN = (1 << 0),
-        RCT1_PARK_FLAGS_SCENARIO_COMPLETE_NAME_INPUT = (1 << 1),
-        RCT1_PARK_FLAGS_FORBID_LANDSCAPE_CHANGES = (1 << 2),
-        RCT1_PARK_FLAGS_FORBID_TREE_REMOVAL = (1 << 3),
-        RCT1_PARK_FLAGS_SHOW_REAL_GUEST_NAMES = (1 << 4),
-        RCT1_PARK_FLAGS_FORBID_HIGH_CONSTRUCTION = (1 << 5), // Below tree height
-        RCT1_PARK_FLAGS_PREF_LESS_INTENSE_RIDES = (1 << 6),
-        RCT1_PARK_FLAGS_FORBID_MARKETING_CAMPAIGN = (1 << 7),
-        RCT1_PARK_FLAGS_ANTI_CHEAT_DEPRECATED = (1 << 8), // Not used anymore, used for cheat detection
-        RCT1_PARK_FLAGS_PREF_MORE_INTENSE_RIDES = (1 << 9),
-        RCT1_PARK_FLAGS_NO_MONEY = (1 << 11), // Used for both scenarios and saved games, unlike RCT2
-        RCT1_PARK_FLAGS_DIFFICULT_GUEST_GENERATION = (1 << 12),
-        RCT1_PARK_FLAGS_PARK_ENTRY_LOCKED_AT_FREE = (1 << 13), // Off: rides and park entry chargeable. On: only rides
-                                                               // chargeable.
-        RCT1_PARK_FLAGS_DIFFICULT_PARK_RATING = (1 << 14),
-        RCT1_PARK_FLAGS_LOCK_REAL_NAMES_OPTION_DEPRECATED = (1 << 15), // Deprecated now we use a persistent 'real names'
-                                                                       // setting
-    };
-
-    enum
-    {
         STEEL_RC_FRONT = 0,
         STEEL_RC_CARRIAGE = 1,
         WOODEN_RC_TRAIN = 2,
@@ -1259,11 +1280,8 @@ namespace OpenRCT2::RCT1
         AIR_POWERED_VERTICAL_COASTER_TRAIN_CAR = 107,
     };
 
-    enum
-    {
-        COPY_COLOUR_1 = -1,
-        COPY_COLOUR_2 = -2,
-    };
+    constexpr auto kCopyColour1 = static_cast<Drawing::Colour>(254);
+    constexpr auto kCopyColour2 = static_cast<Drawing::Colour>(253);
 
     enum
     {
@@ -1287,18 +1305,11 @@ namespace OpenRCT2::RCT1
 
     enum
     {
-        RCT1_LANDSCAPE_DOOR_CLOSED = 0,
-        RCT1_LANDSCAPE_DOOR_HALF_OPEN = 2,
-        RCT1_LANDSCAPE_DOOR_OPEN = 3,
-    };
-
-    enum
-    {
         RCT1_PATH_SUPPORT_TYPE_TRUSS,
         RCT1_PATH_SUPPORT_TYPE_COATED_WOOD,
         RCT1_PATH_SUPPORT_TYPE_SPACE,
         RCT1_PATH_SUPPORT_TYPE_BAMBOO,
     };
 
-    OpenRCT2::TrackElemType RCT1TrackTypeToOpenRCT2(OpenRCT2::RCT12::TrackElemType origTrackType, ride_type_t rideType);
+    TrackElemType RCT1TrackTypeToOpenRCT2(RCT12::TrackElemType origTrackType, ride_type_t rideType);
 } // namespace OpenRCT2::RCT1

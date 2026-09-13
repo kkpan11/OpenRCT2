@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,13 +7,10 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
-#include "../../../interface/Viewport.h"
-#include "../../../ride/Track.h"
 #include "../../../ride/TrackPaint.h"
+#include "../../../ride/ted/TrackElemType.h"
 #include "../../Paint.h"
-#include "../../support/WoodenSupports.h"
 #include "../../tile_element/Segment.h"
-#include "../../track/Segment.h"
 #include "../../track/Support.h"
 
 using namespace OpenRCT2;
@@ -74,11 +71,11 @@ static void PaintLiftBase(
 
     int32_t edges = kEdges3x3[trackSequence];
 
-    auto imageId = session.SupportColours.WithIndex(SPR_FLOOR_METAL_B);
+    auto imageId = session.SupportColours.WithIndex(SPR_FLOOR_TILE_DIAMOND);
     PaintAddImageAsParent(session, imageId, { 0, 0, height }, { { 0, 0, height }, { 32, 32, 1 } });
 
     TrackPaintUtilPaintFences(
-        session, edges, session.MapPosition, trackElement, ride, session.TrackColours, height, kFenceSpritesMetalB,
+        session, edges, session.MapPosition, trackElement, ride, session.TrackColours, height, kFenceSpritesPicketDuplicate,
         session.CurrentRotation);
 
     int32_t blockedSegments = 0;
@@ -141,14 +138,14 @@ static void PaintLiftTowerSection(
 /**
  * rct2: 0x0076C5BC
  */
-TrackPaintFunction GetTrackPaintFunctionLift(OpenRCT2::TrackElemType trackType)
+TrackPaintFunction GetTrackPaintFunctionLift(TrackElemType trackType)
 {
     switch (trackType)
     {
-        case TrackElemType::TowerBase:
+        case TrackElemType::towerBase:
             return PaintLiftBase;
 
-        case TrackElemType::TowerSection:
+        case TrackElemType::towerSection:
             return PaintLiftTowerSection;
         default:
             return TrackPaintFunctionDummy;

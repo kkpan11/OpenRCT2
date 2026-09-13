@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -78,22 +78,28 @@ namespace OpenRCT2::Audio
                 return nullptr;
             }
 
+            std::unique_ptr<SDLAudioSource> source;
             try
             {
-                auto source = CreateAudioSource(rw, index);
-
-                // Stream will already be in memory, so convert to target format
-                auto& targetFormat = _audioMixer->GetFormat();
-                source = source->ToMemory(targetFormat);
-
-                return AddSource(std::move(source));
+                source = CreateAudioSource(rw, index);
             }
             catch (const std::exception& e)
             {
-                SDL_RWclose(rw);
                 LOG_VERBOSE("Unable to create audio source: %s", e.what());
+            }
+
+            SDL_RWclose(rw);
+
+            if (source == nullptr)
+            {
                 return nullptr;
             }
+
+            // Stream will already be in memory, so convert to target format
+            auto& targetFormat = _audioMixer->GetFormat();
+            source = source->ToMemory(targetFormat);
+
+            return AddSource(std::move(source));
         }
 
         IAudioSource* CreateStreamFromWAV(std::unique_ptr<IStream> stream) override

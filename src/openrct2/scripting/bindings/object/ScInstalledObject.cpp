@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,8 @@
 
 #ifdef ENABLE_SCRIPTING
 
+    #include "../../../core/EnumMap.hpp"
+    #include "../../../object/ObjectTypes.h"
     #include "ScObject.hpp"
 
 namespace OpenRCT2::Scripting
@@ -24,7 +26,7 @@ namespace OpenRCT2::Scripting
         { "scenery_group", ObjectType::sceneryGroup },
         { "park_entrance", ObjectType::parkEntrance },
         { "water", ObjectType::water },
-        { "scenario_text", ObjectType::scenarioText },
+        { "scenario_meta", ObjectType::scenarioMeta },
         { "terrain_surface", ObjectType::terrainSurface },
         { "terrain_edge", ObjectType::terrainEdge },
         { "station", ObjectType::station },

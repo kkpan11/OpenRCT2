@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,9 +10,9 @@
 #pragma once
 
 #include "../core/Identifier.hpp"
-#include "../interface/Window.h"
+#include "../interface/WindowClasses.h"
+#include "../interface/WindowTypes.h"
 
-#include <map>
 #include <sfl/static_vector.hpp>
 #include <string>
 #include <variant>
@@ -33,7 +33,7 @@ namespace OpenRCT2
         INTENT_ACTION_INIT_SCENERY,
         INTENT_ACTION_SET_DEFAULT_SCENERY_CONFIG,
         INTENT_ACTION_REFRESH_SCENERY,
-        INTENT_ACTION_INVALIDATE_TICKER_NEWS,
+        INTENT_ACTION_UPDATE_NEWS_TICKER,
         INTENT_ACTION_REFRESH_GUEST_LIST,
         INTENT_ACTION_CLEAR_TILE_INSPECTOR_CLIPBOARD,
         INTENT_ACTION_REFRESH_STAFF_LIST,
@@ -57,6 +57,7 @@ namespace OpenRCT2
         INTENT_ACTION_RESTORE_PROVISIONAL_ELEMENTS,
         INTENT_ACTION_REMOVE_PROVISIONAL_FOOTPATH,
         INTENT_ACTION_REMOVE_PROVISIONAL_TRACK_PIECE,
+        INTENT_ACTION_REFRESH_PLAYER_LIST,
 
         INTENT_ACTION_NULL = 255,
     };
@@ -70,15 +71,15 @@ namespace OpenRCT2
 
     class Intent
     {
-        WindowClass _Class{ WindowClass::Null };
-        WindowDetail _WindowDetail{ WD_NULL };
+        WindowClass _Class{ WindowClass::null };
+        WindowDetail _WindowDetail{ WindowDetail::null };
         IntentAction _Action{ INTENT_ACTION_NULL };
         IntentDataStorage _Data;
 
     public:
         explicit Intent(WindowClass windowClass);
         explicit Intent(WindowDetail windowDetail);
-        explicit Intent(IntentAction windowclass);
+        explicit Intent(IntentAction intentAction);
 
         WindowClass GetWindowClass() const;
         WindowDetail GetWindowDetail() const;

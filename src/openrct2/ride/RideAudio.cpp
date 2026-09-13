@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -13,7 +13,6 @@
 #include "../OpenRCT2.h"
 #include "../audio/Audio.h"
 #include "../audio/AudioChannel.h"
-#include "../audio/AudioContext.h"
 #include "../audio/AudioMixer.h"
 #include "../config/Config.h"
 #include "../interface/Viewport.h"
@@ -31,7 +30,7 @@ using namespace OpenRCT2::Audio;
 
 namespace OpenRCT2::RideAudio
 {
-    constexpr size_t MAX_RIDE_MUSIC_CHANNELS = 32;
+    constexpr size_t kMaxRideMusicChannels = 32;
 
     /**
      * Represents an audio channel to play a particular ride's music track.
@@ -177,7 +176,7 @@ namespace OpenRCT2::RideAudio
             auto source = musicObj->GetTrackSample(instance.TrackIndex);
             if (source != nullptr)
             {
-                auto channel = CreateAudioChannel(source, MixerGroup::RideMusic, shouldLoop, 0);
+                auto channel = CreateAudioChannel(source, MixerGroup::rideMusic, shouldLoop, 0);
                 if (channel != nullptr)
                 {
                     _musicChannels.emplace_back(instance, channel, source);
@@ -195,7 +194,7 @@ namespace OpenRCT2::RideAudio
             auto source = audioObj->GetSample(0);
             if (source != nullptr)
             {
-                auto channel = CreateAudioChannel(source, MixerGroup::Sound, false, 0);
+                auto channel = CreateAudioChannel(source, MixerGroup::sound, false, 0);
                 if (channel != nullptr)
                 {
                     _musicChannels.emplace_back(instance, channel, nullptr);
@@ -243,7 +242,7 @@ namespace OpenRCT2::RideAudio
         {
             foundChannel->Update(instance);
         }
-        else if (_musicChannels.size() < MAX_RIDE_MUSIC_CHANNELS)
+        else if (_musicChannels.size() < kMaxRideMusicChannels)
         {
             StartRideMusicChannel(instance);
         }
@@ -258,7 +257,7 @@ namespace OpenRCT2::RideAudio
             return;
 
         // TODO Allow circus music (CSS24) to play if ride music is disabled (that should be sound)
-        if (gGameSoundsOff || !Config::Get().sound.RideMusicEnabled)
+        if (gGameSoundsOff || !Config::Get().sound.rideMusicEnabled)
             return;
 
         StopInactiveRideMusicChannels();
@@ -315,7 +314,7 @@ namespace OpenRCT2::RideAudio
     {
         if (offset < length)
         {
-            if (_musicInstances.size() < MAX_RIDE_MUSIC_CHANNELS)
+            if (_musicInstances.size() < kMaxRideMusicChannels)
             {
                 auto& instance = _musicInstances.emplace_back();
                 instance.RideId = ride.id;
@@ -381,10 +380,10 @@ namespace OpenRCT2::RideAudio
      */
     void UpdateMusicInstance(Ride& ride, const CoordsXYZ& rideCoords, uint16_t sampleRate)
     {
-        if (gLegacyScene != LegacyScene::scenarioEditor && !gGameSoundsOff && g_music_tracking_viewport != nullptr)
+        if (gLegacyScene != LegacyScene::scenarioEditor && !gGameSoundsOff && gMusicTrackingViewport != nullptr)
         {
             auto rotatedCoords = Translate3DTo2DWithZ(GetCurrentRotation(), rideCoords);
-            auto viewport = g_music_tracking_viewport;
+            auto viewport = gMusicTrackingViewport;
             auto viewWidth = viewport->ViewWidth();
             auto viewWidth2 = viewWidth * 2;
             auto viewX = viewport->viewPos.x - viewWidth2;

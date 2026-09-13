@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,19 +7,18 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "../../../GameState.h"
 #include "../../../entity/EntityRegistry.h"
 #include "../../../interface/Viewport.h"
 #include "../../../object/StationObject.h"
 #include "../../../ride/Ride.h"
 #include "../../../ride/RideEntry.h"
-#include "../../../ride/Track.h"
 #include "../../../ride/TrackPaint.h"
 #include "../../../ride/Vehicle.h"
 #include "../../Boundbox.h"
 #include "../../Paint.h"
 #include "../../support/WoodenSupports.h"
 #include "../../tile_element/Segment.h"
-#include "../../track/Segment.h"
 
 using namespace OpenRCT2;
 
@@ -63,10 +62,10 @@ static void PaintSwingingShipRiders(
     PaintSession& session, const Ride& ride, const Vehicle& vehicle, ImageIndex baseImageIndex, Direction direction,
     const CoordsXYZ& offset, const BoundBoxXYZ& bb)
 {
-    if (session.DPI.zoom_level > ZoomLevel{ 1 })
+    if (session.rt.zoom_level > ZoomLevel{ 1 })
         return;
 
-    if (!(ride.lifecycleFlags & RIDE_LIFECYCLE_ON_TRACK))
+    if (!ride.flags.has(RideFlag::onTrack))
         return;
 
     int32_t peep = 0;
@@ -95,10 +94,10 @@ static void PaintSwingingShipStructure(
         return;
 
     Vehicle* vehicle = nullptr;
-    if (ride.lifecycleFlags & RIDE_LIFECYCLE_ON_TRACK && !ride.vehicles[0].IsNull())
+    if (ride.flags.has(RideFlag::onTrack) && !ride.vehicles[0].IsNull())
     {
-        vehicle = GetEntity<Vehicle>(ride.vehicles[0]);
-        session.InteractionType = ViewportInteractionItem::Entity;
+        vehicle = getGameState().entities.getEntity<Vehicle>(ride.vehicles[0]);
+        session.InteractionType = ViewportInteractionItem::entity;
         session.CurrentlyDrawnEntity = vehicle;
     }
 
@@ -106,10 +105,10 @@ static void PaintSwingingShipStructure(
     CoordsXYZ offset((direction & 1) ? 0 : axisOffset, (direction & 1) ? axisOffset : 0, height + 7);
     BoundBoxXYZ bb = { { bounds.offset, height + 7 }, { bounds.length, 80 } };
 
-    auto baseImageId = rideEntry->Cars[0].base_image_id + kSwingingShipBaseSpriteOffset[direction];
+    auto baseImageId = rideEntry->Cars[0].baseImageId + kSwingingShipBaseSpriteOffset[direction];
     if (vehicle != nullptr)
     {
-        int32_t rotation = static_cast<int8_t>(vehicle->Pitch);
+        int32_t rotation = static_cast<int8_t>(vehicle->flatRideAnimationFrame);
         if (rotation != 0)
         {
             if (direction & 2)
@@ -150,7 +149,7 @@ static void PaintSwingingShipStructure(
     PaintAddImageAsChild(session, imageId, offset, bb);
 
     session.CurrentlyDrawnEntity = nullptr;
-    session.InteractionType = ViewportInteractionItem::Ride;
+    session.InteractionType = ViewportInteractionItem::ride;
 }
 
 static void PaintSwingingShip(
@@ -167,14 +166,14 @@ static void PaintSwingingShip(
     if (relativeTrackSequence == 1 || relativeTrackSequence == 4)
     {
         WoodenASupportsPaintSetupRotated(
-            session, WoodenSupportType::Truss, WoodenSupportSubType::NeSw, direction, height, session.SupportColours);
+            session, WoodenSupportType::truss, WoodenSupportSubType::neSw, direction, height, session.SupportColours);
     }
     else
     {
-        DrawSupportsSideBySide(session, direction, height, session.SupportColours, MetalSupportType::Tubes);
-        if (stationObject != nullptr && !(stationObject->Flags & STATION_OBJECT_FLAGS::NO_PLATFORMS))
+        DrawSupportsSideBySide(session, direction, height, session.SupportColours, MetalSupportType::tubes);
+        if (stationObject != nullptr && !stationObject->Flags.has(StationObjectFlag::noPlatforms))
         {
-            ImageIndex base = (direction & 1) ? SPR_STATION_BASE_A_NW_SE : SPR_STATION_BASE_A_SW_NE;
+            ImageIndex base = (direction & 1) ? SPR_STATION_BASE_TALL_NW_SE : SPR_STATION_BASE_TALL_SW_NE;
             imageId = session.SupportColours.WithIndex(base);
             PaintAddImageAsParent(session, imageId, { 0, 0, height }, { 32, 32, 1 });
         }
@@ -182,7 +181,7 @@ static void PaintSwingingShip(
 
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
 
-    if (stationObject != nullptr && !(stationObject->Flags & STATION_OBJECT_FLAGS::NO_PLATFORMS))
+    if (stationObject != nullptr && !stationObject->Flags.has(StationObjectFlag::noPlatforms))
     {
         if (direction & 1)
         {
@@ -298,9 +297,9 @@ static void PaintSwingingShip(
     PaintUtilSetGeneralSupportHeight(session, height + 112);
 }
 
-TrackPaintFunction GetTrackPaintFunctionSwingingShip(OpenRCT2::TrackElemType trackType)
+TrackPaintFunction GetTrackPaintFunctionSwingingShip(TrackElemType trackType)
 {
-    if (trackType != TrackElemType::FlatTrack1x5)
+    if (trackType != TrackElemType::flatTrack1x5)
     {
         return TrackPaintFunctionDummy;
     }

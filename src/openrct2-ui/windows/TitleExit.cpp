@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include <openrct2-ui/interface/Widget.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/SpriteIds.h>
@@ -15,24 +16,25 @@
 
 namespace OpenRCT2::Ui::Windows
 {
-    enum WindowTitleExitWidgetIdx
+    static constexpr ScreenSize kWindowSize = { 40, 64 };
+
+    enum WindowTitleExitWidgetIdx : WidgetIndex
     {
         WIDX_EXIT,
     };
 
-    static constexpr Widget _titleExitWidgets[] = {
-        MakeWidget({ 0, 0 }, { 40, 64 }, WindowWidgetType::ImgBtn, WindowColour::Tertiary, ImageId(SPR_MENU_EXIT), STR_EXIT),
-    };
+    static constexpr auto _titleExitWidgets = makeWidgets(
+        makeWidget({ 0, 0 }, kWindowSize, WidgetType::imgBtn, WindowColour::tertiary, ImageId(SPR_MENU_EXIT), STR_EXIT));
 
     class TitleExitWindow final : public Window
     {
-        void OnOpen() override
+        void onOpen() override
         {
-            SetWidgets(_titleExitWidgets);
-            InitScrollWidgets();
+            setWidgets(_titleExitWidgets);
+            initScrollWidgets();
         }
 
-        void OnMouseUp(WidgetIndex widgetIndex) override
+        void onMouseUp(WidgetIndex widgetIndex) override
         {
             switch (widgetIndex)
             {
@@ -43,9 +45,9 @@ namespace OpenRCT2::Ui::Windows
             };
         }
 
-        void OnDraw(DrawPixelInfo& dpi) override
+        void onDraw(Drawing::RenderTarget& rt) override
         {
-            DrawWidgets(dpi);
+            drawWidgets(rt);
         }
     };
 
@@ -57,7 +59,7 @@ namespace OpenRCT2::Ui::Windows
     {
         auto* windowMgr = GetWindowManager();
         return windowMgr->Create<TitleExitWindow>(
-            WindowClass::TitleExit, ScreenCoordsXY(ContextGetWidth() - 40, ContextGetHeight() - 64), 40, 64,
-            WF_STICK_TO_BACK | WF_TRANSPARENT | WF_NO_TITLE_BAR);
+            WindowClass::titleExit, ScreenCoordsXY(ContextGetWidth() - 40, ContextGetHeight() - 64), kWindowSize,
+            { WindowFlag::stickToBack, WindowFlag::transparent, WindowFlag::noTitleBar });
     }
 } // namespace OpenRCT2::Ui::Windows

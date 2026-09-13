@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,43 +8,45 @@
  *****************************************************************************/
 
 #include <openrct2-ui/interface/Widget.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/ui/WindowManager.h>
 
 namespace OpenRCT2::Ui::Windows
 {
-    enum WindowTitleOptionsWidgetIdx
+    static constexpr ScreenSize kWindowSize = { 80, 15 };
+
+    enum WindowTitleOptionsWidgetIdx : WidgetIndex
     {
         WIDX_OPTIONS,
     };
 
-    static constexpr Widget _windowTitleOptionsWidgets[] = {
-        MakeWidget({ 0, 0 }, { 80, 15 }, WindowWidgetType::Button, WindowColour::Tertiary, STR_OPTIONS, STR_OPTIONS_TIP),
-    };
+    static constexpr auto _windowTitleOptionsWidgets = makeWidgets(
+        makeWidget({ 0, 0 }, kWindowSize, WidgetType::button, WindowColour::tertiary, STR_OPTIONS, STR_OPTIONS_TIP));
 
     class TitleOptionsWindow final : public Window
     {
     public:
-        void OnOpen() override
+        void onOpen() override
         {
-            SetWidgets(_windowTitleOptionsWidgets);
+            setWidgets(_windowTitleOptionsWidgets);
             WindowInitScrollWidgets(*this);
         }
 
-        void OnMouseUp(WidgetIndex widgetIndex) override
+        void onMouseUp(WidgetIndex widgetIndex) override
         {
             switch (widgetIndex)
             {
                 case WIDX_OPTIONS:
-                    ContextOpenWindow(WindowClass::Options);
+                    ContextOpenWindow(WindowClass::options);
                     break;
             }
         }
 
-        void OnDraw(DrawPixelInfo& dpi) override
+        void onDraw(Drawing::RenderTarget& rt) override
         {
-            DrawWidgets(dpi);
+            drawWidgets(rt);
         }
     };
 
@@ -54,12 +56,12 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* TitleOptionsOpen()
     {
         auto* windowMgr = GetWindowManager();
-        auto* window = windowMgr->BringToFrontByClass(WindowClass::TitleOptions);
+        auto* window = windowMgr->BringToFrontByClass(WindowClass::titleOptions);
         if (window == nullptr)
         {
             window = windowMgr->Create<TitleOptionsWindow>(
-                WindowClass::TitleOptions, ScreenCoordsXY(ContextGetWidth() - 80, 0), 80, 15,
-                WF_STICK_TO_BACK | WF_TRANSPARENT | WF_NO_TITLE_BAR);
+                WindowClass::titleOptions, ScreenCoordsXY(ContextGetWidth() - 80, 0), kWindowSize,
+                { WindowFlag::stickToBack, WindowFlag::transparent, WindowFlag::noTitleBar });
         }
 
         return window;

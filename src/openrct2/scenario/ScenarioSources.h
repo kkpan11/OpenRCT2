@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,13 +11,18 @@
 
 #include "../core/StringTypes.h"
 
+namespace OpenRCT2::Scenario
+{
+    enum class Category : uint8_t;
+}
+
 struct SourceDescriptor
 {
     const utf8* title;
     uint8_t id;
     uint8_t source;
     int32_t index;
-    uint8_t category;
+    OpenRCT2::Scenario::Category category;
     u8string_view textObjectId;
 };
 
@@ -72,6 +77,7 @@ enum
     // Special
     SC_ALTON_TOWERS,
     SC_FORT_ANACHRONISM,
+    SC_TAIWAN_PARK,
 
     // Added Attractions
     SC_WHISPERING_CLIFFS = 40,

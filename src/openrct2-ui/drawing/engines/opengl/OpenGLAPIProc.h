@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -91,6 +91,7 @@ OPENGL_PROC(PFNGLUNIFORM2FPROC, glUniform2f)
 OPENGL_PROC(PFNGLUNIFORM4FPROC, glUniform4f)
 OPENGL_PROC(PFNGLUNIFORM4IPROC, glUniform4i)
 OPENGL_PROC(PFNGLUNIFORM4FVPROC, glUniform4fv)
+OPENGL_PROC(PFNGLUNIFORM2FVPROC, glUniform2fv)
 OPENGL_PROC(PFNGLUSEPROGRAMPROC, glUseProgram)
 OPENGL_PROC(PFNGLVERTEXATTRIBIPOINTERPROC, glVertexAttribIPointer)
 OPENGL_PROC(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer)
@@ -102,3 +103,9 @@ extern "C" void glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, G
 extern "C" void glVertexAttribDivisor(GLuint index, GLuint divisor);
 #endif
 OPENGL_PROC(PFNGLBLENDFUNCSEPARATEPROC, glBlendFuncSeparate)
+OPENGL_PROC(PFNGLTEXSUBIMAGE2D, glTexSubImage2D)
+OPENGL_PROC(PFNGLDRAWBUFFERSPROC, glDrawBuffers)
+OPENGL_PROC(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus)
+OPENGL_PROC(PFNGLCLEARDEPTHPROC, glClearDepth)
+OPENGL_PROC(PFNGLREADBUFFERPROC, glReadBuffer)
+OPENGL_PROC(PFNGLDRAWBUFFERPROC, glDrawBuffer)

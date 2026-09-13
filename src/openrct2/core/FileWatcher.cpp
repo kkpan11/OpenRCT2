@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,12 +9,12 @@
 
 #include "../Diagnostic.h"
 
-#include <algorithm>
-#include <array>
-#include <cstdio>
 #include <stdexcept>
 
 #ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
     #include <windows.h>
 #elif defined(__linux__)
     #include <chrono>
@@ -22,15 +22,13 @@
     #include <sys/inotify.h>
     #include <sys/types.h>
     #include <unistd.h>
-#elif defined(__APPLE__)
-    #include <CoreServices/CoreServices.h>
 #endif
 
-#include "../core/Guard.hpp"
-#include "../core/Path.hpp"
-#include "../core/String.hpp"
 #include "FileSystem.hpp"
 #include "FileWatcher.h"
+#include "Guard.hpp"
+#include "Path.hpp"
+#include "String.hpp"
 
 using namespace OpenRCT2;
 

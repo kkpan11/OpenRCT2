@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,134 +10,135 @@
 #include "EntranceElement.h"
 
 #include "../../Context.h"
-#include "../../object/EntranceObject.h"
 #include "../../object/FootpathObject.h"
 #include "../../object/FootpathSurfaceObject.h"
 #include "../../object/ObjectManager.h"
-#include "../Entrance.h"
 
-// rct2: 0x0097B974
-static constexpr uint16_t kEntranceDirections[] = {
-    (4),     0, 0, 0, 0, 0, 0, 0, // ENTRANCE_TYPE_RIDE_ENTRANCE,
-    (4),     0, 0, 0, 0, 0, 0, 0, // ENTRANCE_TYPE_RIDE_EXIT,
-    (4 | 1), 0, 0, 0, 0, 0, 0, 0, // ENTRANCE_TYPE_PARK_ENTRANCE
-};
-
-uint8_t EntranceElement::GetEntranceType() const
+namespace OpenRCT2
 {
-    return entranceType;
-}
+    // rct2: 0x0097B974
+    static constexpr std::array<std::array<uint16_t, 8>, 3> kEntranceDirections = { {
+        { (4), 0, 0, 0, 0, 0, 0, 0 },     // EntranceType::rideEntrance,
+        { (4), 0, 0, 0, 0, 0, 0, 0 },     // EntranceType::rideExit,
+        { (4 | 1), 0, 0, 0, 0, 0, 0, 0 }, // EntranceType::parkEntrance
+    } };
 
-void EntranceElement::SetEntranceType(uint8_t newType)
-{
-    entranceType = newType;
-}
-
-RideId EntranceElement::GetRideIndex() const
-{
-    return rideIndex;
-}
-
-void EntranceElement::SetRideIndex(RideId newRideIndex)
-{
-    rideIndex = newRideIndex;
-}
-
-StationIndex EntranceElement::GetStationIndex() const
-{
-    return stationIndex;
-}
-
-void EntranceElement::SetStationIndex(StationIndex newStationIndex)
-{
-    stationIndex = newStationIndex;
-}
-
-uint8_t EntranceElement::GetSequenceIndex() const
-{
-    return SequenceIndex & 0xF;
-}
-
-void EntranceElement::SetSequenceIndex(uint8_t newSequenceIndex)
-{
-    SequenceIndex &= ~0xF;
-    SequenceIndex |= (newSequenceIndex & 0xF);
-}
-
-bool EntranceElement::HasLegacyPathEntry() const
-{
-    return (flags2 & ENTRANCE_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY) != 0;
-}
-
-ObjectEntryIndex EntranceElement::GetLegacyPathEntryIndex() const
-{
-    if (HasLegacyPathEntry())
-        return PathType;
-
-    return kObjectEntryIndexNull;
-}
-
-const FootpathObject* EntranceElement::GetLegacyPathEntry() const
-{
-    auto& objMgr = OpenRCT2::GetContext()->GetObjectManager();
-    return objMgr.GetLoadedObject<FootpathObject>(GetLegacyPathEntryIndex());
-}
-
-void EntranceElement::SetLegacyPathEntryIndex(ObjectEntryIndex newPathType)
-{
-    PathType = newPathType;
-    flags2 |= ENTRANCE_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY;
-}
-
-ObjectEntryIndex EntranceElement::GetSurfaceEntryIndex() const
-{
-    if (HasLegacyPathEntry())
-        return kObjectEntryIndexNull;
-
-    return PathType;
-}
-
-const FootpathSurfaceObject* EntranceElement::GetSurfaceEntry() const
-{
-    auto& objMgr = OpenRCT2::GetContext()->GetObjectManager();
-    return objMgr.GetLoadedObject<FootpathSurfaceObject>(GetSurfaceEntryIndex());
-}
-
-void EntranceElement::SetSurfaceEntryIndex(ObjectEntryIndex newIndex)
-{
-    PathType = newIndex;
-    flags2 &= ~ENTRANCE_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY;
-}
-
-const PathSurfaceDescriptor* EntranceElement::GetPathSurfaceDescriptor() const
-{
-    if (HasLegacyPathEntry())
+    EntranceType EntranceElement::getEntranceType() const
     {
-        const auto* legacyPathEntry = GetLegacyPathEntry();
-        if (legacyPathEntry == nullptr)
-            return nullptr;
-
-        return &legacyPathEntry->GetPathSurfaceDescriptor();
+        return entranceType;
     }
 
-    const auto* surfaceEntry = GetSurfaceEntry();
-    if (surfaceEntry == nullptr)
-        return nullptr;
+    void EntranceElement::setEntranceType(EntranceType newType)
+    {
+        entranceType = newType;
+    }
 
-    return &surfaceEntry->GetDescriptor();
-}
+    RideId EntranceElement::getRideIndex() const
+    {
+        return rideIndex;
+    }
 
-int32_t EntranceElement::GetDirections() const
-{
-    return kEntranceDirections[(GetEntranceType() * 8) + GetSequenceIndex()];
-}
+    void EntranceElement::setRideIndex(RideId newRideIndex)
+    {
+        rideIndex = newRideIndex;
+    }
 
-ObjectEntryIndex EntranceElement::getEntryIndex() const
-{
-    return entryIndex;
-}
+    StationIndex EntranceElement::getStationIndex() const
+    {
+        return stationIndex;
+    }
 
-void EntranceElement::setEntryIndex(ObjectEntryIndex newIndex)
-{
-    entryIndex = newIndex;
-}
+    void EntranceElement::setStationIndex(StationIndex newStationIndex)
+    {
+        stationIndex = newStationIndex;
+    }
+
+    ParkEntranceSequence EntranceElement::getSequenceIndex() const
+    {
+        return static_cast<ParkEntranceSequence>(sequenceIndex & 0xF);
+    }
+
+    void EntranceElement::setSequenceIndex(ParkEntranceSequence newSequenceIndex)
+    {
+        sequenceIndex &= ~0xF;
+        sequenceIndex |= (EnumValue(newSequenceIndex) & 0xF);
+    }
+
+    bool EntranceElement::hasLegacyPathEntry() const
+    {
+        return flags2.has(EntranceElementFlag::isLegacyPathEntry);
+    }
+
+    ObjectEntryIndex EntranceElement::getLegacyPathEntryIndex() const
+    {
+        if (hasLegacyPathEntry())
+            return pathType;
+
+        return kObjectEntryIndexNull;
+    }
+
+    const FootpathObject* EntranceElement::getLegacyPathEntry() const
+    {
+        auto& objMgr = GetContext()->GetObjectManager();
+        return objMgr.GetLoadedObject<FootpathObject>(getLegacyPathEntryIndex());
+    }
+
+    void EntranceElement::setLegacyPathEntryIndex(ObjectEntryIndex newPathType)
+    {
+        pathType = newPathType;
+        flags2.set(EntranceElementFlag::isLegacyPathEntry);
+    }
+
+    ObjectEntryIndex EntranceElement::getSurfaceEntryIndex() const
+    {
+        if (hasLegacyPathEntry())
+            return kObjectEntryIndexNull;
+
+        return pathType;
+    }
+
+    const FootpathSurfaceObject* EntranceElement::getSurfaceEntry() const
+    {
+        auto& objMgr = GetContext()->GetObjectManager();
+        return objMgr.GetLoadedObject<FootpathSurfaceObject>(getSurfaceEntryIndex());
+    }
+
+    void EntranceElement::setSurfaceEntryIndex(ObjectEntryIndex newIndex)
+    {
+        pathType = newIndex;
+        flags2.unset(EntranceElementFlag::isLegacyPathEntry);
+    }
+
+    const PathSurfaceDescriptor* EntranceElement::getPathSurfaceDescriptor() const
+    {
+        if (hasLegacyPathEntry())
+        {
+            const auto* legacyPathEntry = getLegacyPathEntry();
+            if (legacyPathEntry == nullptr)
+                return nullptr;
+
+            return &legacyPathEntry->GetPathSurfaceDescriptor();
+        }
+
+        const auto* surfaceEntry = getSurfaceEntry();
+        if (surfaceEntry == nullptr)
+            return nullptr;
+
+        return &surfaceEntry->GetDescriptor();
+    }
+
+    int32_t EntranceElement::getDirections() const
+    {
+        return kEntranceDirections[EnumValue(getEntranceType())][EnumValue(getSequenceIndex())];
+    }
+
+    ObjectEntryIndex EntranceElement::getEntryIndex() const
+    {
+        return entryIndex;
+    }
+
+    void EntranceElement::setEntryIndex(ObjectEntryIndex newIndex)
+    {
+        entryIndex = newIndex;
+    }
+} // namespace OpenRCT2

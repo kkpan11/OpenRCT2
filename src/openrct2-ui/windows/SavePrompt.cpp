@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,7 @@
 
 #include <iterator>
 #include <openrct2-ui/interface/Widget.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/Diagnostic.h>
@@ -18,17 +19,16 @@
 #include <openrct2/audio/Audio.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/network/Network.h>
+#include <openrct2/ui/UiContext.h>
 #include <openrct2/ui/WindowManager.h>
 #include <openrct2/windows/Intent.h>
 
 namespace OpenRCT2::Ui::Windows
 {
-    static constexpr int32_t WH_SAVE = 54;
-    static constexpr int32_t WW_SAVE = 260;
-    static constexpr int32_t WH_QUIT = 38;
-    static constexpr int32_t WW_QUIT = 177;
+    static constexpr ScreenSize kWindowSizeSave = { 260, 54 };
+    static constexpr ScreenSize kWindowSizeQuit = { 177, 38 };
 
-    enum WindowSavePromptWidgetIdx
+    enum WindowSavePromptWidgetIdx : WidgetIndex
     {
         WIDX_BACKGROUND,
         WIDX_TITLE,
@@ -40,13 +40,13 @@ namespace OpenRCT2::Ui::Windows
     };
 
     // clang-format off
-    static constexpr Widget _savePromptWidgets[] = {
-        WINDOW_SHIM_WHITE(kStringIdNone, WW_SAVE, WH_SAVE),
-        MakeWidget({  2, 19}, {256, 12}, WindowWidgetType::LabelCentred, WindowColour::Primary, kStringIdEmpty                ), // question/label
-        MakeWidget({  8, 35}, { 78, 14}, WindowWidgetType::Button,        WindowColour::Primary, STR_SAVE_PROMPT_SAVE     ), // save
-        MakeWidget({ 91, 35}, { 78, 14}, WindowWidgetType::Button,        WindowColour::Primary, STR_SAVE_PROMPT_DONT_SAVE), // don't save
-        MakeWidget({174, 35}, { 78, 14}, WindowWidgetType::Button,        WindowColour::Primary, STR_SAVE_PROMPT_CANCEL   ), // cancel
-    };
+    static constexpr auto _savePromptWidgets = makeWidgets(
+        makeWindowShim(kStringIdNone, kWindowSizeSave),
+        makeWidget({  2, 19}, {256, 12}, WidgetType::labelCentred, WindowColour::primary, kStringIdEmpty           ), // question/label
+        makeWidget({  8, 35}, { 78, 14}, WidgetType::button,       WindowColour::primary, STR_SAVE_PROMPT_SAVE     ), // save
+        makeWidget({ 91, 35}, { 78, 14}, WidgetType::button,       WindowColour::primary, STR_SAVE_PROMPT_DONT_SAVE), // don't save
+        makeWidget({174, 35}, { 78, 14}, WidgetType::button,       WindowColour::primary, STR_SAVE_PROMPT_CANCEL   ) // cancel
+    );
     // clang-format on
 
     enum WindowQuitPromptWidgetIdx
@@ -59,11 +59,11 @@ namespace OpenRCT2::Ui::Windows
     };
 
     // clang-format off
-    static constexpr Widget _quitPromptWidgets[] = {
-        WINDOW_SHIM_WHITE(STR_QUIT_GAME_PROMPT_TITLE, WW_QUIT, WH_QUIT),
-        MakeWidget({ 8, 19}, {78, 14}, WindowWidgetType::Button, WindowColour::Primary, STR_OK    ), // ok
-        MakeWidget({91, 19}, {78, 14}, WindowWidgetType::Button, WindowColour::Primary, STR_CANCEL), // cancel
-    };
+    static constexpr auto _quitPromptWidgets = makeWidgets(
+        makeWindowShim(STR_QUIT_GAME_PROMPT_TITLE, kWindowSizeQuit),
+        makeWidget({ 8, 19}, {78, 14}, WidgetType::button, WindowColour::primary, STR_OK    ), // ok
+        makeWidget({91, 19}, {78, 14}, WidgetType::button, WindowColour::primary, STR_CANCEL)  // cancel
+    );
     // clang-format on
 
     static constexpr StringId window_save_prompt_labels[][2] = {
@@ -92,26 +92,26 @@ namespace OpenRCT2::Ui::Windows
         {
         }
 
-        void OnOpen() override
+        void onOpen() override
         {
             bool canSave = !(isInTrackDesignerOrManager());
 
             if (canSave)
-                SetWidgets(_savePromptWidgets);
+                setWidgets(_savePromptWidgets);
             else
-                SetWidgets(_quitPromptWidgets);
+                setWidgets(_quitPromptWidgets);
 
-            InitScrollWidgets();
+            initScrollWidgets();
 
             // Pause the game if not network play.
-            if (NetworkGetMode() == NETWORK_MODE_NONE)
+            if (Network::GetMode() == Network::Mode::none)
             {
                 gGamePaused |= GAME_PAUSED_MODAL;
                 Audio::StopAll();
             }
 
-            auto* windowMgr = Ui::GetWindowManager();
-            windowMgr->InvalidateByClass(WindowClass::TopToolbar);
+            auto* windowMgr = GetWindowManager();
+            windowMgr->InvalidateByClass(WindowClass::topToolbar);
 
             if (canSave)
             {
@@ -129,20 +129,20 @@ namespace OpenRCT2::Ui::Windows
             }
         }
 
-        void OnClose() override
+        void onClose() override
         {
             // Unpause the game
-            if (NetworkGetMode() == NETWORK_MODE_NONE)
+            if (Network::GetMode() == Network::Mode::none)
             {
                 gGamePaused &= ~GAME_PAUSED_MODAL;
                 Audio::Resume();
             }
 
-            auto* windowMgr = Ui::GetWindowManager();
-            windowMgr->InvalidateByClass(WindowClass::TopToolbar);
+            auto* windowMgr = GetWindowManager();
+            windowMgr->InvalidateByClass(WindowClass::topToolbar);
         }
 
-        void OnMouseUp(WidgetIndex widgetIndex) override
+        void onMouseUp(WidgetIndex widgetIndex) override
         {
             if (gLegacyScene == LegacyScene::titleSequence || gLegacyScene == LegacyScene::trackDesigner
                 || gLegacyScene == LegacyScene::trackDesignsManager)
@@ -154,7 +154,7 @@ namespace OpenRCT2::Ui::Windows
                         break;
                     case WQIDX_CLOSE:
                     case WQIDX_CANCEL:
-                        Close();
+                        close();
                         break;
                 }
                 return;
@@ -168,16 +168,16 @@ namespace OpenRCT2::Ui::Windows
 
                     if (isInEditorMode())
                     {
-                        intent = std::make_unique<Intent>(WindowClass::Loadsave);
+                        intent = std::make_unique<Intent>(WindowClass::loadsave);
                         intent->PutEnumExtra<LoadSaveAction>(INTENT_EXTRA_LOADSAVE_ACTION, LoadSaveAction::save);
                         intent->PutEnumExtra<LoadSaveType>(INTENT_EXTRA_LOADSAVE_TYPE, LoadSaveType::landscape);
-                        intent->PutExtra(INTENT_EXTRA_PATH, GetGameState().ScenarioName);
+                        intent->PutExtra(INTENT_EXTRA_PATH, getGameState().scenarioOptions.name);
                     }
                     else
                     {
                         intent = CreateSaveGameAsIntent();
                     }
-                    Close();
+                    close();
                     intent->PutExtra(INTENT_EXTRA_CALLBACK, reinterpret_cast<CloseCallback>(WindowSavePromptCallback));
                     ContextOpenIntent(intent.get());
                     break;
@@ -187,26 +187,22 @@ namespace OpenRCT2::Ui::Windows
                     return;
                 case WIDX_CLOSE:
                 case WIDX_CANCEL:
-                    Close();
+                    close();
                     return;
             }
         }
 
-        void OnDraw(DrawPixelInfo& dpi) override
+        void onDraw(Drawing::RenderTarget& rt) override
         {
-            DrawWidgets(dpi);
-        }
-
-        void OnResize() override
-        {
-            ResizeFrame();
+            drawWidgets(rt);
         }
     };
 
     WindowBase* SavePromptOpen()
     {
         PromptMode prompt_mode = gSavePromptMode;
-        if (prompt_mode == PromptMode::quit)
+        const bool isQuitRequest = prompt_mode == PromptMode::quit;
+        if (isQuitRequest)
         {
             prompt_mode = PromptMode::saveBeforeQuit;
         }
@@ -218,7 +214,7 @@ namespace OpenRCT2::Ui::Windows
             return nullptr;
         }
 
-        if (!Config::Get().general.ConfirmationPrompt)
+        if (!Config::Get().general.confirmationPrompt)
         {
             /* game_load_or_quit_no_save_prompt() will exec requested task and close this window
              * immediately again.
@@ -226,7 +222,7 @@ namespace OpenRCT2::Ui::Windows
              * and game_load_or_quit() are not called by the original binary anymore.
              */
 
-            if (gScreenAge < 3840 && NetworkGetMode() == NETWORK_MODE_NONE)
+            if (gScreenAge < 3840 && Network::GetMode() == Network::Mode::none)
             {
                 GameLoadOrQuitNoSavePrompt();
                 return nullptr;
@@ -236,7 +232,7 @@ namespace OpenRCT2::Ui::Windows
         auto* windowMgr = GetWindowManager();
 
         // Check if window is already open
-        auto* window = windowMgr->BringToFrontByClass(WindowClass::SavePrompt);
+        auto* window = windowMgr->BringToFrontByClass(WindowClass::savePrompt);
         if (window != nullptr)
         {
             windowMgr->Close(*window);
@@ -248,17 +244,22 @@ namespace OpenRCT2::Ui::Windows
             return nullptr;
         }
 
-        int32_t width = WW_SAVE;
-        int32_t height = WH_SAVE;
+        auto windowSize = kWindowSizeSave;
         if (isInTrackDesignerOrManager())
         {
-            width = WW_QUIT;
-            height = WH_QUIT;
+            windowSize = kWindowSizeQuit;
+        }
+
+        // The prompt blocks the OS quit request, so signal that the game is waiting on the user.
+        auto& uiContext = GetContext()->GetUiContext();
+        if (isQuitRequest && !uiContext.HasFocus())
+        {
+            uiContext.requestUserAttention();
         }
 
         auto savePromptWindow = std::make_unique<SavePromptWindow>(prompt_mode);
         return windowMgr->Create(
-            std::move(savePromptWindow), WindowClass::SavePrompt, {}, width, height,
-            WF_TRANSPARENT | WF_STICK_TO_FRONT | WF_CENTRE_SCREEN | WF_AUTO_POSITION);
+            std::move(savePromptWindow), WindowClass::savePrompt, {}, windowSize,
+            { WindowFlag::transparent, WindowFlag::stickToFront, WindowFlag::centreScreen, WindowFlag::autoPosition });
     }
 } // namespace OpenRCT2::Ui::Windows

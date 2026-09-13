@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,7 +15,6 @@
 #include <openrct2/Game.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/ParkImporter.h>
-#include <openrct2/world/Footpath.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/BannerElement.h>
@@ -43,7 +42,7 @@ protected:
         ASSERT_TRUE(initialised);
 
         GetContext()->LoadParkFromFile(parkPath);
-        GameLoadInit();
+        GameLoadInit(); // NB: calls `setActiveScene`
 
         // Changed in some tests. Store to restore its value
         _gLegacyScene = gLegacyScene;
@@ -88,7 +87,7 @@ std::vector<T*> BuildListManual(const CoordsXY& pos)
             res.push_back(element);
         }
 
-    } while (!(element++)->IsLastForTile());
+    } while (!(element++)->isLastForTile());
 
     return res;
 }
@@ -134,7 +133,7 @@ void CheckMapTiles()
     {
         for (int x = 0; x < kMaximumMapSizeTechnical; ++x)
         {
-            auto pos = TileCoordsXY(x, y).ToCoordsXY();
+            auto pos = TileCoordsXY(x, y).toCoordsXY();
 
             bool matches = CompareLists<T>(pos);
             EXPECT_TRUE(matches) << "x = " << x << ", y = " << y;

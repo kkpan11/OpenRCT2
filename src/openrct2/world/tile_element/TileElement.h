@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,29 +10,31 @@
 #pragma once
 
 #include "../../Identifiers.h"
-#include "../Banner.h"
 #include "TileElementBase.h"
 
-#pragma pack(push, 1)
-/**
- * Map element structure
- * size: 0x10
- */
-struct TileElement : public TileElementBase
+namespace OpenRCT2
 {
-    uint8_t Pad05[3];
-    uint8_t Pad08[8];
+#pragma pack(push, 1)
+    /**
+     * Map element structure
+     * size: 0x10
+     */
+    struct TileElement : public TileElementBase
+    {
+        uint8_t pad05[3];
+        uint8_t pad08[8];
 
-    void ClearAs(TileElementType newType);
+        void clearAs(TileElementType newType);
 
-    RideId GetRideIndex() const;
+        RideId getRideIndex() const;
 
-    void SetBannerIndex(BannerIndex newIndex);
-    void RemoveBannerEntry();
-    BannerIndex GetBannerIndex() const;
-};
-static_assert(sizeof(TileElement) == kTileElementSize);
+        void setBannerIndex(BannerIndex newIndex);
+        void removeBannerEntry();
+        BannerIndex getBannerIndex() const;
+    };
+    static_assert(sizeof(TileElement) == kTileElementSize);
 
-bool TileElementIsUnderground(TileElement* tileElement);
+    bool tileElementIsUnderground(TileElement* tileElement);
 
 #pragma pack(pop)
+} // namespace OpenRCT2

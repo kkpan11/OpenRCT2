@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,7 +15,11 @@
 
 #include <memory>
 
-struct RCTObjectEntry;
+namespace OpenRCT2::Scenario
+{
+    enum class Category : uint8_t;
+    enum class ObjectiveType : uint8_t;
+} // namespace OpenRCT2::Scenario
 
 struct ScenarioHighscoreEntry
 {
@@ -27,16 +31,16 @@ struct ScenarioHighscoreEntry
 
 enum class ScenarioSource : uint8_t
 {
-    RCT1,
-    RCT1_AA,
-    RCT1_LL,
-    RCT2,
-    RCT2_WW,
-    RCT2_TT,
-    UCES,
-    Real,
-    Extras,
-    Other
+    rct1,
+    rct1AA,
+    rct1LL,
+    rct2,
+    rct2WW,
+    rct2TT,
+    uces,
+    real,
+    extras,
+    other
 };
 
 struct ScenarioIndexEntry
@@ -45,13 +49,13 @@ struct ScenarioIndexEntry
     uint64_t Timestamp;
 
     // Category / sequence
-    uint8_t Category;
+    OpenRCT2::Scenario::Category Category;
     ScenarioSource SourceGame;
     int16_t SourceIndex = -1;
     uint16_t ScenarioId;
 
     // Objective
-    uint8_t ObjectiveType;
+    OpenRCT2::Scenario::ObjectiveType ObjectiveType;
     uint8_t ObjectiveArg1;  // years
     int64_t ObjectiveArg2;  // money or excitement
     uint16_t ObjectiveArg3; // guests or rideID or coasterLength
@@ -88,8 +92,7 @@ struct IScenarioRepository
     virtual bool TryRecordHighscore(int32_t language, const utf8* scenarioFileName, money64 companyValue, const utf8* name) = 0;
 };
 
-[[nodiscard]] std::unique_ptr<IScenarioRepository> CreateScenarioRepository(
-    const std::shared_ptr<OpenRCT2::IPlatformEnvironment>& env);
+[[nodiscard]] std::unique_ptr<IScenarioRepository> CreateScenarioRepository(OpenRCT2::IPlatformEnvironment& env);
 [[nodiscard]] IScenarioRepository* GetScenarioRepository();
 
 void ScenarioRepositoryScan();

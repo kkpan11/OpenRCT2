@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,32 +10,32 @@
 #include "../UiStringIds.h"
 
 #include <openrct2-ui/interface/Dropdown.h>
-#include <openrct2-ui/interface/Viewport.h>
 #include <openrct2-ui/interface/Widget.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
-#include <openrct2/Game.h>
+#include <openrct2/GameState.h>
 #include <openrct2/SpriteIds.h>
-#include <openrct2/actions/LargeSceneryRemoveAction.h>
-#include <openrct2/actions/SignSetNameAction.h>
-#include <openrct2/actions/SignSetStyleAction.h>
-#include <openrct2/actions/WallRemoveAction.h>
+#include <openrct2/actions/GameActionRunner.h>
+#include <openrct2/actions/scenery/LargeSceneryRemoveAction.h>
+#include <openrct2/actions/scenery/SignSetNameAction.h>
+#include <openrct2/actions/scenery/SignSetStyleAction.h>
+#include <openrct2/actions/scenery/WallRemoveAction.h>
 #include <openrct2/config/Config.h>
+#include <openrct2/interface/Viewport.h>
 #include <openrct2/object/LargeSceneryEntry.h>
 #include <openrct2/object/ObjectEntryManager.h>
 #include <openrct2/object/WallSceneryEntry.h>
 #include <openrct2/ui/WindowManager.h>
 #include <openrct2/world/Banner.h>
-#include <openrct2/world/Scenery.h>
 #include <openrct2/world/tile_element/LargeSceneryElement.h>
 #include <openrct2/world/tile_element/WallElement.h>
 
 namespace OpenRCT2::Ui::Windows
 {
-    static constexpr StringId WINDOW_TITLE = STR_SIGN;
-    static constexpr int32_t WW = 113;
-    static constexpr int32_t WH = 96;
+    static constexpr StringId kWindowTitle = STR_SIGN;
+    static constexpr ScreenSize kWindowSize = { 113, 96 };
 
-    enum WindowSignWidgetIdx
+    enum WindowSignWidgetIdx : WidgetIndex
     {
         WIDX_BACKGROUND,
         WIDX_TITLE,
@@ -49,14 +49,14 @@ namespace OpenRCT2::Ui::Windows
 
     // clang-format off
     // 0x9AEE00
-    static constexpr Widget _signWidgets[] = {
-        WINDOW_SHIM(WINDOW_TITLE, WW, WH),
-        MakeWidget({      3,      17}, {85, 60}, WindowWidgetType::Viewport,  WindowColour::Secondary                                                        ), // Viewport
-        MakeWidget({WW - 25,      19}, {24, 24}, WindowWidgetType::FlatBtn,   WindowColour::Secondary, ImageId(SPR_RENAME),   STR_CHANGE_SIGN_TEXT_TIP       ), // change sign button
-        MakeWidget({WW - 25,      67}, {24, 24}, WindowWidgetType::FlatBtn,   WindowColour::Secondary, ImageId(SPR_DEMOLISH), STR_DEMOLISH_SIGN_TIP          ), // demolish button
-        MakeWidget({      5, WH - 16}, {12, 12}, WindowWidgetType::ColourBtn, WindowColour::Secondary, kWidgetContentEmpty,   STR_SELECT_MAIN_SIGN_COLOUR_TIP), // Main colour
-        MakeWidget({     17, WH - 16}, {12, 12}, WindowWidgetType::ColourBtn, WindowColour::Secondary, kWidgetContentEmpty,   STR_SELECT_TEXT_COLOUR_TIP     ), // Text colour
-    };
+    static constexpr auto _signWidgets = makeWidgets(
+        makeWindowShim(kWindowTitle, kWindowSize),
+        makeWidget({                     3,                      17}, {85, 60}, WidgetType::viewport,  WindowColour::secondary                                                        ), // Viewport
+        makeWidget({kWindowSize.width - 25,                      19}, {24, 24}, WidgetType::flatBtn,   WindowColour::secondary, ImageId(SPR_RENAME),   STR_CHANGE_SIGN_TEXT_TIP       ), // change sign button
+        makeWidget({kWindowSize.width - 25,                      67}, {24, 24}, WidgetType::flatBtn,   WindowColour::secondary, ImageId(SPR_DEMOLISH), STR_DEMOLISH_SIGN_TIP          ), // demolish button
+        makeWidget({                     5, kWindowSize.height - 16}, {12, 12}, WidgetType::colourBtn, WindowColour::secondary, kWidgetContentEmpty,   STR_SELECT_MAIN_SIGN_COLOUR_TIP), // Main colour
+        makeWidget({                    17, kWindowSize.height - 16}, {12, 12}, WidgetType::colourBtn, WindowColour::secondary, kWidgetContentEmpty,   STR_SELECT_TEXT_COLOUR_TIP     )  // Text colour
+    );
     // clang-format on
 
     class SignWindow final : public Window
@@ -64,8 +64,8 @@ namespace OpenRCT2::Ui::Windows
     private:
         bool _isSmall = false;
         ObjectEntryIndex _sceneryEntry = kObjectEntryIndexNull;
-        colour_t _mainColour = {};
-        colour_t _textColour = {};
+        Drawing::Colour _mainColour = {};
+        Drawing::Colour _textColour = {};
 
         BannerIndex GetBannerIndex() const
         {
@@ -77,24 +77,20 @@ namespace OpenRCT2::Ui::Windows
             auto* banner = GetBanner(GetBannerIndex());
             if (banner != nullptr)
             {
-                auto bannerText = banner->GetText();
+                auto bannerText = banner->getText();
                 WindowTextInputRawOpen(
                     this, WIDX_SIGN_TEXT, STR_SIGN_TEXT_TITLE, STR_SIGN_TEXT_PROMPT, {}, bannerText.c_str(), 32);
             }
         }
 
     public:
-        void OnOpen() override
+        void onOpen() override
         {
-            SetWidgets(_signWidgets);
+            setWidgets(_signWidgets);
             WindowInitScrollWidgets(*this);
         }
 
-        /*
-         * Initializes the window and sets it's number and if it's small
-         * @return true if successfull
-         */
-        bool Initialize(rct_windownumber windowNumber, const bool isSmall)
+        bool initialise(WindowNumber windowNumber, const bool isSmall)
         {
             number = windowNumber;
             _isSmall = isSmall;
@@ -104,84 +100,86 @@ namespace OpenRCT2::Ui::Windows
                 return false;
             }
 
-            auto signViewPosition = banner->position.ToCoordsXY().ToTileCentre();
+            auto signViewPosition = banner->position.toCoordsXY().toTileCentre();
             auto* tileElement = BannerGetTileElement(GetBannerIndex());
             if (tileElement == nullptr)
                 return false;
 
-            int32_t viewZ = tileElement->GetBaseZ();
-            frame_no = viewZ;
+            int32_t viewZ = tileElement->getBaseZ();
+            currentFrame = viewZ;
 
             if (_isSmall)
             {
-                auto* wallElement = tileElement->AsWall();
+                auto* wallElement = tileElement->asWall();
                 if (wallElement == nullptr)
                 {
                     return false;
                 }
-                _mainColour = wallElement->GetPrimaryColour();
-                _textColour = wallElement->GetSecondaryColour();
-                _sceneryEntry = wallElement->GetEntryIndex();
+                _mainColour = wallElement->getPrimaryColour();
+                _textColour = wallElement->getSecondaryColour();
+                _sceneryEntry = wallElement->getEntryIndex();
             }
             else
             {
-                auto* sceneryElement = tileElement->AsLargeScenery();
+                auto* sceneryElement = tileElement->asLargeScenery();
                 if (sceneryElement == nullptr)
                 {
                     return false;
                 }
-                _mainColour = sceneryElement->GetPrimaryColour();
-                _textColour = sceneryElement->GetSecondaryColour();
-                _sceneryEntry = sceneryElement->GetEntryIndex();
+                _mainColour = sceneryElement->getPrimaryColour();
+                _textColour = sceneryElement->getSecondaryColour();
+                _sceneryEntry = sceneryElement->getEntryIndex();
             }
 
             // Create viewport
             Widget& viewportWidget = widgets[WIDX_VIEWPORT];
             ViewportCreate(
-                this, windowPos + ScreenCoordsXY{ viewportWidget.left + 1, viewportWidget.top + 1 }, viewportWidget.width() - 1,
-                viewportWidget.height() - 1, Focus(CoordsXYZ{ signViewPosition, viewZ }));
+                *this, windowPos + ScreenCoordsXY{ viewportWidget.left + 1, viewportWidget.top + 1 },
+                viewportWidget.width() - 2, viewportWidget.height() - 2, Focus(CoordsXYZ{ signViewPosition, viewZ }));
 
-            viewport->flags = Config::Get().general.AlwaysShowGridlines ? VIEWPORT_FLAG_GRIDLINES : VIEWPORT_FLAG_NONE;
-            Invalidate();
+            viewport->flags = Config::Get().general.alwaysShowGridlines ? VIEWPORT_FLAG_GRIDLINES : VIEWPORT_FLAG_NONE;
+            invalidate();
 
             return true;
         }
 
-        void OnMouseUp(WidgetIndex widgetIndex) override
+        void onMouseUp(WidgetIndex widgetIndex) override
         {
             auto* banner = GetBanner(GetBannerIndex());
             if (banner == nullptr)
             {
-                Close();
+                close();
                 return;
             }
+
+            auto& gameState = getGameState();
             switch (widgetIndex)
             {
                 case WIDX_CLOSE:
-                    Close();
+                    close();
                     break;
                 case WIDX_SIGN_DEMOLISH:
                 {
                     auto* tileElement = BannerGetTileElement(GetBannerIndex());
                     if (tileElement == nullptr)
                     {
-                        Close();
+                        close();
                         return;
                     }
-                    auto bannerCoords = banner->position.ToCoordsXY();
+                    auto bannerCoords = banner->position.toCoordsXY();
 
                     if (_isSmall)
                     {
-                        CoordsXYZD wallLocation = { bannerCoords, tileElement->GetBaseZ(), tileElement->GetDirection() };
-                        auto wallRemoveAction = WallRemoveAction(wallLocation);
-                        GameActions::Execute(&wallRemoveAction);
+                        CoordsXYZD wallLocation = { bannerCoords, tileElement->getBaseZ(), tileElement->getDirection() };
+                        auto wallRemoveAction = GameActions::WallRemoveAction(wallLocation);
+                        GameActions::Execute(&wallRemoveAction, gameState);
                     }
                     else
                     {
-                        auto sceneryRemoveAction = LargeSceneryRemoveAction(
-                            { bannerCoords, tileElement->GetBaseZ(), tileElement->GetDirection() },
-                            tileElement->AsLargeScenery()->GetSequenceIndex());
-                        GameActions::Execute(&sceneryRemoveAction);
+                        auto sceneryRemoveAction = GameActions::LargeSceneryRemoveAction(
+                            { bannerCoords, tileElement->getBaseZ(), tileElement->getDirection() },
+                            tileElement->asLargeScenery()->getSequenceIndex());
+                        GameActions::Execute(&sceneryRemoveAction, gameState);
                     }
                     break;
                 }
@@ -191,7 +189,7 @@ namespace OpenRCT2::Ui::Windows
             }
         }
 
-        void OnMouseDown(WidgetIndex widgetIndex) override
+        void onMouseDown(WidgetIndex widgetIndex) override
         {
             Widget* widget = &widgets[widgetIndex];
             switch (widgetIndex)
@@ -205,8 +203,9 @@ namespace OpenRCT2::Ui::Windows
             }
         }
 
-        void OnDropdown(WidgetIndex widgetIndex, int32_t dropdownIndex) override
+        void onDropdown(WidgetIndex widgetIndex, int32_t dropdownIndex) override
         {
+            auto& gameState = getGameState();
             switch (widgetIndex)
             {
                 case WIDX_MAIN_COLOUR:
@@ -214,8 +213,9 @@ namespace OpenRCT2::Ui::Windows
                     if (dropdownIndex == -1)
                         return;
                     _mainColour = ColourDropDownIndexToColour(dropdownIndex);
-                    auto signSetStyleAction = SignSetStyleAction(GetBannerIndex(), _mainColour, _textColour, !_isSmall);
-                    GameActions::Execute(&signSetStyleAction);
+                    auto signSetStyleAction = GameActions::SignSetStyleAction(
+                        GetBannerIndex(), _mainColour, _textColour, !_isSmall);
+                    GameActions::Execute(&signSetStyleAction, gameState);
                     break;
                 }
                 case WIDX_TEXT_COLOUR:
@@ -223,87 +223,88 @@ namespace OpenRCT2::Ui::Windows
                     if (dropdownIndex == -1)
                         return;
                     _textColour = ColourDropDownIndexToColour(dropdownIndex);
-                    auto signSetStyleAction = SignSetStyleAction(GetBannerIndex(), _mainColour, _textColour, !_isSmall);
-                    GameActions::Execute(&signSetStyleAction);
+                    auto signSetStyleAction = GameActions::SignSetStyleAction(
+                        GetBannerIndex(), _mainColour, _textColour, !_isSmall);
+                    GameActions::Execute(&signSetStyleAction, gameState);
                     break;
                 }
                 default:
                     return;
             }
 
-            Invalidate();
+            invalidate();
         }
 
-        void OnTextInput(WidgetIndex widgetIndex, std::string_view text) override
+        void onTextInput(WidgetIndex widgetIndex, std::string_view text) override
         {
             if (widgetIndex == WIDX_SIGN_TEXT && !text.empty())
             {
-                auto signSetNameAction = SignSetNameAction(GetBannerIndex(), std::string(text));
-                GameActions::Execute(&signSetNameAction);
+                auto signSetNameAction = GameActions::SignSetNameAction(GetBannerIndex(), std::string(text));
+                GameActions::Execute(&signSetNameAction, getGameState());
             }
         }
 
-        void OnPrepareDraw() override
+        void onPrepareDraw() override
         {
-            Widget* main_colour_btn = &widgets[WIDX_MAIN_COLOUR];
-            Widget* text_colour_btn = &widgets[WIDX_TEXT_COLOUR];
+            auto& mainColourButton = widgets[WIDX_MAIN_COLOUR];
+            auto& textColourButotn = widgets[WIDX_TEXT_COLOUR];
 
             if (_isSmall)
             {
-                auto* wallEntry = OpenRCT2::ObjectManager::GetObjectEntry<WallSceneryEntry>(_sceneryEntry);
+                auto* wallEntry = ObjectEntryManager::GetObjectEntry<WallSceneryEntry>(_sceneryEntry);
 
-                main_colour_btn->type = WindowWidgetType::Empty;
-                text_colour_btn->type = WindowWidgetType::Empty;
+                mainColourButton.setHidden();
+                textColourButotn.setHidden();
                 if (wallEntry == nullptr)
                 {
                     return;
                 }
-                if (wallEntry->flags & WALL_SCENERY_HAS_PRIMARY_COLOUR)
+                if (wallEntry->flags.has(WallSceneryFlag::hasPrimaryColour))
                 {
-                    main_colour_btn->type = WindowWidgetType::ColourBtn;
+                    mainColourButton.setVisible();
                 }
-                if (wallEntry->flags & WALL_SCENERY_HAS_SECONDARY_COLOUR)
+                if (wallEntry->flags.has(WallSceneryFlag::hasSecondaryColour))
                 {
-                    text_colour_btn->type = WindowWidgetType::ColourBtn;
+                    textColourButotn.setVisible();
                 }
             }
             else
             {
-                auto* sceneryEntry = OpenRCT2::ObjectManager::GetObjectEntry<LargeSceneryEntry>(_sceneryEntry);
+                auto* sceneryEntry = ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(_sceneryEntry);
 
-                main_colour_btn->type = WindowWidgetType::Empty;
-                text_colour_btn->type = WindowWidgetType::Empty;
+                mainColourButton.setHidden();
+                textColourButotn.setHidden();
                 if (sceneryEntry == nullptr)
                 {
                     return;
                 }
-                if (sceneryEntry->flags & LARGE_SCENERY_FLAG_HAS_PRIMARY_COLOUR)
+                if (sceneryEntry->flags.has(LargeSceneryFlag::hasPrimaryColour))
                 {
-                    main_colour_btn->type = WindowWidgetType::ColourBtn;
+                    mainColourButton.setVisible();
                 }
-                if (sceneryEntry->flags & LARGE_SCENERY_FLAG_HAS_SECONDARY_COLOUR)
+                if (sceneryEntry->flags.has(LargeSceneryFlag::hasSecondaryColour))
                 {
-                    text_colour_btn->type = WindowWidgetType::ColourBtn;
+                    textColourButotn.setVisible();
                 }
             }
 
-            main_colour_btn->image = GetColourButtonImage(_mainColour);
-            text_colour_btn->image = GetColourButtonImage(_textColour);
+            mainColourButton.image = getColourButtonImage(_mainColour);
+            textColourButotn.image = getColourButtonImage(_textColour);
         }
 
-        void OnDraw(DrawPixelInfo& dpi) override
+        void onDraw(Drawing::RenderTarget& rt) override
         {
-            DrawWidgets(dpi);
+            drawWidgets(rt);
 
             if (viewport != nullptr)
             {
-                WindowDrawViewport(dpi, *this);
+                WindowDrawViewport(rt, *this);
             }
         }
 
-        void OnViewportRotate() override
+        void onViewportRotate() override
         {
-            RemoveViewport();
+            removeViewport();
 
             auto banner = GetBanner(GetBannerIndex());
             if (banner == nullptr)
@@ -311,21 +312,16 @@ namespace OpenRCT2::Ui::Windows
                 return;
             }
 
-            auto signViewPos = CoordsXYZ{ banner->position.ToCoordsXY().ToTileCentre(), frame_no };
+            auto signViewPos = CoordsXYZ{ banner->position.toCoordsXY().toTileCentre(), currentFrame };
 
             // Create viewport
             Widget* viewportWidget = &widgets[WIDX_VIEWPORT];
             ViewportCreate(
-                this, windowPos + ScreenCoordsXY{ viewportWidget->left + 1, viewportWidget->top + 1 },
-                viewportWidget->width() - 1, viewportWidget->height() - 1, Focus(CoordsXYZ{ signViewPos }));
+                *this, windowPos + ScreenCoordsXY{ viewportWidget->left + 1, viewportWidget->top + 1 },
+                viewportWidget->width() - 2, viewportWidget->height() - 2, Focus(CoordsXYZ{ signViewPos }));
             if (viewport != nullptr)
-                viewport->flags = Config::Get().general.AlwaysShowGridlines ? VIEWPORT_FLAG_GRIDLINES : VIEWPORT_FLAG_NONE;
-            Invalidate();
-        }
-
-        void OnResize() override
-        {
-            ResizeFrame();
+                viewport->flags = Config::Get().general.alwaysShowGridlines ? VIEWPORT_FLAG_GRIDLINES : VIEWPORT_FLAG_NONE;
+            invalidate();
         }
     };
 
@@ -333,20 +329,20 @@ namespace OpenRCT2::Ui::Windows
      *
      *  rct2: 0x006BA305
      */
-    WindowBase* SignOpen(rct_windownumber number)
+    WindowBase* SignOpen(WindowNumber number)
     {
         auto* windowMgr = GetWindowManager();
-        auto* w = static_cast<SignWindow*>(windowMgr->BringToFrontByNumber(WindowClass::Banner, number));
+        auto* w = static_cast<SignWindow*>(windowMgr->BringToFrontByNumber(WindowClass::banner, number));
 
         if (w != nullptr)
             return w;
 
-        w = windowMgr->Create<SignWindow>(WindowClass::Banner, WW, WH, 0);
+        w = windowMgr->Create<SignWindow>(WindowClass::banner, kWindowSize, {});
 
         if (w == nullptr)
             return nullptr;
 
-        bool result = w->Initialize(number, false);
+        bool result = w->initialise(number, false);
         if (result != true)
             return nullptr;
 
@@ -357,20 +353,20 @@ namespace OpenRCT2::Ui::Windows
      *
      *  rct2: 0x6E5F52
      */
-    WindowBase* SignSmallOpen(rct_windownumber number)
+    WindowBase* SignSmallOpen(WindowNumber number)
     {
         auto* windowMgr = GetWindowManager();
-        auto* w = static_cast<SignWindow*>(windowMgr->BringToFrontByNumber(WindowClass::Banner, number));
+        auto* w = static_cast<SignWindow*>(windowMgr->BringToFrontByNumber(WindowClass::banner, number));
 
         if (w != nullptr)
             return w;
 
-        w = windowMgr->Create<SignWindow>(WindowClass::Banner, WW, WH, 0);
+        w = windowMgr->Create<SignWindow>(WindowClass::banner, kWindowSize, {});
 
         if (w == nullptr)
             return nullptr;
 
-        bool result = w->Initialize(number, true);
+        bool result = w->initialise(number, true);
         if (result != true)
             return nullptr;
 

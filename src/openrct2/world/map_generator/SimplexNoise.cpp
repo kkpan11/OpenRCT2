@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -217,9 +217,7 @@ namespace OpenRCT2::World::MapGenerator
         if (settings->smoothTileEdges)
         {
             // Set the tile slopes so that there are no cliffs
-            while (MapSmooth(1, 1, mapSize.x - 1, mapSize.y - 1))
-            {
-            }
+            smoothMap(settings->mapSize, smoothTileStrong);
         }
 
         // Add the water

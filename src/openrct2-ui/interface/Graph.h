@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,8 +11,13 @@
 
 #include <openrct2/Context.h>
 #include <openrct2/core/Money.hpp>
-#include <openrct2/drawing/Drawing.h>
-#include <openrct2/world/Location.hpp>
+#include <openrct2/interface/ColourWithFlags.h>
+#include <openrct2/interface/ScreenCoords.hpp>
+
+namespace OpenRCT2::Drawing
+{
+    struct RenderTarget;
+}
 
 namespace OpenRCT2::Graph
 {
@@ -34,11 +39,11 @@ namespace OpenRCT2::Graph
 
         void RecalculateLayout(const ScreenRect newBounds, const int32_t newNumYLabels, const int32_t newNumPoints)
         {
-            yLabelStepPx = (newBounds.GetBottom() - newBounds.GetTop()) / (newNumYLabels - 1);
-            xStepPx = (newBounds.GetRight() - newBounds.GetLeft()) / (newNumPoints - 1);
+            yLabelStepPx = (newBounds.getBottom() - newBounds.getTop()) / (newNumYLabels - 1);
+            xStepPx = (newBounds.getRight() - newBounds.getLeft()) / (newNumPoints - 1);
             // adjust bounds to be exact multiples of the steps.
-            internalBounds = { newBounds.Point1,
-                               newBounds.Point1
+            internalBounds = { newBounds.point1,
+                               newBounds.point1
                                    + ScreenCoordsXY{ xStepPx * (newNumPoints - 1), yLabelStepPx * (newNumYLabels - 1) } };
             numPoints = newNumPoints;
             numYLabels = newNumYLabels;
@@ -49,9 +54,9 @@ namespace OpenRCT2::Graph
             const ScreenCoordsXY cursorPos = ContextGetCursorPositionScaled();
 
             int32_t i = -1;
-            if (internalBounds.Contains(cursorPos))
+            if (internalBounds.contains(cursorPos))
             {
-                i = (numPoints - 1) - (cursorPos.x - internalBounds.GetLeft() + (xStepPx / 2)) / xStepPx;
+                i = (numPoints - 1) - (cursorPos.x - internalBounds.getLeft() + (xStepPx / 2)) / xStepPx;
                 if (i < 0)
                     i = 1;
                 if (i > numPoints - 1)
@@ -67,7 +72,7 @@ namespace OpenRCT2::Graph
         }
     };
 
-    void DrawFinanceGraph(DrawPixelInfo& dpi, const GraphProperties<money64>& p);
-    void DrawRatingGraph(DrawPixelInfo& dpi, const GraphProperties<uint16_t>& p);
-    void DrawGuestGraph(DrawPixelInfo& dpi, const GraphProperties<uint32_t>& p);
+    void DrawFinanceGraph(Drawing::RenderTarget& rt, const GraphProperties<money64>& p);
+    void DrawRatingGraph(Drawing::RenderTarget& rt, const GraphProperties<uint16_t>& p);
+    void DrawGuestGraph(Drawing::RenderTarget& rt, const GraphProperties<uint32_t>& p);
 } // namespace OpenRCT2::Graph

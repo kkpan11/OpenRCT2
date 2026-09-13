@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,17 +9,16 @@
 
 #pragma once
 
+#include "command_line/ExitCode.h"
 #include "core/StringTypes.h"
-
-enum class PromptMode : uint8_t;
 
 enum class StartupAction
 {
-    None,
-    Intro,
-    Title,
-    Open,
-    Edit
+    none,
+    intro,
+    title,
+    open,
+    edit
 };
 
 enum class LegacyScene : uint8_t
@@ -51,17 +50,29 @@ extern u8string gSilentRecordingName;
 extern bool gSilentReplays;
 
 #ifndef DISABLE_NETWORK
-extern int32_t gNetworkStart;
-extern std::string gNetworkStartHost;
-extern int32_t gNetworkStartPort;
-extern std::string gNetworkStartAddress;
+namespace OpenRCT2::Network
+{
+    enum class Mode : int32_t;
+}
+
+namespace OpenRCT2
+{
+    extern Network::Mode gNetworkStart;
+    extern std::string gNetworkStartHost;
+    extern int32_t gNetworkStartPort;
+    extern std::string gNetworkStartAddress;
+} // namespace OpenRCT2
 #endif
+
+namespace OpenRCT2
+{
+    enum class PromptMode : uint8_t;
+
+    CommandLine::ExitCode CommandLineRun(const char** argv, int32_t argc);
+
+    extern PromptMode gSavePromptMode;
+} // namespace OpenRCT2
 
 extern uint32_t gCurrentDrawCount;
 extern LegacyScene gLegacyScene;
 extern uint32_t gScreenAge;
-extern PromptMode gSavePromptMode;
-
-void OpenRCT2Finish();
-
-int32_t CommandLineRun(const char** argv, int32_t argc);

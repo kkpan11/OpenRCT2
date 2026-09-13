@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,9 +9,9 @@
 
 #include "MapHelpers.h"
 
-#include "../../world/tile_element/Slope.h"
-#include "../../world/tile_element/SurfaceElement.h"
 #include "../Map.h"
+#include "../tile_element/Slope.h"
+#include "../tile_element/SurfaceElement.h"
 
 #include <algorithm>
 
@@ -20,181 +20,178 @@ namespace OpenRCT2::World::MapGenerator
     static uint8_t GetBaseHeightOrZero(int32_t x, int32_t y)
     {
         auto surfaceElement = MapGetSurfaceElementAt(TileCoordsXY{ x, y });
-        return surfaceElement != nullptr ? surfaceElement->BaseHeight : 0;
+        return surfaceElement != nullptr ? surfaceElement->baseHeight : 0;
     }
 
     /**
      * Not perfect, this still leaves some particular tiles unsmoothed.
      */
-    int32_t MapSmooth(int32_t l, int32_t t, int32_t r, int32_t b)
+    int32_t smoothTileStrong(const TileCoordsXY tileCoords)
     {
-        int32_t x, y, count, doubleCorner, raisedLand = 0;
-        uint8_t highest, cornerHeights[4];
-        for (y = t; y < b; y++)
+        auto surfaceElement = MapGetSurfaceElementAt(tileCoords);
+        if (surfaceElement == nullptr)
+            return 0;
+
+        surfaceElement->setSlope(kTileSlopeFlat);
+
+        auto x = tileCoords.x, y = tileCoords.y;
+        auto raisedLand = 0;
+
+        // Raise to edge height - 2
+        uint8_t highest = surfaceElement->baseHeight;
+        highest = std::max(highest, GetBaseHeightOrZero(x - 1, y + 0));
+        highest = std::max(highest, GetBaseHeightOrZero(x + 1, y + 0));
+        highest = std::max(highest, GetBaseHeightOrZero(x + 0, y - 1));
+        highest = std::max(highest, GetBaseHeightOrZero(x + 0, y + 1));
+        if (surfaceElement->baseHeight < highest - 2)
         {
-            for (x = l; x < r; x++)
+            raisedLand = 1;
+            surfaceElement->baseHeight = surfaceElement->clearanceHeight = highest - 2;
+        }
+
+        // Check corners
+        int32_t doubleCorner = -1;
+        uint8_t cornerHeights[4] = {
+            GetBaseHeightOrZero(x - 1, y - 1),
+            GetBaseHeightOrZero(x + 1, y - 1),
+            GetBaseHeightOrZero(x + 1, y + 1),
+            GetBaseHeightOrZero(x - 1, y + 1),
+        };
+
+        highest = surfaceElement->baseHeight;
+        for (std::size_t i = 0; i < std::size(cornerHeights); i++)
+            highest = std::max(highest, cornerHeights[i]);
+
+        if (highest >= surfaceElement->baseHeight + 4)
+        {
+            int32_t count = 0;
+            int32_t canCompensate = 1;
+            for (std::size_t i = 0; i < std::size(cornerHeights); i++)
             {
-                auto surfaceElement = MapGetSurfaceElementAt(TileCoordsXY{ x, y });
-                if (surfaceElement == nullptr)
-                    continue;
-                surfaceElement->SetSlope(kTileSlopeFlat);
-
-                // Raise to edge height - 2
-                highest = surfaceElement->BaseHeight;
-                highest = std::max(highest, GetBaseHeightOrZero(x - 1, y + 0));
-                highest = std::max(highest, GetBaseHeightOrZero(x + 1, y + 0));
-                highest = std::max(highest, GetBaseHeightOrZero(x + 0, y - 1));
-                highest = std::max(highest, GetBaseHeightOrZero(x + 0, y + 1));
-                if (surfaceElement->BaseHeight < highest - 2)
+                if (cornerHeights[i] == highest)
                 {
-                    raisedLand = 1;
-                    surfaceElement->BaseHeight = surfaceElement->ClearanceHeight = highest - 2;
-                }
+                    count++;
 
-                // Check corners
-                doubleCorner = -1;
-                cornerHeights[0] = GetBaseHeightOrZero(x - 1, y - 1);
-                cornerHeights[1] = GetBaseHeightOrZero(x + 1, y - 1);
-                cornerHeights[2] = GetBaseHeightOrZero(x + 1, y + 1);
-                cornerHeights[3] = GetBaseHeightOrZero(x - 1, y + 1);
-                highest = surfaceElement->BaseHeight;
-                for (std::size_t i = 0; i < std::size(cornerHeights); i++)
-                    highest = std::max(highest, cornerHeights[i]);
-
-                if (highest >= surfaceElement->BaseHeight + 4)
-                {
-                    count = 0;
-                    int32_t canCompensate = 1;
-                    for (std::size_t i = 0; i < std::size(cornerHeights); i++)
-                        if (cornerHeights[i] == highest)
-                        {
-                            count++;
-
-                            // Check if surrounding corners aren't too high. The current tile
-                            // can't compensate for all the height differences anymore if it has
-                            // the extra height slope.
-                            int32_t highestOnLowestSide;
-                            switch (i)
-                            {
-                                default:
-                                case 0:
-                                    highestOnLowestSide = std::max(
-                                        GetBaseHeightOrZero(x + 1, y), GetBaseHeightOrZero(x, y + 1));
-                                    break;
-                                case 1:
-                                    highestOnLowestSide = std::max(
-                                        GetBaseHeightOrZero(x - 1, y), GetBaseHeightOrZero(x, y + 1));
-                                    break;
-                                case 2:
-                                    highestOnLowestSide = std::max(
-                                        GetBaseHeightOrZero(x - 1, y), GetBaseHeightOrZero(x, y - 1));
-                                    break;
-                                case 3:
-                                    highestOnLowestSide = std::max(
-                                        GetBaseHeightOrZero(x + 1, y), GetBaseHeightOrZero(x, y - 1));
-                                    break;
-                            }
-
-                            if (highestOnLowestSide > surfaceElement->BaseHeight)
-                            {
-                                surfaceElement->BaseHeight = surfaceElement->ClearanceHeight = highestOnLowestSide;
-                                raisedLand = 1;
-                                canCompensate = 0;
-                            }
-                        }
-
-                    if (count == 1 && canCompensate)
+                    // Check if surrounding corners aren't too high. The current tile
+                    // can't compensate for all the height differences anymore if it has
+                    // the extra height slope.
+                    int32_t highestOnLowestSide;
+                    switch (i)
                     {
-                        if (surfaceElement->BaseHeight < highest - 4)
-                        {
-                            surfaceElement->BaseHeight = surfaceElement->ClearanceHeight = highest - 4;
-                            raisedLand = 1;
-                        }
-                        if (cornerHeights[0] == highest && cornerHeights[2] <= cornerHeights[0] - 4)
-                            doubleCorner = 0;
-                        else if (cornerHeights[1] == highest && cornerHeights[3] <= cornerHeights[1] - 4)
-                            doubleCorner = 1;
-                        else if (cornerHeights[2] == highest && cornerHeights[0] <= cornerHeights[2] - 4)
-                            doubleCorner = 2;
-                        else if (cornerHeights[3] == highest && cornerHeights[1] <= cornerHeights[3] - 4)
-                            doubleCorner = 3;
-                    }
-                    else
-                    {
-                        if (surfaceElement->BaseHeight < highest - 2)
-                        {
-                            surfaceElement->BaseHeight = surfaceElement->ClearanceHeight = highest - 2;
-                            raisedLand = 1;
-                        }
-                    }
-                }
-
-                if (doubleCorner != -1)
-                {
-                    uint8_t slope = surfaceElement->GetSlope() | kTileSlopeDiagonalFlag;
-                    switch (doubleCorner)
-                    {
+                        default:
                         case 0:
-                            slope |= kTileSlopeNCornerDown;
+                            highestOnLowestSide = std::max(GetBaseHeightOrZero(x + 1, y), GetBaseHeightOrZero(x, y + 1));
                             break;
                         case 1:
-                            slope |= kTileSlopeWCornerDown;
+                            highestOnLowestSide = std::max(GetBaseHeightOrZero(x - 1, y), GetBaseHeightOrZero(x, y + 1));
                             break;
                         case 2:
-                            slope |= kTileSlopeSCornerDown;
+                            highestOnLowestSide = std::max(GetBaseHeightOrZero(x - 1, y), GetBaseHeightOrZero(x, y - 1));
                             break;
                         case 3:
-                            slope |= kTileSlopeECornerDown;
+                            highestOnLowestSide = std::max(GetBaseHeightOrZero(x + 1, y), GetBaseHeightOrZero(x, y - 1));
                             break;
                     }
-                    surfaceElement->SetSlope(slope);
-                }
-                else
-                {
-                    uint8_t slope = surfaceElement->GetSlope();
-                    // Corners
-                    auto surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 1, y + 1 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeNCornerUp;
 
-                    surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x - 1, y + 1 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeWCornerUp;
-
-                    surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 1, y - 1 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeECornerUp;
-
-                    surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x - 1, y - 1 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeSCornerUp;
-
-                    // Sides
-                    surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 1, y + 0 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeNESideUp;
-
-                    surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x - 1, y + 0 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeSWSideUp;
-
-                    surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 0, y - 1 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeSESideUp;
-
-                    surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 0, y + 1 });
-                    if (surfaceElement2 != nullptr && surfaceElement2->BaseHeight > surfaceElement->BaseHeight)
-                        slope |= kTileSlopeNWSideUp;
-
-                    // Raise
-                    if (slope == kTileSlopeRaisedCornersMask)
+                    if (highestOnLowestSide > surfaceElement->baseHeight)
                     {
-                        slope = kTileSlopeFlat;
-                        surfaceElement->BaseHeight = surfaceElement->ClearanceHeight += 2;
+                        surfaceElement->baseHeight = surfaceElement->clearanceHeight = highestOnLowestSide;
+                        raisedLand = 1;
+                        canCompensate = 0;
                     }
-                    surfaceElement->SetSlope(slope);
                 }
             }
+
+            if (count == 1 && canCompensate)
+            {
+                if (surfaceElement->baseHeight < highest - 4)
+                {
+                    surfaceElement->baseHeight = surfaceElement->clearanceHeight = highest - 4;
+                    raisedLand = 1;
+                }
+                if (cornerHeights[0] == highest && cornerHeights[2] <= cornerHeights[0] - 4)
+                    doubleCorner = 0;
+                else if (cornerHeights[1] == highest && cornerHeights[3] <= cornerHeights[1] - 4)
+                    doubleCorner = 1;
+                else if (cornerHeights[2] == highest && cornerHeights[0] <= cornerHeights[2] - 4)
+                    doubleCorner = 2;
+                else if (cornerHeights[3] == highest && cornerHeights[1] <= cornerHeights[3] - 4)
+                    doubleCorner = 3;
+            }
+            else
+            {
+                if (surfaceElement->baseHeight < highest - 2)
+                {
+                    surfaceElement->baseHeight = surfaceElement->clearanceHeight = highest - 2;
+                    raisedLand = 1;
+                }
+            }
+        }
+
+        if (doubleCorner != -1)
+        {
+            uint8_t slope = surfaceElement->getSlope() | kTileSlopeDiagonalFlag;
+            switch (doubleCorner)
+            {
+                case 0:
+                    slope |= kTileSlopeNCornerDown;
+                    break;
+                case 1:
+                    slope |= kTileSlopeWCornerDown;
+                    break;
+                case 2:
+                    slope |= kTileSlopeSCornerDown;
+                    break;
+                case 3:
+                    slope |= kTileSlopeECornerDown;
+                    break;
+            }
+            surfaceElement->setSlope(slope);
+        }
+        else
+        {
+            uint8_t slope = surfaceElement->getSlope();
+            // Corners
+            auto surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 1, y + 1 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeNCornerUp;
+
+            surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x - 1, y + 1 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeWCornerUp;
+
+            surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 1, y - 1 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeECornerUp;
+
+            surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x - 1, y - 1 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeSCornerUp;
+
+            // Sides
+            surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 1, y + 0 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeNESideUp;
+
+            surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x - 1, y + 0 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeSWSideUp;
+
+            surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 0, y - 1 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeSESideUp;
+
+            surfaceElement2 = MapGetSurfaceElementAt(TileCoordsXY{ x + 0, y + 1 });
+            if (surfaceElement2 != nullptr && surfaceElement2->baseHeight > surfaceElement->baseHeight)
+                slope |= kTileSlopeNWSideUp;
+
+            // Raise
+            if (slope == kTileSlopeRaisedCornersMask)
+            {
+                slope = kTileSlopeFlat;
+                surfaceElement->baseHeight = surfaceElement->clearanceHeight += 2;
+            }
+            surfaceElement->setSlope(slope);
         }
 
         return raisedLand;
@@ -205,7 +202,7 @@ namespace OpenRCT2::World::MapGenerator
      * This does not change the base height, unless all corners have been raised.
      * @returns 0 if no edits were made, 1 otherwise
      */
-    int32_t TileSmooth(const TileCoordsXY& tileCoords)
+    int32_t smoothTileWeak(const TileCoordsXY tileCoords)
     {
         auto* const surfaceElement = MapGetSurfaceElementAt(tileCoords);
         if (surfaceElement == nullptr)
@@ -250,11 +247,11 @@ namespace OpenRCT2::World::MapGenerator
                 // Get neighbour height. If the element is not valid (outside of map) assume the same height
                 auto* neighbourSurfaceElement = MapGetSurfaceElementAt(tileCoords + TileCoordsXY{ x_offset, y_offset });
                 neighbourHeightOffset.baseheight[index] = neighbourSurfaceElement != nullptr
-                    ? neighbourSurfaceElement->BaseHeight
-                    : surfaceElement->BaseHeight;
+                    ? neighbourSurfaceElement->baseHeight
+                    : surfaceElement->baseHeight;
 
                 // Make the height relative to the current surface element
-                neighbourHeightOffset.baseheight[index] -= surfaceElement->BaseHeight;
+                neighbourHeightOffset.baseheight[index] -= surfaceElement->baseHeight;
 
                 index++;
             }
@@ -286,7 +283,7 @@ namespace OpenRCT2::World::MapGenerator
         }
 
         // Check if the calculated slope is the same already
-        uint8_t currentSlope = surfaceElement->GetSlope();
+        uint8_t currentSlope = surfaceElement->getSlope();
         if (currentSlope == slope)
         {
             return 0;
@@ -295,25 +292,44 @@ namespace OpenRCT2::World::MapGenerator
         if ((slope & kTileSlopeRaisedCornersMask) == kTileSlopeRaisedCornersMask)
         {
             // All corners are raised, raise the entire tile instead.
-            surfaceElement->SetSlope(kTileSlopeFlat);
-            surfaceElement->BaseHeight = (surfaceElement->ClearanceHeight += 2);
-            if (surfaceElement->GetWaterHeight() <= surfaceElement->GetBaseZ())
+            surfaceElement->setSlope(kTileSlopeFlat);
+            surfaceElement->baseHeight = (surfaceElement->clearanceHeight += 2);
+            if (surfaceElement->getWaterHeight() <= surfaceElement->getBaseZ())
             {
-                surfaceElement->SetWaterHeight(0);
+                surfaceElement->setWaterHeight(0);
             }
         }
         else
         {
             // Apply the slope to this tile
-            surfaceElement->SetSlope(slope);
+            surfaceElement->setSlope(slope);
 
             // Set correct clearance height
             if (slope & kTileSlopeDiagonalFlag)
-                surfaceElement->ClearanceHeight = surfaceElement->BaseHeight + 4;
+                surfaceElement->clearanceHeight = surfaceElement->baseHeight + 4;
             else if (slope & kTileSlopeRaisedCornersMask)
-                surfaceElement->ClearanceHeight = surfaceElement->BaseHeight + 2;
+                surfaceElement->clearanceHeight = surfaceElement->baseHeight + 2;
         }
 
         return 1;
+    }
+
+    void smoothMap(TileCoordsXY mapSize, SmoothFunction smoothFunc)
+    {
+        while (true)
+        {
+            auto numTilesChanged = 0;
+
+            for (auto y = 1; y < mapSize.y - 1; y++)
+            {
+                for (auto x = 1; x < mapSize.x - 1; x++)
+                {
+                    numTilesChanged += smoothFunc({ x, y });
+                }
+            }
+
+            if (numTilesChanged == 0)
+                break;
+        }
     }
 } // namespace OpenRCT2::World::MapGenerator

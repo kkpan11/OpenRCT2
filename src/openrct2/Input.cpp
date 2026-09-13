@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,11 +11,12 @@
 
 #include "Context.h"
 #include "Game.h"
+#include "interface/WindowTypes.h"
 
 namespace OpenRCT2
 {
     InputState _inputState;
-    uint8_t _inputFlags;
+    InputFlags gInputFlags;
 
     WidgetRef gHoverWidget;
     WidgetRef gPressedWidget;
@@ -38,28 +39,6 @@ namespace OpenRCT2
     void GameHandleKeyboardInput()
     {
         ContextInputHandleKeyboard(false);
-    }
-
-    void InputSetFlag(INPUT_FLAGS flag, bool on)
-    {
-        if (on)
-        {
-            _inputFlags |= flag;
-        }
-        else
-        {
-            _inputFlags &= ~flag;
-        }
-    }
-
-    bool InputTestFlag(INPUT_FLAGS flag)
-    {
-        return _inputFlags & flag;
-    }
-
-    void InputResetFlags()
-    {
-        _inputFlags = 0;
     }
 
     void InputSetState(InputState state)

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,22 +8,25 @@
  *****************************************************************************/
 
 #include <cmath>
-#include <openrct2-ui/interface/Viewport.h>
 #include <openrct2-ui/interface/Widget.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
-#include <openrct2/Input.h>
-#include <openrct2/SpriteIds.h>
 #include <openrct2/config/Config.h>
+#include <openrct2/drawing/Drawing.Screen.h>
 #include <openrct2/drawing/Drawing.h>
+#include <openrct2/drawing/Text.h>
+#include <openrct2/interface/Viewport.h>
 #include <openrct2/localisation/Formatter.h>
 #include <openrct2/localisation/StringIds.h>
 #include <openrct2/paint/Paint.h>
 #include <openrct2/ui/WindowManager.h>
 #include <openrct2/world/Location.hpp>
+#include <openrct2/world/Map.h>
+#include <openrct2/world/MapSelection.h>
 
 namespace OpenRCT2::Ui::Windows
 {
-    enum WindowViewClippingWidgetIdx
+    enum WindowViewClippingWidgetIdx : WidgetIndex
     {
         WIDX_BACKGROUND,
         WIDX_TITLE,
@@ -42,28 +45,27 @@ namespace OpenRCT2::Ui::Windows
 
     enum class DisplayType
     {
-        DisplayRaw,
-        DisplayUnits
+        displayRaw,
+        displayUnits
     };
 
 #pragma region Widgets
 
-    static constexpr StringId WINDOW_TITLE = STR_VIEW_CLIPPING_TITLE;
-    static constexpr int32_t WW = 180;
-    static constexpr int32_t WH = 172;
+    static constexpr StringId kWindowTitle = STR_VIEW_CLIPPING_TITLE;
+    static constexpr ScreenSize kWindowSize = { 180, 172 };
 
     // clang-format off
-    static constexpr Widget _viewClippingWidgets[] = {
-        WINDOW_SHIM(WINDOW_TITLE, WW, WH),
-        MakeWidget        ({     11,  19}, {    159,  11}, WindowWidgetType::Checkbox, WindowColour::Primary, STR_VIEW_CLIPPING_HEIGHT_ENABLE,                  STR_VIEW_CLIPPING_HEIGHT_ENABLE_TIP               ), // clip enable/disable check box
-        MakeWidget        ({      5,  36}, {WW - 10,  65}, WindowWidgetType::Groupbox, WindowColour::Primary, STR_VIEW_CLIPPING_VERTICAL_CLIPPING                                                                 ),
-        MakeSpinnerWidgets({     90,  51}, {     79,  12}, WindowWidgetType::Spinner,  WindowColour::Primary, kStringIdNone,                                    STR_VIEW_CLIPPING_HEIGHT_VALUE_TOGGLE             ), // clip height (3 widgets)
-        MakeWidget        ({     11,  66}, {    158,  13}, WindowWidgetType::Scroll,   WindowColour::Primary, SCROLL_HORIZONTAL,                                STR_VIEW_CLIPPING_HEIGHT_SCROLL_TIP               ), // clip height scrollbar
-        MakeWidget        ({     11,  83}, {    159,  11}, WindowWidgetType::Checkbox, WindowColour::Primary, STR_VIEW_CLIPPING_VERTICAL_CLIPPING_SEE_THROUGH, STR_VIEW_CLIPPING_VERTICAL_CLIPPING_SEE_THROUGH_TIP), // clip height enable/disable see-through check box
-        MakeWidget        ({      5, 107}, {WW - 10,  60}, WindowWidgetType::Groupbox, WindowColour::Primary, STR_VIEW_CLIPPING_HORIZONTAL_CLIPPING                                                               ),
-        MakeWidget        ({     11, 122}, {    158,  17}, WindowWidgetType::Button,   WindowColour::Primary, STR_VIEW_CLIPPING_SELECT_AREA                                                                       ), // selector
-        MakeWidget        ({     11, 143}, {    158,  18}, WindowWidgetType::Button,   WindowColour::Primary, STR_VIEW_CLIPPING_CLEAR_SELECTION                                                                   ), // clear
-    };
+    static constexpr auto _viewClippingWidgets = makeWidgets(
+        makeWindowShim(kWindowTitle, kWindowSize),
+        makeWidget                ({     11,  19}, {    159,  11},                WidgetType::checkbox, WindowColour::primary, STR_VIEW_CLIPPING_HEIGHT_ENABLE,                  STR_VIEW_CLIPPING_HEIGHT_ENABLE_TIP               ), // clip enable/disable check box
+        makeWidget                ({      5,  36}, {kWindowSize.width - 10,  65}, WidgetType::groupbox, WindowColour::primary, STR_VIEW_CLIPPING_VERTICAL_CLIPPING                                                                 ),
+        makeHoldableSpinnerWidgets({     90,  51}, {     79,  12},                WidgetType::spinner,  WindowColour::primary, kStringIdNone,                                    STR_VIEW_CLIPPING_HEIGHT_VALUE_TOGGLE             ), // clip height (3 widgets)
+        makeWidget                ({     11,  66}, {    158,  13},                WidgetType::scroll,   WindowColour::primary, SCROLL_HORIZONTAL,                                STR_VIEW_CLIPPING_HEIGHT_SCROLL_TIP               ), // clip height scrollbar
+        makeWidget                ({     11,  83}, {    159,  11},                WidgetType::checkbox, WindowColour::primary, STR_VIEW_CLIPPING_VERTICAL_CLIPPING_SEE_THROUGH, STR_VIEW_CLIPPING_VERTICAL_CLIPPING_SEE_THROUGH_TIP), // clip height enable/disable see-through check box
+        makeWidget                ({      5, 107}, {kWindowSize.width - 10,  60}, WidgetType::groupbox, WindowColour::primary, STR_VIEW_CLIPPING_HORIZONTAL_CLIPPING                                                               ),
+        makeWidget                ({     11, 122}, {    158,  17},                WidgetType::button,   WindowColour::primary, STR_VIEW_CLIPPING_SELECT_AREA                                                                       ), // selector
+        makeWidget                ({     11, 143}, {    158,  18},                WidgetType::button,   WindowColour::primary, STR_VIEW_CLIPPING_CLEAR_SELECTION                                                                   )  // clear
+    );
     // clang-format on
 
 #pragma endregion
@@ -79,18 +81,18 @@ namespace OpenRCT2::Ui::Windows
         static inline DisplayType _clipHeightDisplayType;
 
     public:
-        void OnCloseButton()
+        void onCloseButton()
         {
-            OnClose();
+            onClose();
         }
 
-        void OnMouseUp(WidgetIndex widgetIndex) override
+        void onMouseUp(WidgetIndex widgetIndex) override
         {
             // mouseup appears to be used for buttons, checkboxes
             switch (widgetIndex)
             {
                 case WIDX_CLOSE:
-                    Close();
+                    close();
                     break;
                 case WIDX_CLIP_CHECKBOX_ENABLE:
                 {
@@ -99,22 +101,22 @@ namespace OpenRCT2::Ui::Windows
                     if (mainWindow != nullptr)
                     {
                         mainWindow->viewport->flags ^= VIEWPORT_FLAG_CLIP_VIEW;
-                        mainWindow->Invalidate();
+                        mainWindow->invalidate();
                     }
-                    this->Invalidate();
+                    this->invalidate();
                     break;
                 }
                 case WIDX_CLIP_HEIGHT_VALUE:
                     // Toggle display of the cut height value in RAW vs UNITS
-                    if (_clipHeightDisplayType == DisplayType::DisplayRaw)
+                    if (_clipHeightDisplayType == DisplayType::displayRaw)
                     {
-                        _clipHeightDisplayType = DisplayType::DisplayUnits;
+                        _clipHeightDisplayType = DisplayType::displayUnits;
                     }
                     else
                     {
-                        _clipHeightDisplayType = DisplayType::DisplayRaw;
+                        _clipHeightDisplayType = DisplayType::displayRaw;
                     }
-                    this->Invalidate();
+                    this->invalidate();
                     break;
                 case WIDX_CLIP_SELECTOR:
                     // Activate the selection tool
@@ -127,7 +129,7 @@ namespace OpenRCT2::Ui::Windows
                     _previousClipSelectionB = gClipSelectionB;
                     gClipSelectionA = { 0, 0 };
                     gClipSelectionB = { kMaximumMapSizeBig - 1, kMaximumMapSizeBig - 1 };
-                    GfxInvalidateScreen();
+                    Drawing::GfxInvalidateScreen();
                     break;
                 case WIDX_CLIP_CLEAR:
                     if (IsActive())
@@ -137,7 +139,7 @@ namespace OpenRCT2::Ui::Windows
                     }
                     gClipSelectionA = { 0, 0 };
                     gClipSelectionB = { kMaximumMapSizeBig - 1, kMaximumMapSizeBig - 1 };
-                    GfxInvalidateScreen();
+                    Drawing::GfxInvalidateScreen();
                     break;
                 case WIDX_CLIP_SEE_THROUGH_CHECKBOX_ENABLE:
                 {
@@ -145,15 +147,15 @@ namespace OpenRCT2::Ui::Windows
                     if (auto mainWindow = WindowGetMain(); mainWindow != nullptr)
                     {
                         mainWindow->viewport->flags ^= VIEWPORT_FLAG_CLIP_VIEW_SEE_THROUGH;
-                        mainWindow->Invalidate();
+                        mainWindow->invalidate();
                     }
-                    Invalidate();
+                    invalidate();
                     break;
                 }
             }
         }
 
-        void OnMouseDown(WidgetIndex widgetIndex) override
+        void onMouseDown(WidgetIndex widgetIndex) override
         {
             WindowBase* mainWindow;
 
@@ -164,23 +166,23 @@ namespace OpenRCT2::Ui::Windows
                         SetClipHeight(gClipHeight + 1);
                     mainWindow = WindowGetMain();
                     if (mainWindow != nullptr)
-                        mainWindow->Invalidate();
+                        mainWindow->invalidate();
                     break;
                 case WIDX_CLIP_HEIGHT_DECREASE:
                     if (gClipHeight > 0)
                         SetClipHeight(gClipHeight - 1);
                     mainWindow = WindowGetMain();
                     if (mainWindow != nullptr)
-                        mainWindow->Invalidate();
+                        mainWindow->invalidate();
                     break;
             }
         }
 
-        void OnUpdate() override
+        void onUpdate() override
         {
             const auto& widget = widgets[WIDX_CLIP_HEIGHT_SLIDER];
             const ScrollArea* const scroll = &this->scrolls[0];
-            const int16_t scroll_width = widget.width() - 1;
+            const int16_t scroll_width = widget.width() - 2;
             const uint8_t clip_height = static_cast<uint8_t>(
                 (static_cast<float>(scroll->contentOffsetX) / (scroll->contentWidth - scroll_width)) * 255);
             if (clip_height != gClipHeight)
@@ -191,7 +193,7 @@ namespace OpenRCT2::Ui::Windows
                 WindowBase* mainWindow = WindowGetMain();
                 if (mainWindow != nullptr)
                 {
-                    mainWindow->Invalidate();
+                    mainWindow->invalidate();
                 }
             }
 
@@ -203,10 +205,10 @@ namespace OpenRCT2::Ui::Windows
                 gClipSelectionB = _previousClipSelectionB;
             }
 
-            InvalidateWidget(WIDX_CLIP_HEIGHT_SLIDER);
+            invalidateWidget(WIDX_CLIP_HEIGHT_SLIDER);
         }
 
-        void OnToolUpdate(WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords) override
+        void onToolUpdate(WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords) override
         {
             if (_dragging)
             {
@@ -217,15 +219,15 @@ namespace OpenRCT2::Ui::Windows
             auto mapCoords = ScreenPosToMapPos(screenCoords, &direction);
             if (mapCoords.has_value())
             {
-                gMapSelectFlags |= MAP_SELECT_FLAG_ENABLE;
+                gMapSelectFlags.set(MapSelectFlag::enable);
                 MapInvalidateTileFull(gMapSelectPositionA);
                 gMapSelectPositionA = gMapSelectPositionB = mapCoords.value();
                 MapInvalidateTileFull(mapCoords.value());
-                gMapSelectType = MAP_SELECT_TYPE_FULL;
+                gMapSelectType = MapSelectType::full;
             }
         }
 
-        void OnToolDown(WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords) override
+        void onToolDown(WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords) override
         {
             int32_t direction;
             auto mapCoords = ScreenPosToMapPos(screenCoords, &direction);
@@ -236,7 +238,7 @@ namespace OpenRCT2::Ui::Windows
             }
         }
 
-        void OnToolDrag(WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords) override
+        void onToolDrag(WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords) override
         {
             if (!_dragging)
             {
@@ -247,105 +249,101 @@ namespace OpenRCT2::Ui::Windows
             auto mapCoords = ScreenPosToMapPos(screenCoords, &direction);
             if (mapCoords)
             {
-                MapInvalidateSelectionRect();
-                gMapSelectFlags |= MAP_SELECT_FLAG_ENABLE;
+                gMapSelectFlags.set(MapSelectFlag::enable);
                 gMapSelectPositionA.x = std::min(_selectionStart.x, mapCoords->x);
                 gMapSelectPositionB.x = std::max(_selectionStart.x, mapCoords->x);
                 gMapSelectPositionA.y = std::min(_selectionStart.y, mapCoords->y);
                 gMapSelectPositionB.y = std::max(_selectionStart.y, mapCoords->y);
-                gMapSelectType = MAP_SELECT_TYPE_FULL;
-                MapInvalidateSelectionRect();
+                gMapSelectType = MapSelectType::full;
             }
         }
 
-        void OnToolUp(WidgetIndex, const ScreenCoordsXY&) override
+        void onToolUp(WidgetIndex, const ScreenCoordsXY&) override
         {
             gClipSelectionA = gMapSelectPositionA;
             gClipSelectionB = gMapSelectPositionB;
             _toolActive = false;
             ToolCancel();
-            GfxInvalidateScreen();
+            Drawing::GfxInvalidateScreen();
         }
 
-        void OnPrepareDraw() override
+        void onPrepareDraw() override
         {
-            WidgetScrollUpdateThumbs(*this, WIDX_CLIP_HEIGHT_SLIDER);
+            widgetScrollUpdateThumbs(*this, WIDX_CLIP_HEIGHT_SLIDER);
 
             WindowBase* mainWindow = WindowGetMain();
             if (mainWindow != nullptr)
             {
-                WidgetSetCheckboxValue(*this, WIDX_CLIP_CHECKBOX_ENABLE, mainWindow->viewport->flags & VIEWPORT_FLAG_CLIP_VIEW);
-                WidgetSetCheckboxValue(
-                    *this, WIDX_CLIP_SEE_THROUGH_CHECKBOX_ENABLE,
-                    mainWindow->viewport->flags & VIEWPORT_FLAG_CLIP_VIEW_SEE_THROUGH);
+                setCheckboxValue(WIDX_CLIP_CHECKBOX_ENABLE, mainWindow->viewport->flags & VIEWPORT_FLAG_CLIP_VIEW);
+                setCheckboxValue(
+                    WIDX_CLIP_SEE_THROUGH_CHECKBOX_ENABLE, mainWindow->viewport->flags & VIEWPORT_FLAG_CLIP_VIEW_SEE_THROUGH);
             }
 
-            if (IsActive())
-            {
-                this->pressed_widgets |= 1uLL << WIDX_CLIP_SELECTOR;
-            }
-            else
-            {
-                this->pressed_widgets &= ~(1uLL << WIDX_CLIP_SELECTOR);
-            }
+            setWidgetPressed(WIDX_CLIP_SELECTOR, IsActive());
         }
 
-        void OnDraw(DrawPixelInfo& dpi) override
+        void onDraw(Drawing::RenderTarget& rt) override
         {
-            WindowDrawWidgets(*this, dpi);
+            WindowDrawWidgets(*this, rt);
 
             // Clip height value
             auto screenCoords = this->windowPos + ScreenCoordsXY{ 8, this->widgets[WIDX_CLIP_HEIGHT_VALUE].top };
-            DrawTextBasic(dpi, screenCoords, STR_VIEW_CLIPPING_HEIGHT_VALUE, {}, { this->colours[0] });
+            drawText(rt, screenCoords, STR_VIEW_CLIPPING_HEIGHT_VALUE, { this->colours[0] });
 
             screenCoords = this->windowPos
                 + ScreenCoordsXY{ this->widgets[WIDX_CLIP_HEIGHT_VALUE].left + 1, this->widgets[WIDX_CLIP_HEIGHT_VALUE].top };
 
             switch (_clipHeightDisplayType)
             {
-                case DisplayType::DisplayRaw:
+                case DisplayType::displayRaw:
                 default:
                 {
                     auto ft = Formatter();
                     ft.Add<int32_t>(static_cast<int32_t>(gClipHeight));
 
                     // Printing the raw value.
-                    DrawTextBasic(dpi, screenCoords, STR_FORMAT_INTEGER, ft, { this->colours[0] });
+                    drawText(rt, screenCoords, STR_FORMAT_INTEGER, ft, { this->colours[0] });
                     break;
                 }
-                case DisplayType::DisplayUnits:
+                case DisplayType::displayUnits:
                 {
                     // Print the value in the configured height label type:
-                    if (Config::Get().general.ShowHeightAsUnits)
+                    if (Config::Get().general.showHeightAsUnits)
                     {
                         // Height label is Units.
+                        auto fpHeight = MakeFixed1dp<fixed16_1dp>(gClipHeight, 0) / 2 - MakeFixed1dp<fixed16_1dp>(7, 0);
+
                         auto ft = Formatter();
-                        ft.Add<fixed16_1dp>((MakeFixed1dp<fixed16_1dp>(gClipHeight, 0) / 2 - MakeFixed1dp<fixed16_1dp>(7, 0)));
-                        DrawTextBasic(
-                            dpi, screenCoords, STR_UNIT1DP_NO_SUFFIX, ft,
+                        ft.Add<fixed16_1dp>(fpHeight);
+                        drawText(
+                            rt, screenCoords, STR_UNIT1DP_NO_SUFFIX, ft,
                             { this->colours[0] }); // Printing the value in Height Units.
                     }
                     else
                     {
                         // Height label is Real Values.
                         // Print the value in the configured measurement units.
-                        switch (Config::Get().general.MeasurementFormat)
+                        switch (Config::Get().general.measurementFormat)
                         {
-                            case MeasurementFormat::Metric:
+                            case MeasurementFormat::metric:
                             case MeasurementFormat::SI:
                             {
+                                auto fpHeight = std::llround(MakeFixed2dp<fixed32_2dp>(gClipHeight, 0) / 2 * 1.5f)
+                                    - MakeFixed2dp<fixed32_2dp>(10, 50);
+
                                 auto ft = Formatter();
-                                ft.Add<fixed32_2dp>(
-                                    MakeFixed2dp<fixed32_2dp>(gClipHeight, 0) / 2 * 1.5f - MakeFixed2dp<fixed32_2dp>(10, 50));
-                                DrawTextBasic(dpi, screenCoords, STR_UNIT2DP_SUFFIX_METRES, ft, { this->colours[0] });
+                                ft.Add<fixed32_2dp>(fpHeight);
+                                drawText(rt, screenCoords, STR_UNIT2DP_SUFFIX_METRES, ft, { this->colours[0] });
                                 break;
                             }
-                            case MeasurementFormat::Imperial:
+                            case MeasurementFormat::imperial:
                             {
+                                auto fpHeight = std::llround(MakeFixed1dp<fixed16_1dp>(gClipHeight, 0) / 2 * 5.0f)
+                                    - MakeFixed1dp<fixed16_1dp>(35, 0);
+
                                 auto ft = Formatter();
-                                ft.Add<fixed16_1dp>(
-                                    MakeFixed1dp<fixed16_1dp>(gClipHeight, 0) / 2.0f * 5 - MakeFixed1dp<fixed16_1dp>(35, 0));
-                                DrawTextBasic(dpi, screenCoords, STR_UNIT1DP_SUFFIX_FEET, ft, { this->colours[0] });
+                                ft.Add<fixed16_1dp>(fpHeight);
+                                drawText(rt, screenCoords, STR_UNIT1DP_SUFFIX_FEET, ft, { this->colours[0] });
                                 break;
                             }
                         }
@@ -354,18 +352,18 @@ namespace OpenRCT2::Ui::Windows
             }
         }
 
-        ScreenSize OnScrollGetSize(int32_t scrollIndex) override
+        ScreenSize onScrollGetSize(int32_t scrollIndex) override
         {
             return { 1000, 0 };
         }
 
-        void OnOpen() override
+        void onOpen() override
         {
-            SetWidgets(_viewClippingWidgets);
-            this->hold_down_widgets = (1uLL << WIDX_CLIP_HEIGHT_INCREASE) | (1uL << WIDX_CLIP_HEIGHT_DECREASE);
+            setWidgets(_viewClippingWidgets);
+
             WindowInitScrollWidgets(*this);
 
-            _clipHeightDisplayType = DisplayType::DisplayUnits;
+            _clipHeightDisplayType = DisplayType::displayUnits;
 
             // Initialise the clip height slider from the current clip height value.
             this->SetClipHeight(gClipHeight);
@@ -379,24 +377,19 @@ namespace OpenRCT2::Ui::Windows
             if (mainWindow != nullptr)
             {
                 mainWindow->viewport->flags |= VIEWPORT_FLAG_CLIP_VIEW;
-                mainWindow->Invalidate();
+                mainWindow->invalidate();
             }
         }
 
-        void OnResize() override
-        {
-            ResizeFrame();
-        }
-
     private:
-        void OnClose() override
+        void onClose() override
         {
             // Turn off view clipping when the window is closed.
             WindowBase* mainWindow = WindowGetMain();
             if (mainWindow != nullptr)
             {
                 mainWindow->viewport->flags &= ~VIEWPORT_FLAG_CLIP_VIEW;
-                mainWindow->Invalidate();
+                mainWindow->invalidate();
             }
         }
 
@@ -406,22 +399,22 @@ namespace OpenRCT2::Ui::Windows
             const auto& widget = widgets[WIDX_CLIP_HEIGHT_SLIDER];
             const float clip_height_ratio = static_cast<float>(gClipHeight) / 255;
             this->scrolls[0].contentOffsetX = static_cast<int16_t>(
-                std::ceil(clip_height_ratio * (this->scrolls[0].contentWidth - (widget.width() - 1))));
+                std::ceil(clip_height_ratio * (this->scrolls[0].contentWidth - (widget.width() - 2))));
         }
 
         bool IsActive()
         {
-            return isToolActive(WindowClass::ViewClipping);
+            return isToolActive(WindowClass::viewClipping);
         }
     };
 
     WindowBase* ViewClippingOpen()
     {
         auto* windowMgr = GetWindowManager();
-        auto* window = windowMgr->BringToFrontByClass(WindowClass::ViewClipping);
+        auto* window = windowMgr->BringToFrontByClass(WindowClass::viewClipping);
         if (window == nullptr)
         {
-            window = windowMgr->Create<ViewClippingWindow>(WindowClass::ViewClipping, ScreenCoordsXY(32, 32), WW, WH);
+            window = windowMgr->Create<ViewClippingWindow>(WindowClass::viewClipping, ScreenCoordsXY(32, 32), kWindowSize);
         }
         return window;
     }

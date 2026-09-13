@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,19 +9,17 @@
 
 #include "TestData.h"
 
+#include <exception>
 #include <gtest/gtest.h>
 #include <openrct2/Context.h>
-#include <openrct2/Game.h>
+#include <openrct2/Diagnostic.h>
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/ReplayManager.h>
-#include <openrct2/audio/AudioContext.h>
-#include <openrct2/core/File.h>
 #include <openrct2/core/FileScanner.h>
 #include <openrct2/core/Path.hpp>
 #include <openrct2/core/String.hpp>
 #include <openrct2/platform/Platform.h>
-#include <openrct2/ride/Ride.h>
 #include <string>
 
 using namespace OpenRCT2;
@@ -53,12 +51,12 @@ static std::vector<ReplayTestData> GetReplayFiles()
     std::string replayPathPattern = Path::Combine(replayPath, u8"*.parkrep");
     std::vector<std::string> files;
 
-    auto scanner = Path::ScanDirectory(replayPathPattern, true);
-    while (scanner->Next())
+    auto scanner = Path::scanDirectory(replayPathPattern, true);
+    while (scanner->next())
     {
         ReplayTestData test;
-        test.name = sanitizeTestName(scanner->GetFileInfo().Name);
-        test.filePath = scanner->GetPath();
+        test.name = sanitizeTestName(scanner->getFileInfo().name);
+        test.filePath = Path::GetAbsolute(scanner->getPath());
         res.push_back(std::move(test));
     }
     return res;
@@ -84,8 +82,15 @@ TEST_P(ReplayTests, RunReplay)
     IReplayManager* replayManager = context->GetReplayManager();
     ASSERT_NE(replayManager, nullptr);
 
-    bool startedReplay = replayManager->StartPlayback(replayFile);
-    ASSERT_TRUE(startedReplay);
+    try
+    {
+        replayManager->StartPlayback(replayFile);
+    }
+    catch (const std::exception& e)
+    {
+        LOG_WARNING("Can't start replay!. %s", e.what());
+        FAIL();
+    }
 
     while (replayManager->IsReplaying())
     {

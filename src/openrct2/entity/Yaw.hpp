@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -17,14 +17,14 @@ namespace OpenRCT2::Entity::Yaw
 {
     enum class SpritePrecision : uint8_t
     {
-        None = 0,
-        Sprites1,
-        Sprites2,
-        Sprites4,
-        Sprites8,
-        Sprites16,
-        Sprites32,
-        Sprites64
+        none = 0,
+        sprites1,
+        sprites2,
+        sprites4,
+        sprites8,
+        sprites16,
+        sprites32,
+        sprites64
     };
 
     // Sprites32 represents the precision of the base rotation precision. Base rotation is the precision of

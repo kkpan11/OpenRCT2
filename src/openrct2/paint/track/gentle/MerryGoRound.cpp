@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,17 +7,16 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "../../../GameState.h"
 #include "../../../entity/EntityRegistry.h"
 #include "../../../interface/Viewport.h"
 #include "../../../ride/Ride.h"
 #include "../../../ride/RideEntry.h"
-#include "../../../ride/Track.h"
 #include "../../../ride/TrackPaint.h"
 #include "../../../ride/Vehicle.h"
 #include "../../Paint.h"
 #include "../../support/WoodenSupports.h"
 #include "../../tile_element/Segment.h"
-#include "../../track/Segment.h"
 
 using namespace OpenRCT2;
 
@@ -33,9 +32,9 @@ static void PaintRiders(
     PaintSession& session, const Ride& ride, const RideObjectEntry& rideEntry, const Vehicle& vehicle, int32_t rotationOffset,
     const CoordsXYZ& offset, const BoundBoxXYZ& bb)
 {
-    if (session.DPI.zoom_level > ZoomLevel{ 0 })
+    if (session.rt.zoom_level > ZoomLevel{ 0 })
         return;
-    if (!(ride.lifecycleFlags & RIDE_LIFECYCLE_ON_TRACK))
+    if (!ride.flags.has(RideFlag::onTrack))
         return;
 
     for (int32_t peep = 0; peep <= 14; peep += 2)
@@ -48,7 +47,7 @@ static void PaintRiders(
         if (imageOffset >= 68)
             continue;
 
-        auto imageIndex = rideEntry.Cars[0].base_image_id + 32 + imageOffset;
+        auto imageIndex = rideEntry.Cars[0].baseImageId + 32 + imageOffset;
         auto imageId = ImageId(imageIndex, vehicle.peep_tshirt_colours[peep], vehicle.peep_tshirt_colours[peep + 1]);
         PaintAddImageAsChild(session, imageId, offset, bb);
     }
@@ -64,14 +63,14 @@ static void PaintCarousel(
     if (rideEntry == nullptr)
         return;
 
-    auto vehicle = GetEntity<Vehicle>(ride.vehicles[0]);
-    if (ride.lifecycleFlags & RIDE_LIFECYCLE_ON_TRACK && vehicle != nullptr)
+    auto vehicle = getGameState().entities.getEntity<Vehicle>(ride.vehicles[0]);
+    if (ride.flags.has(RideFlag::onTrack) && vehicle != nullptr)
     {
-        session.InteractionType = ViewportInteractionItem::Entity;
+        session.InteractionType = ViewportInteractionItem::entity;
         session.CurrentlyDrawnEntity = vehicle;
 
-        if (ride.lifecycleFlags & (RIDE_LIFECYCLE_BREAKDOWN_PENDING | RIDE_LIFECYCLE_BROKEN_DOWN)
-            && ride.breakdownReasonPending == BREAKDOWN_CONTROL_FAILURE && ride.breakdownSoundModifier >= 128)
+        if (ride.flags.hasAny(RideFlag::breakdownPending, RideFlag::brokenDown)
+            && ride.breakdownReasonPending == Breakdown::controlFailure && ride.breakdownSoundModifier >= 128)
         {
             height += kMerryGoRoundBreakdownVibration[(vehicle->current_time >> 1) & 7];
         }
@@ -80,8 +79,8 @@ static void PaintCarousel(
     auto rotationOffset = 0;
     if (vehicle != nullptr)
     {
-        auto rotation = ((vehicle->Orientation >> 3) + session.CurrentRotation) << 5;
-        rotationOffset = (vehicle->Pitch + rotation) % 128;
+        auto rotation = ((vehicle->orientation >> 3) + session.CurrentRotation) << 5;
+        rotationOffset = (vehicle->flatRideAnimationFrame + rotation) % 128;
     }
 
     CoordsXYZ offset(xOffset, yOffset, height);
@@ -93,7 +92,7 @@ static void PaintCarousel(
         imageTemplate = stationColour;
     }
     auto imageOffset = rotationOffset & 0x1F;
-    auto imageId = imageTemplate.WithIndex(rideEntry->Cars[0].base_image_id + imageOffset);
+    auto imageId = imageTemplate.WithIndex(rideEntry->Cars[0].baseImageId + imageOffset);
     PaintAddImageAsParent(session, imageId, offset, bb);
 
     if (vehicle != nullptr && vehicle->num_peeps > 0)
@@ -102,7 +101,7 @@ static void PaintCarousel(
     }
 
     session.CurrentlyDrawnEntity = nullptr;
-    session.InteractionType = ViewportInteractionItem::Ride;
+    session.InteractionType = ViewportInteractionItem::ride;
 }
 
 static void PaintMerryGoRound(
@@ -114,12 +113,12 @@ static void PaintMerryGoRound(
     int32_t edges = kEdges3x3[trackSequence];
 
     WoodenASupportsPaintSetupRotated(
-        session, WoodenSupportType::Truss, WoodenSupportSubType::NeSw, direction, height,
+        session, WoodenSupportType::truss, WoodenSupportSubType::neSw, direction, height,
         GetStationColourScheme(session, trackElement));
 
     const StationObject* stationObject = ride.getStationObject();
 
-    TrackPaintUtilPaintFloor(session, edges, session.TrackColours, height, kFloorSpritesCork, stationObject);
+    TrackPaintUtilPaintFloor(session, edges, session.TrackColours, height, kFloorSpritesMulch, stationObject);
 
     TrackPaintUtilPaintFences(
         session, edges, session.MapPosition, trackElement, ride, GetStationColourScheme(session, trackElement), height,
@@ -174,9 +173,9 @@ static void PaintMerryGoRound(
     PaintUtilSetGeneralSupportHeight(session, height + 64);
 }
 
-TrackPaintFunction GetTrackPaintFunctionMerryGoRound(OpenRCT2::TrackElemType trackType)
+TrackPaintFunction GetTrackPaintFunctionMerryGoRound(TrackElemType trackType)
 {
-    if (trackType != TrackElemType::FlatTrack3x3)
+    if (trackType != TrackElemType::flatTrack3x3)
     {
         return TrackPaintFunctionDummy;
     }

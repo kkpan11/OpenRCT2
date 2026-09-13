@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,7 +16,9 @@
 #include "../core/UnicodeChar.h"
 #include "../localisation/LocalisationService.h"
 #include "../rct12/CSChar.h"
-#include "Drawing.h"
+#include "Colour.h"
+#include "Drawing.Sprite.h"
+#include "ScrollingText.h"
 #include "TTF.h"
 
 #include <iterator>
@@ -25,229 +27,229 @@
 
 using namespace OpenRCT2;
 
-static constexpr int32_t kSpriteFontLineHeight[FontStyleCount] = {
+static constexpr int32_t kSpriteFontLineHeight[kFontStyleCount] = {
     10,
     10,
     6,
 };
 
-static uint8_t _spriteFontCharacterWidths[FontStyleCount][kSpriteFontGlyphCount];
-static uint8_t _additionalSpriteFontCharacterWidth[FontStyleCount][SPR_G2_GLYPH_COUNT] = {};
+static uint8_t _spriteFontCharacterWidths[kFontStyleCount][SPR_FONTS_GLYPH_COUNT] = {};
 
-#ifndef NO_TTF
+#ifndef DISABLE_TTF
 TTFFontSetDescriptor* gCurrentTTFFontSet;
-#endif // NO_TTF
+#endif // DISABLE_TTF
 
-constexpr uint8_t CS_SPRITE_FONT_OFFSET = 32;
+constexpr uint8_t kCSSpriteFontOffset = 32;
 
-static const std::unordered_map<char32_t, int32_t> codepointOffsetMap = {
-    { UnicodeChar::ae_uc, SPR_G2_AE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::o_stroke_uc, SPR_G2_O_STROKE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::y_acute_uc, SPR_G2_Y_ACUTE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::ae, SPR_G2_AE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::o_stroke, SPR_G2_O_STROKE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::y_acute, SPR_G2_Y_ACUTE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::a_breve_uc, SPR_G2_A_BREVE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::a_breve, 226 - CS_SPRITE_FONT_OFFSET }, // Render as â, no visual difference in the RCT font
-    { UnicodeChar::a_ogonek_uc, CSChar::a_ogonek_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::a_ogonek, CSChar::a_ogonek - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::c_acute_uc, CSChar::c_acute_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::c_acute, CSChar::c_acute - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::c_caron_uc, SPR_G2_C_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::c_caron, SPR_G2_C_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::d_caron_uc, SPR_G2_D_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::d_caron, SPR_G2_D_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::e_ogonek_uc, CSChar::e_ogonek_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::e_ogonek, CSChar::e_ogonek - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::e_caron_uc, SPR_G2_E_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::e_caron, SPR_G2_E_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::g_breve_uc, SPR_G2_G_BREVE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::g_breve, SPR_G2_G_BREVE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::i_with_dot_uc, SPR_G2_I_WITH_DOT_UPPER - SPR_CHAR_START },
-    { UnicodeChar::i_without_dot, SPR_G2_I_WITHOUT_DOT_LOWER - SPR_CHAR_START },
-    { UnicodeChar::j, SPR_G2_J - SPR_CHAR_START },
-    { UnicodeChar::l, SPR_G2_L - SPR_CHAR_START },
-    { UnicodeChar::l_stroke_uc, CSChar::l_stroke_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::l_stroke, CSChar::l_stroke - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::n_acute_uc, CSChar::n_acute_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::n_acute, CSChar::n_acute - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::n_caron_uc, SPR_G2_N_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::n_caron, SPR_G2_N_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::o_macron, CSChar::o_circumflex - CS_SPRITE_FONT_OFFSET }, // No visual difference
-    { UnicodeChar::o_double_acute_uc, SPR_G2_O_DOUBLE_ACUTE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::o_double_acute, SPR_G2_O_DOUBLE_ACUTE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::oe_uc, SPR_G2_OE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::oe, SPR_G2_OE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::r_caron_uc, SPR_G2_R_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::r_caron, SPR_G2_R_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::s_acute_uc, CSChar::s_acute_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::s_acute, CSChar::s_acute - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::s_cedilla_uc, SPR_G2_S_CEDILLA_UPPER - SPR_CHAR_START },
-    { UnicodeChar::s_cedilla, SPR_G2_S_CEDILLA_LOWER - SPR_CHAR_START },
-    { UnicodeChar::s_caron_uc, SPR_G2_S_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::s_caron, SPR_G2_S_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::t_caron_uc, SPR_G2_T_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::t_caron, SPR_G2_T_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::u_ring_uc, SPR_G2_U_RING_UPPER - SPR_CHAR_START },
-    { UnicodeChar::u_ring, SPR_G2_U_RING_LOWER - SPR_CHAR_START },
-    { UnicodeChar::u_double_acute_uc, SPR_G2_U_DOUBLE_ACUTE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::u_double_acute, SPR_G2_U_DOUBLE_ACUTE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::w_circumflex_uc, SPR_G2_W_CIRCUMFLEX_UPPER - SPR_CHAR_START },
-    { UnicodeChar::w_circumflex, SPR_G2_W_CIRCUMFLEX_LOWER - SPR_CHAR_START },
-    { UnicodeChar::y_circumflex_uc, SPR_G2_Y_CIRCUMFLEX_UPPER - SPR_CHAR_START },
-    { UnicodeChar::y_circumflex, SPR_G2_Y_CIRCUMFLEX_LOWER - SPR_CHAR_START },
-    { UnicodeChar::z_acute_uc, CSChar::z_acute_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::z_acute, CSChar::z_acute - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::z_dot_uc, CSChar::z_dot_uc - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::z_dot, CSChar::z_dot - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::z_caron_uc, SPR_G2_Z_CARON_UPPER - SPR_CHAR_START },
-    { UnicodeChar::z_caron, SPR_G2_Z_CARON_LOWER - SPR_CHAR_START },
-    { UnicodeChar::f_with_hook_uc, 'F' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::s_comma_uc, SPR_G2_S_CEDILLA_UPPER - SPR_CHAR_START }, // No visual difference
-    { UnicodeChar::s_comma, SPR_G2_S_CEDILLA_LOWER - SPR_CHAR_START },    // Ditto
-    { UnicodeChar::t_comma_uc, SPR_G2_T_COMMA_UPPER - SPR_CHAR_START },
-    { UnicodeChar::t_comma, SPR_G2_T_COMMA_LOWER - SPR_CHAR_START },
-    { UnicodeChar::sharp_s_uc, 223 - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::c_circumflex_uc, SPR_G2_C_CIRCUMFLEX_UPPER - SPR_CHAR_START },
-    { UnicodeChar::c_circumflex, SPR_G2_C_CIRCUMFLEX_LOWER - SPR_CHAR_START },
-    { UnicodeChar::g_circumflex_uc, SPR_G2_G_CIRCUMFLEX_UPPER - SPR_CHAR_START },
-    { UnicodeChar::g_circumflex, SPR_G2_G_CIRCUMFLEX_LOWER - SPR_CHAR_START },
-    { UnicodeChar::h_circumflex_uc, SPR_G2_H_CIRCUMFLEX_UPPER - SPR_CHAR_START },
-    { UnicodeChar::h_circumflex, SPR_G2_H_CIRCUMFLEX_LOWER - SPR_CHAR_START },
-    { UnicodeChar::j_circumflex_uc, SPR_G2_J_CIRCUMFLEX_UPPER - SPR_CHAR_START },
-    { UnicodeChar::j_circumflex, SPR_G2_J_CIRCUMFLEX_LOWER - SPR_CHAR_START },
-    { UnicodeChar::s_circumflex_uc, SPR_G2_S_CIRCUMFLEX_UPPER - SPR_CHAR_START },
-    { UnicodeChar::s_circumflex, SPR_G2_S_CIRCUMFLEX_LOWER - SPR_CHAR_START },
-    { UnicodeChar::u_breve_uc, SPR_G2_U_BREVE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::u_breve, SPR_G2_U_BREVE_LOWER - SPR_CHAR_START },
+static const std::unordered_map<UnicodeChar, int32_t> kCodepointOffsetMap = {
+    { UnicodeChar::aeUc, SPR_FONTS_AE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::oStrokeUc, SPR_FONTS_O_STROKE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::yAcuteUc, SPR_FONTS_Y_ACUTE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::ae, SPR_FONTS_AE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::oStroke, SPR_FONTS_O_STROKE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::yAcute, SPR_FONTS_Y_ACUTE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::aBreveUc, SPR_FONTS_A_BREVE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::aBreve, 226 - kCSSpriteFontOffset }, // Render as â, no visual difference in the RCT font
+    { UnicodeChar::aOgonekUc, EnumValue(CSChar::aOgonekUc) - kCSSpriteFontOffset },
+    { UnicodeChar::aOgonek, EnumValue(CSChar::aOgonek) - kCSSpriteFontOffset },
+    { UnicodeChar::cAcuteUc, EnumValue(CSChar::cAcuteUc) - kCSSpriteFontOffset },
+    { UnicodeChar::cAcute, EnumValue(CSChar::cAcute) - kCSSpriteFontOffset },
+    { UnicodeChar::cCaronUc, SPR_FONTS_C_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cCaron, SPR_FONTS_C_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::dCaronUc, SPR_FONTS_D_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::dCaron, SPR_FONTS_D_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::eOgonekUc, EnumValue(CSChar::eOgonekUc) - kCSSpriteFontOffset },
+    { UnicodeChar::eOgonek, EnumValue(CSChar::eOgonek) - kCSSpriteFontOffset },
+    { UnicodeChar::eCaronUc, SPR_FONTS_E_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::eCaron, SPR_FONTS_E_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::gBreveUc, SPR_FONTS_G_BREVE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::gBreve, SPR_FONTS_G_BREVE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::iWithDotUc, SPR_FONTS_I_WITH_DOT_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::iWithoutDot, SPR_FONTS_I_WITHOUT_DOT_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::lStrokeUc, EnumValue(CSChar::lStrokeUc) - kCSSpriteFontOffset },
+    { UnicodeChar::lStroke, EnumValue(CSChar::lStroke) - kCSSpriteFontOffset },
+    { UnicodeChar::nAcuteUc, EnumValue(CSChar::nAcuteUc) - kCSSpriteFontOffset },
+    { UnicodeChar::nAcute, EnumValue(CSChar::nAcute) - kCSSpriteFontOffset },
+    { UnicodeChar::nCaronUc, SPR_FONTS_N_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::nCaron, SPR_FONTS_N_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::oMacron, EnumValue(CSChar::oCircumflex) - kCSSpriteFontOffset }, // No visual difference
+    { UnicodeChar::oDoubleAcuteUc, SPR_FONTS_O_DOUBLE_ACUTE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::oDoubleAcute, SPR_FONTS_O_DOUBLE_ACUTE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::oeUc, SPR_FONTS_OE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::oe, SPR_FONTS_OE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::rCaronUc, SPR_FONTS_R_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::rCaron, SPR_FONTS_R_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::sAcuteUc, EnumValue(CSChar::sAcuteUc) - kCSSpriteFontOffset },
+    { UnicodeChar::sAcute, EnumValue(CSChar::sAcute) - kCSSpriteFontOffset },
+    { UnicodeChar::sCedillaUc, SPR_FONTS_S_CEDILLA_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::sCedilla, SPR_FONTS_S_CEDILLA_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::sCaronUc, SPR_FONTS_S_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::sCaron, SPR_FONTS_S_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::tCaronUc, SPR_FONTS_T_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::tCaron, SPR_FONTS_T_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::uRingUc, SPR_FONTS_U_RING_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::uRing, SPR_FONTS_U_RING_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::uDoubleAcuteUc, SPR_FONTS_U_DOUBLE_ACUTE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::uDoubleAcute, SPR_FONTS_U_DOUBLE_ACUTE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::wCircumflexUc, SPR_FONTS_W_CIRCUMFLEX_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::wCircumflex, SPR_FONTS_W_CIRCUMFLEX_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::yCircumflexUc, SPR_FONTS_Y_CIRCUMFLEX_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::yCircumflex, SPR_FONTS_Y_CIRCUMFLEX_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::zAcuteUc, EnumValue(CSChar::zAcuteUc) - kCSSpriteFontOffset },
+    { UnicodeChar::zAcute, EnumValue(CSChar::zAcute) - kCSSpriteFontOffset },
+    { UnicodeChar::zDotUc, EnumValue(CSChar::zDotUc) - kCSSpriteFontOffset },
+    { UnicodeChar::zDot, EnumValue(CSChar::zDot) - kCSSpriteFontOffset },
+    { UnicodeChar::zCaronUc, SPR_FONTS_Z_CARON_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::zCaron, SPR_FONTS_Z_CARON_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::fWithHookUc, 'F' - kCSSpriteFontOffset },
+    { UnicodeChar::sCommaUc, SPR_FONTS_S_CEDILLA_UPPER - SPR_FONTS_BEGIN }, // No visual difference
+    { UnicodeChar::sComma, SPR_FONTS_S_CEDILLA_LOWER - SPR_FONTS_BEGIN },   // Ditto
+    { UnicodeChar::tCommaUc, SPR_FONTS_T_COMMA_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::tComma, SPR_FONTS_T_COMMA_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::sharpSUc, 223 - kCSSpriteFontOffset },
+    { UnicodeChar::cCircumflexUc, SPR_FONTS_C_CIRCUMFLEX_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cCircumflex, SPR_FONTS_C_CIRCUMFLEX_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::gCircumflexUc, SPR_FONTS_G_CIRCUMFLEX_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::gCircumflex, SPR_FONTS_G_CIRCUMFLEX_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::hCircumflexUc, SPR_FONTS_H_CIRCUMFLEX_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::hCircumflex, SPR_FONTS_H_CIRCUMFLEX_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::jCircumflexUc, SPR_FONTS_J_CIRCUMFLEX_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::jCircumflex, SPR_FONTS_J_CIRCUMFLEX_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::sCircumflexUc, SPR_FONTS_S_CIRCUMFLEX_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::sCircumflex, SPR_FONTS_S_CIRCUMFLEX_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::uBreveUc, SPR_FONTS_U_BREVE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::uBreve, SPR_FONTS_U_BREVE_LOWER - SPR_FONTS_BEGIN },
 
     // Cyrillic alphabet
-    { UnicodeChar::cyrillic_io_uc, 203 - CS_SPRITE_FONT_OFFSET }, // Looks just like Ë
-    { UnicodeChar::cyrillic_ukrainian_ie_uc, SPR_G2_CYRILLIC_UKRAINIAN_IE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_dze_uc, 'S' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_dotted_i_uc, 'I' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_yi_uc, 207 - CS_SPRITE_FONT_OFFSET }, // Looks just like Ï
-    { UnicodeChar::cyrillic_je_uc, 'J' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_a_uc, 'A' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_be_uc, SPR_G2_CYRILLIC_BE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ve_uc, 'B' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_ghe_uc, SPR_G2_CYRILLIC_GHE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_de_uc, SPR_G2_CYRILLIC_DE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ie_uc, 'E' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_zhe_uc, SPR_G2_CYRILLIC_ZHE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ze_uc, SPR_G2_CYRILLIC_ZE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_i_uc, SPR_G2_CYRILLIC_I_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_short_i_uc, SPR_G2_CYRILLIC_SHORT_I_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ka_uc, 'K' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_el_uc, SPR_G2_CYRILLIC_EL_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_em_uc, 'M' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_en_uc, 'H' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_o_uc, 'O' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_pe_uc, SPR_G2_CYRILLIC_PE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_er_uc, 'P' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_es_uc, 'C' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_te_uc, 'T' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_u_uc, SPR_G2_CYRILLIC_U_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ef_uc, SPR_G2_CYRILLIC_EF_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ha_uc, 'X' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_tse_uc, SPR_G2_CYRILLIC_TSE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_che_uc, SPR_G2_CYRILLIC_CHE_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_sha_uc, SPR_G2_CYRILLIC_SHA_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_shcha_uc, SPR_G2_CYRILLIC_SHCHA_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_hard_sign_uc, SPR_G2_CYRILLIC_HARD_SIGN_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_yeru_uc, SPR_G2_CYRILLIC_YERU_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_soft_sign_uc, SPR_G2_CYRILLIC_SOFT_SIGN_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_e_uc, SPR_G2_CYRILLIC_E_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_yu_uc, SPR_G2_CYRILLIC_YU_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ya_uc, SPR_G2_CYRILLIC_YA_UPPER - SPR_CHAR_START },
+    { UnicodeChar::cyrillicIoUc, 203 - kCSSpriteFontOffset }, // Looks just like Ë
+    { UnicodeChar::cyrillicUkrainianIeUc, SPR_FONTS_CYRILLIC_UKRAINIAN_IE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicDzeUc, 'S' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicDottedIUc, 'I' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicYiUc, 207 - kCSSpriteFontOffset }, // Looks just like Ï
+    { UnicodeChar::cyrillicJeUc, 'J' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicAUc, 'A' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicBeUc, SPR_FONTS_CYRILLIC_BE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicVeUc, 'B' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicGheUc, SPR_FONTS_CYRILLIC_GHE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicDeUc, SPR_FONTS_CYRILLIC_DE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicIeUc, 'E' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicZheUc, SPR_FONTS_CYRILLIC_ZHE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicZeUc, SPR_FONTS_CYRILLIC_ZE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicIUc, SPR_FONTS_CYRILLIC_I_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicShortIUc, SPR_FONTS_CYRILLIC_SHORT_I_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicKaUc, 'K' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicElUc, SPR_FONTS_CYRILLIC_EL_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicEmUc, 'M' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicEnUc, 'H' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicOUc, 'O' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicPeUc, SPR_FONTS_CYRILLIC_PE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicErUc, 'P' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicEsUc, 'C' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicTeUc, 'T' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicUUc, SPR_FONTS_CYRILLIC_U_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicEfUc, SPR_FONTS_CYRILLIC_EF_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicHaUc, 'X' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicTseUc, SPR_FONTS_CYRILLIC_TSE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicCheUc, SPR_FONTS_CYRILLIC_CHE_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicShaUc, SPR_FONTS_CYRILLIC_SHA_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicShchaUc, SPR_FONTS_CYRILLIC_SHCHA_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicHardSignUc, SPR_FONTS_CYRILLIC_HARD_SIGN_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicYeruUc, SPR_FONTS_CYRILLIC_YERU_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicSoftSignUc, SPR_FONTS_CYRILLIC_SOFT_SIGN_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicEUc, SPR_FONTS_CYRILLIC_E_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicYuUc, SPR_FONTS_CYRILLIC_YU_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicYaUc, SPR_FONTS_CYRILLIC_YA_UPPER - SPR_FONTS_BEGIN },
 
-    { UnicodeChar::cyrillic_a, 'a' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_be, SPR_G2_CYRILLIC_BE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ve, SPR_G2_CYRILLIC_VE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ghe, SPR_G2_CYRILLIC_GHE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_de, SPR_G2_CYRILLIC_DE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ie, 'e' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_zhe, SPR_G2_CYRILLIC_ZHE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ze, SPR_G2_CYRILLIC_ZE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_i, SPR_G2_CYRILLIC_I_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_short_i, SPR_G2_CYRILLIC_SHORT_I_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ka, SPR_G2_CYRILLIC_KA_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_el, SPR_G2_CYRILLIC_EL_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_em, SPR_G2_CYRILLIC_EM_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_en, SPR_G2_CYRILLIC_EN_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_o, 'o' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_pe, SPR_G2_CYRILLIC_PE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_er, 'p' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_es, 'c' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_te, SPR_G2_CYRILLIC_TE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_u, 'y' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_ef, SPR_G2_CYRILLIC_EF_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ha, 'x' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_tse, SPR_G2_CYRILLIC_TSE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_che, SPR_G2_CYRILLIC_CHE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_sha, SPR_G2_CYRILLIC_SHA_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_shcha, SPR_G2_CYRILLIC_SHCHA_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_hard_sign, SPR_G2_CYRILLIC_HARD_SIGN_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_yeru, SPR_G2_CYRILLIC_YERU_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_soft_sign, SPR_G2_CYRILLIC_SOFT_SIGN_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_e, SPR_G2_CYRILLIC_E_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_yu, SPR_G2_CYRILLIC_YU_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ya, SPR_G2_CYRILLIC_YA_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_io, 235 - CS_SPRITE_FONT_OFFSET }, // Looks just like ë
-    { UnicodeChar::cyrillic_ukrainian_ie, SPR_G2_CYRILLIC_UKRAINIAN_IE_LOWER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_dze, 's' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_dotted_i, 'i' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::cyrillic_yi, 239 - CS_SPRITE_FONT_OFFSET }, // Looks just like ï
-    { UnicodeChar::cyrillic_je, SPR_G2_J - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ghe_upturn_uc, SPR_G2_CYRILLIC_GHE_UPTURN_UPPER - SPR_CHAR_START },
-    { UnicodeChar::cyrillic_ghe_upturn, SPR_G2_CYRILLIC_GHE_UPTURN_LOWER - SPR_CHAR_START },
+    { UnicodeChar::cyrillicA, 'a' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicBe, SPR_FONTS_CYRILLIC_BE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicVe, SPR_FONTS_CYRILLIC_VE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicGhe, SPR_FONTS_CYRILLIC_GHE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicDe, SPR_FONTS_CYRILLIC_DE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicIe, 'e' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicZhe, SPR_FONTS_CYRILLIC_ZHE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicZe, SPR_FONTS_CYRILLIC_ZE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicI, SPR_FONTS_CYRILLIC_I_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicShortI, SPR_FONTS_CYRILLIC_SHORT_I_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicKa, SPR_FONTS_CYRILLIC_KA_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicEl, SPR_FONTS_CYRILLIC_EL_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicEm, SPR_FONTS_CYRILLIC_EM_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicEn, SPR_FONTS_CYRILLIC_EN_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicO, 'o' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicPe, SPR_FONTS_CYRILLIC_PE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicEr, 'p' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicEs, 'c' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicTe, SPR_FONTS_CYRILLIC_TE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicU, 'y' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicEf, SPR_FONTS_CYRILLIC_EF_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicHa, 'x' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicTse, SPR_FONTS_CYRILLIC_TSE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicChe, SPR_FONTS_CYRILLIC_CHE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicSha, SPR_FONTS_CYRILLIC_SHA_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicShcha, SPR_FONTS_CYRILLIC_SHCHA_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicHardSign, SPR_FONTS_CYRILLIC_HARD_SIGN_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicYeru, SPR_FONTS_CYRILLIC_YERU_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicSoftSign, SPR_FONTS_CYRILLIC_SOFT_SIGN_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicE, SPR_FONTS_CYRILLIC_E_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicYu, SPR_FONTS_CYRILLIC_YU_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicYa, SPR_FONTS_CYRILLIC_YA_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicIo, 235 - kCSSpriteFontOffset }, // Looks just like ë
+    { UnicodeChar::cyrillicUkrainianIe, SPR_FONTS_CYRILLIC_UKRAINIAN_IE_LOWER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicDze, 's' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicDottedI, 'i' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicYi, 239 - kCSSpriteFontOffset }, // Looks just like ï
+    { UnicodeChar::cyrillicJe, 'J' - kCSSpriteFontOffset },
+    { UnicodeChar::cyrillicGheUpturnUc, SPR_FONTS_CYRILLIC_GHE_UPTURN_UPPER - SPR_FONTS_BEGIN },
+    { UnicodeChar::cyrillicGheUpturn, SPR_FONTS_CYRILLIC_GHE_UPTURN_LOWER - SPR_FONTS_BEGIN },
 
     // Punctuation
-    { UnicodeChar::left_brace, SPR_G2_LEFT_BRACE - SPR_CHAR_START },
-    { UnicodeChar::vertical_bar, SPR_G2_VERTICAL_BAR - SPR_CHAR_START },
-    { UnicodeChar::right_brace, SPR_G2_RIGHT_BRACE - SPR_CHAR_START },
-    { UnicodeChar::tilde, SPR_G2_TILDE - SPR_CHAR_START },
-    { UnicodeChar::non_breaking_space, ' ' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::interpunct, SPR_G2_INTERPUNCT - SPR_CHAR_START },
-    { UnicodeChar::multiplication_sign, CSChar::cross - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::en_dash, '-' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::em_dash, '-' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::single_quote_open, '`' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::single_quote_end, '\'' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::single_german_quote_open, ',' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::german_quote_open, SPR_G2_GERMAN_OPENQUOTES - SPR_CHAR_START },
-    { UnicodeChar::bullet, CSChar::bullet - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::ellipsis, SPR_G2_ELLIPSIS - SPR_CHAR_START },
-    { UnicodeChar::narrow_non_breaking_space, ' ' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::quote_open, CSChar::quote_open - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::quote_close, CSChar::quote_close - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::leftBrace, SPR_FONTS_LEFT_BRACE - SPR_FONTS_BEGIN },
+    { UnicodeChar::verticalBar, SPR_FONTS_VERTICAL_BAR - SPR_FONTS_BEGIN },
+    { UnicodeChar::rightBrace, SPR_FONTS_RIGHT_BRACE - SPR_FONTS_BEGIN },
+    { UnicodeChar::tilde, SPR_FONTS_TILDE - SPR_FONTS_BEGIN },
+    { UnicodeChar::nonBreakingSpace, ' ' - kCSSpriteFontOffset },
+    { UnicodeChar::interpunct, SPR_FONTS_INTERPUNCT - SPR_FONTS_BEGIN },
+    { UnicodeChar::multiplicationSign, EnumValue(CSChar::cross) - kCSSpriteFontOffset },
+    { UnicodeChar::enDash, '-' - kCSSpriteFontOffset },
+    { UnicodeChar::emDash, '-' - kCSSpriteFontOffset },
+    { UnicodeChar::singleQuoteOpen, '`' - kCSSpriteFontOffset },
+    { UnicodeChar::singleQuoteEnd, '\'' - kCSSpriteFontOffset },
+    { UnicodeChar::singleGermanQuoteOpen, ',' - kCSSpriteFontOffset },
+    { UnicodeChar::germanQuoteOpen, SPR_FONTS_GERMAN_OPENQUOTES - SPR_FONTS_BEGIN },
+    { UnicodeChar::bullet, EnumValue(CSChar::bullet) - kCSSpriteFontOffset },
+    { UnicodeChar::ellipsis, SPR_FONTS_ELLIPSIS - SPR_FONTS_BEGIN },
+    { UnicodeChar::narrowNonBreakingSpace, ' ' - kCSSpriteFontOffset },
+    { UnicodeChar::quoteOpen, EnumValue(CSChar::quoteOpen) - kCSSpriteFontOffset },
+    { UnicodeChar::quoteClose, EnumValue(CSChar::quoteClose) - kCSSpriteFontOffset },
 
     // Currency
-    { UnicodeChar::guilder, SPR_G2_GUILDER_SIGN - SPR_CHAR_START },
-    { UnicodeChar::euro, CSChar::euro - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::rouble, SPR_G2_ROUBLE_SIGN - SPR_CHAR_START },
+    { UnicodeChar::guilder, SPR_FONTS_GUILDER_SIGN - SPR_FONTS_BEGIN },
+    { UnicodeChar::euro, EnumValue(CSChar::euro) - kCSSpriteFontOffset },
+    { UnicodeChar::won, SPR_FONTS_WON_SIGN - SPR_FONTS_BEGIN },
+    { UnicodeChar::hryvnia, SPR_FONTS_HRYVNIA_SIGN - SPR_FONTS_BEGIN },
+    { UnicodeChar::rouble, SPR_FONTS_ROUBLE_SIGN - SPR_FONTS_BEGIN },
 
     // Dingbats
-    { UnicodeChar::up, CSChar::up - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::small_up, CSChar::small_up - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::right, CSChar::right - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::down, CSChar::down - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::small_down, CSChar::small_down - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::left, CSChar::left - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::air, CSChar::air - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::tick, CSChar::tick - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::plus, '+' - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::minus, '-' - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::up, EnumValue(CSChar::up) - kCSSpriteFontOffset },
+    { UnicodeChar::smallUp, EnumValue(CSChar::smallUp) - kCSSpriteFontOffset },
+    { UnicodeChar::right, EnumValue(CSChar::right) - kCSSpriteFontOffset },
+    { UnicodeChar::down, EnumValue(CSChar::down) - kCSSpriteFontOffset },
+    { UnicodeChar::smallDown, EnumValue(CSChar::smallDown) - kCSSpriteFontOffset },
+    { UnicodeChar::left, EnumValue(CSChar::left) - kCSSpriteFontOffset },
+    { UnicodeChar::air, EnumValue(CSChar::air) - kCSSpriteFontOffset },
+    { UnicodeChar::tick, EnumValue(CSChar::tick) - kCSSpriteFontOffset },
+    { UnicodeChar::dingbatMultiply, EnumValue(CSChar::cross) - kCSSpriteFontOffset },
+    { UnicodeChar::plus, '+' - kCSSpriteFontOffset },
+    { UnicodeChar::minus, '-' - kCSSpriteFontOffset },
 
     // Emoji
-    { UnicodeChar::cross, CSChar::cross - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::water, CSChar::water - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::eye, SPR_G2_EYE - SPR_CHAR_START },
-    { UnicodeChar::road, CSChar::road - CS_SPRITE_FONT_OFFSET },
-    { UnicodeChar::railway, CSChar::railway - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::cross, 'X' - kCSSpriteFontOffset },
+    { UnicodeChar::water, EnumValue(CSChar::water) - kCSSpriteFontOffset },
+    { UnicodeChar::eye, SPR_FONTS_EYE - SPR_FONTS_BEGIN },
+    { UnicodeChar::road, EnumValue(CSChar::road) - kCSSpriteFontOffset },
+    { UnicodeChar::railway, EnumValue(CSChar::railway) - kCSSpriteFontOffset },
 
     // Misc
-    { UnicodeChar::superscript_minus_one, CSChar::superscript_minus_one - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::superscriptMinusOne, EnumValue(CSChar::superscriptMinusOne) - kCSSpriteFontOffset },
 };
 
 static char32_t _smallestCodepointValue = 0;
@@ -261,45 +263,28 @@ void FontSpriteInitialiseCharacters()
 {
     // Compute min and max that helps avoiding lookups for no reason.
     _smallestCodepointValue = std::numeric_limits<char32_t>::max();
-    for (const auto& entry : codepointOffsetMap)
+    for (const auto& entry : kCodepointOffsetMap)
     {
-        _smallestCodepointValue = std::min(_smallestCodepointValue, entry.first);
-        _biggestCodepointValue = std::max(_biggestCodepointValue, entry.first);
+        _smallestCodepointValue = std::min(_smallestCodepointValue, EnumValue(entry.first));
+        _biggestCodepointValue = std::max(_biggestCodepointValue, EnumValue(entry.first));
     }
 
-    for (const auto& fontStyle : FontStyles)
+    for (const auto& fontStyle : kFontStyles)
     {
-        int32_t glyphOffset = EnumValue(fontStyle) * kSpriteFontGlyphCount;
-        for (uint8_t glyphIndex = 0; glyphIndex < kSpriteFontGlyphCount; glyphIndex++)
+        int32_t glyphOffset = EnumValue(fontStyle) * SPR_FONTS_GLYPH_COUNT;
+        for (auto glyphIndex = 0u; glyphIndex < SPR_FONTS_GLYPH_COUNT; glyphIndex++)
         {
-            const G1Element* g1 = GfxGetG1Element(glyphIndex + SPR_CHAR_START + glyphOffset);
+            const G1Element* g1 = GfxGetG1Element(glyphIndex + SPR_FONTS_BEGIN + glyphOffset);
             int32_t width = 0;
             if (g1 != nullptr)
             {
-                width = g1->width + (2 * g1->x_offset) - 1;
+                width = g1->width + (2 * g1->xOffset) - 1;
             }
-
             _spriteFontCharacterWidths[EnumValue(fontStyle)][glyphIndex] = static_cast<uint8_t>(width);
         }
     }
 
-    for (const auto& fontStyle : FontStyles)
-    {
-        int32_t glyphOffset = EnumValue(fontStyle) * SPR_G2_GLYPH_COUNT;
-        for (auto glyphIndex = 0u; glyphIndex < SPR_G2_GLYPH_COUNT; glyphIndex++)
-        {
-            const G1Element* g1 = GfxGetG1Element(glyphIndex + SPR_G2_CHAR_BEGIN + glyphOffset);
-            int32_t width = 0;
-            if (g1 != nullptr)
-            {
-                width = g1->width + (2 * g1->x_offset) - 1;
-            }
-
-            _additionalSpriteFontCharacterWidth[EnumValue(fontStyle)][glyphIndex] = static_cast<uint8_t>(width);
-        }
-    }
-
-    ScrollingTextInitialiseBitmaps();
+    Drawing::ScrollingText::initialiseBitmaps();
 }
 
 int32_t FontSpriteGetCodepointOffset(int32_t codepoint)
@@ -308,8 +293,8 @@ int32_t FontSpriteGetCodepointOffset(int32_t codepoint)
     if (static_cast<char32_t>(codepoint) >= _smallestCodepointValue
         && static_cast<char32_t>(codepoint) <= _biggestCodepointValue)
     {
-        auto result = codepointOffsetMap.find(codepoint);
-        if (result != codepointOffsetMap.end())
+        auto result = kCodepointOffsetMap.find(static_cast<UnicodeChar>(codepoint));
+        if (result != kCodepointOffsetMap.end())
             return result->second;
     }
 
@@ -323,19 +308,8 @@ int32_t FontSpriteGetCodepointWidth(FontStyle fontStyle, int32_t codepoint)
 {
     int32_t glyphIndex = FontSpriteGetCodepointOffset(codepoint);
     auto baseFontIndex = EnumValue(fontStyle);
-    if (glyphIndex >= kSpriteFontGlyphCount)
-    {
-        glyphIndex = (SPR_CHAR_START + glyphIndex) - SPR_G2_CHAR_BEGIN;
 
-        if (glyphIndex >= static_cast<int32_t>(std::size(_additionalSpriteFontCharacterWidth[baseFontIndex])))
-        {
-            LOG_WARNING("Invalid glyph index %u", glyphIndex);
-            glyphIndex = 0;
-        }
-        return _additionalSpriteFontCharacterWidth[baseFontIndex][glyphIndex];
-    }
-
-    if (glyphIndex < 0 || glyphIndex >= static_cast<int32_t>(kSpriteFontGlyphCount))
+    if (glyphIndex >= static_cast<int32_t>(std::size(_spriteFontCharacterWidths[baseFontIndex])))
     {
         LOG_WARNING("Invalid glyph index %u", glyphIndex);
         glyphIndex = 0;
@@ -345,25 +319,21 @@ int32_t FontSpriteGetCodepointWidth(FontStyle fontStyle, int32_t codepoint)
 
 ImageId FontSpriteGetCodepointSprite(FontStyle fontStyle, int32_t codepoint)
 {
-    int32_t offset = EnumValue(fontStyle) * kSpriteFontGlyphCount;
     auto codePointOffset = FontSpriteGetCodepointOffset(codepoint);
-    if (codePointOffset > kSpriteFontGlyphCount)
-    {
-        offset = EnumValue(fontStyle) * SPR_G2_GLYPH_COUNT;
-    }
+    int32_t offset = EnumValue(fontStyle) * SPR_FONTS_GLYPH_COUNT;
 
-    return ImageId(SPR_CHAR_START + offset + codePointOffset, COLOUR_BLACK);
+    return ImageId(SPR_FONTS_BEGIN + offset + codePointOffset, OpenRCT2::Drawing::Colour::black);
 }
 
 int32_t FontGetLineHeight(FontStyle fontStyle)
 {
     auto fontSize = EnumValue(fontStyle);
-#ifndef NO_TTF
+#ifndef DISABLE_TTF
     if (LocalisationService_UseTrueTypeFont())
     {
         return gCurrentTTFFontSet->size[fontSize].line_height;
     }
-#endif // NO_TTF
+#endif // DISABLE_TTF
     return kSpriteFontLineHeight[fontSize];
 }
 
@@ -382,13 +352,13 @@ bool FontSupportsStringSprite(const utf8* text)
         bool supported = false;
 
         if ((codepoint >= 32 && codepoint < 256)
-            || (codepoint >= UnicodeChar::cyrillic_a_uc && codepoint <= UnicodeChar::cyrillic_ya))
+            || (codepoint >= EnumValue(UnicodeChar::cyrillicAUc) && codepoint <= EnumValue(UnicodeChar::cyrillicYa)))
         {
             supported = true;
         }
 
-        auto result = codepointOffsetMap.find(codepoint);
-        if (result != codepointOffsetMap.end())
+        auto result = kCodepointOffsetMap.find(static_cast<UnicodeChar>(codepoint));
+        if (result != kCodepointOffsetMap.end())
             supported = true;
 
         if (!supported)
@@ -401,7 +371,7 @@ bool FontSupportsStringSprite(const utf8* text)
 
 bool FontSupportsStringTTF(const utf8* text, FontStyle fontStyle)
 {
-#ifndef NO_TTF
+#ifndef DISABLE_TTF
     const utf8* src = text;
     const TTF_Font* font = gCurrentTTFFontSet->size[EnumValue(fontStyle)].font;
     if (font == nullptr)
@@ -421,7 +391,7 @@ bool FontSupportsStringTTF(const utf8* text, FontStyle fontStyle)
     return true;
 #else
     return false;
-#endif // NO_TTF
+#endif // DISABLE_TTF
 }
 
 bool FontSupportsString(const utf8* text, FontStyle fontStyle)

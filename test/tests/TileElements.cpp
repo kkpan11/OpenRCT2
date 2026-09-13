@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -14,7 +14,6 @@
 #include <openrct2/Context.h>
 #include <openrct2/Game.h>
 #include <openrct2/OpenRCT2.h>
-#include <openrct2/ParkImporter.h>
 #include <openrct2/world/Footpath.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/tile_element/EntranceElement.h>
@@ -36,7 +35,7 @@ protected:
         ASSERT_TRUE(initialised);
 
         GetContext()->LoadParkFromFile(parkPath);
-        GameLoadInit();
+        GameLoadInit(); // NB: calls `setActiveScene`
 
         // Changed in some tests. Store to restore its value
         _gLegacyScene = gLegacyScene;
@@ -62,7 +61,7 @@ LegacyScene TileElementWantsFootpathConnection::_gLegacyScene;
 TEST_F(TileElementWantsFootpathConnection, FlatPath)
 {
     // Flat paths want to connect to other paths in any direction
-    const auto* pathElement = MapGetFootpathElement(TileCoordsXYZ{ 19, 18, 14 }.ToCoordsXYZ());
+    const auto* pathElement = MapGetFootpathElement(TileCoordsXYZ{ 19, 18, 14 }.toCoordsXYZ());
     ASSERT_NE(pathElement, nullptr);
     EXPECT_TRUE(TileElementWantsPathConnectionTowards({ 19, 18, 14, 0 }, nullptr));
     EXPECT_TRUE(TileElementWantsPathConnectionTowards({ 19, 18, 14, 1 }, nullptr));
@@ -74,9 +73,9 @@ TEST_F(TileElementWantsFootpathConnection, FlatPath)
 TEST_F(TileElementWantsFootpathConnection, SlopedPath)
 {
     // Sloped paths only want to connect in two directions, of which is one at a higher offset
-    const auto* slopedPathElement = MapGetFootpathElement(TileCoordsXYZ{ 18, 18, 14 }.ToCoordsXYZ());
+    const auto* slopedPathElement = MapGetFootpathElement(TileCoordsXYZ{ 18, 18, 14 }.toCoordsXYZ());
     ASSERT_NE(slopedPathElement, nullptr);
-    ASSERT_TRUE(slopedPathElement->AsPath()->IsSloped());
+    ASSERT_TRUE(slopedPathElement->asPath()->isSloped());
     // Bottom and top of sloped path want a path connection
     EXPECT_TRUE(TileElementWantsPathConnectionTowards({ 18, 18, 14, 2 }, nullptr));
     EXPECT_TRUE(TileElementWantsPathConnectionTowards({ 18, 18, 16, 0 }, nullptr));
@@ -94,7 +93,7 @@ TEST_F(TileElementWantsFootpathConnection, Stall)
 {
     // Stalls usually have one path direction flag, but can have multiple (info kiosk for example)
     auto tileCoords = TileCoordsXYZ{ 19, 15, 14 };
-    const TrackElement* const stallElement = MapGetTrackElementAt(tileCoords.ToCoordsXYZ());
+    const TrackElement* const stallElement = MapGetTrackElementAt(tileCoords.toCoordsXYZ());
     ASSERT_NE(stallElement, nullptr);
     EXPECT_TRUE(TileElementWantsPathConnectionTowards({ 19, 15, 14, 0 }, nullptr));
     EXPECT_FALSE(TileElementWantsPathConnectionTowards({ 19, 15, 14, 1 }, nullptr));
@@ -106,7 +105,7 @@ TEST_F(TileElementWantsFootpathConnection, Stall)
 TEST_F(TileElementWantsFootpathConnection, RideEntrance)
 {
     // Ride entrances and exits want a connection in one direction
-    const EntranceElement* const entranceElement = MapGetRideEntranceElementAt(TileCoordsXYZ{ 18, 8, 14 }.ToCoordsXYZ(), false);
+    const EntranceElement* const entranceElement = MapGetRideEntranceElementAt(TileCoordsXYZ{ 18, 8, 14 }.toCoordsXYZ(), false);
     ASSERT_NE(entranceElement, nullptr);
     EXPECT_TRUE(TileElementWantsPathConnectionTowards({ 18, 8, 14, 0 }, nullptr));
     EXPECT_FALSE(TileElementWantsPathConnectionTowards({ 18, 8, 14, 1 }, nullptr));
@@ -118,7 +117,7 @@ TEST_F(TileElementWantsFootpathConnection, RideEntrance)
 TEST_F(TileElementWantsFootpathConnection, RideExit)
 {
     // The exit has been rotated; it wants a path connection in direction 1, but not 0 like the entrance
-    const EntranceElement* const exitElement = MapGetRideExitElementAt(TileCoordsXYZ{ 18, 10, 14 }.ToCoordsXYZ(), false);
+    const EntranceElement* const exitElement = MapGetRideExitElementAt(TileCoordsXYZ{ 18, 10, 14 }.toCoordsXYZ(), false);
     ASSERT_NE(exitElement, nullptr);
     EXPECT_FALSE(TileElementWantsPathConnectionTowards({ 18, 10, 14, 0 }, nullptr));
     EXPECT_TRUE(TileElementWantsPathConnectionTowards({ 18, 10, 14, 1 }, nullptr));
@@ -155,14 +154,14 @@ TEST_F(TileElementWantsFootpathConnection, MapEdge)
 {
     // Paths at the map edge should have edge flags turned on when placed in scenario editor
     // This tile is a single, unconnected footpath on the map edge - on load, GetEdges() returns 0
-    auto* pathElement = MapGetFootpathElement(TileCoordsXYZ{ 1, 4, 14 }.ToCoordsXYZ());
+    auto* pathElement = MapGetFootpathElement(TileCoordsXYZ{ 1, 4, 14 }.toCoordsXYZ());
 
     gLegacyScene = LegacyScene::scenarioEditor;
 
     // Calculate the connected edges and set the appropriate edge flags
     // FIXME: The footpath functions should only take PathElement and not TileElement.
-    FootpathConnectEdges({ 16, 64 }, pathElement->as<TileElement>(), 0);
-    auto edges = pathElement->GetEdges();
+    FootpathConnectEdges({ 16, 64 }, pathElement->as<TileElement>(), {});
+    auto edges = pathElement->getEdges();
 
     // The tiles alongside in the Y direction are both on the map edge so should be marked as an edge
     EXPECT_TRUE(edges & (1 << 1));

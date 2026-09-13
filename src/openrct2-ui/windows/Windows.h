@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,31 +9,49 @@
 
 #pragma once
 
+#include <functional>
 #include <openrct2/Identifiers.h>
-#include <openrct2/interface/Window.h>
+#include <openrct2/core/StringTypes.h>
+#include <openrct2/interface/WindowTypes.h>
+#include <openrct2/localisation/StringIdType.h>
 #include <openrct2/world/ScenerySelection.h>
 #include <optional>
 #include <string_view>
 
-class Formatter;
-
-struct ObjectEntryDescriptor;
-struct OpenRCT2String;
-struct Peep;
-struct Ride;
+struct ScreenCoordsXY;
+struct StringWithArgs;
 struct RideSelection;
-struct TileElement;
 struct TrackDesign;
-struct Vehicle;
+struct TrackDesignFileRef;
 
-enum class GuestListFilterType : int32_t;
 enum class ScatterToolDensity : uint8_t;
 
-using LoadSaveCallback = void (*)(ModalResult result, const utf8* path);
-using ScenarioSelectCallback = void (*)(const utf8* path);
+namespace OpenRCT2
+{
+    enum class GuestListFilterType : int32_t;
+
+    class Formatter;
+    struct ObjectEntryDescriptor;
+    struct Peep;
+    struct Ride;
+    struct TileElement;
+    struct Vehicle;
+
+    using LoadSaveCallback = void (*)(ModalResult result, const utf8* path);
+    using ScenarioSelectCallback = void (*)(const utf8* path);
+} // namespace OpenRCT2
+
+namespace OpenRCT2::Drawing
+{
+    enum class Colour : uint8_t;
+
+    struct RenderTarget;
+} // namespace OpenRCT2::Drawing
 
 namespace OpenRCT2::Ui::Windows
 {
+    constexpr int32_t kTabBarHeight = 43;
+
     extern bool gWindowSceneryScatterEnabled;
     extern uint16_t gWindowSceneryScatterSize;
     extern ScatterToolDensity gWindowSceneryScatterDensity;
@@ -48,10 +66,10 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* AssetPacksOpen();
 
     // Banner
-    WindowBase* BannerOpen(rct_windownumber number);
+    WindowBase* BannerOpen(WindowNumber number);
 
     // Changelog
-    WindowBase* ChangelogOpen(int personality);
+    WindowBase* ChangelogOpen(WindowView personality);
 
     // Cheats
     WindowBase* CheatsOpen();
@@ -63,6 +81,9 @@ namespace OpenRCT2::Ui::Windows
     // CustomCurrency
     WindowBase* CustomCurrencyOpen();
 
+    // DateInfoPanel
+    WindowBase* dateInfoPanelOpen();
+
     // DebugPaint
     WindowBase* DebugPaintOpen();
 
@@ -72,21 +93,22 @@ namespace OpenRCT2::Ui::Windows
     // EditorInventionsList
     WindowBase* EditorInventionsListOpen();
 
-    // EditorBottomToolbar
-    WindowBase* EditorBottomToolbarOpen();
-
-    // EditorObjectiveOptions
-    WindowBase* EditorObjectiveOptionsOpen();
-
     // EditorObjectSelection
     WindowBase* EditorObjectSelectionOpen();
     bool EditorObjectSelectionWindowCheck();
+    void EditorObjectSelectionClose();
 
     // EditorParkEntrance
     WindowBase* EditorParkEntranceOpen();
 
     // EditorScenarioOptions
     WindowBase* EditorScenarioOptionsOpen();
+
+    // EditorStatusLine
+    WindowBase* editorStatusLineOpen();
+
+    // EditorStepController
+    WindowBase* editorStepControllerOpen();
 
     // Error
     WindowBase* ErrorOpen(StringId title, StringId message, const class Formatter& formatter, bool autoClose = false);
@@ -107,11 +129,10 @@ namespace OpenRCT2::Ui::Windows
     void WindowFootpathKeyboardShortcutSlopeUp();
     void WindowFootpathKeyboardShortcutBuildCurrent();
     void WindowFootpathKeyboardShortcutDemolishCurrent();
+    bool WindowFootpathSelectDefault();
 
-    // GameBottomToolbar
-    extern uint8_t gToolbarDirtyFlags;
-    WindowBase* GameBottomToolbarOpen();
-    void WindowGameBottomToolbarInvalidateNewsItem();
+    // GameStatusBar
+    WindowBase* gameStatusBarOpen();
 
     // Guest
     WindowBase* GuestOpen(Peep* peep);
@@ -134,7 +155,7 @@ namespace OpenRCT2::Ui::Windows
     // LoadSave
     WindowBase* LoadsaveOpen(
         LoadSaveAction action, LoadSaveType type, std::string_view defaultPath,
-        std::function<void(ModalResult result, std::string_view)> callback, TrackDesign* trackDesign);
+        std::function<void(ModalResult result, std::string_view)> callback, bool isJsCallback, TrackDesign* trackDesign);
     void WindowLoadSaveInputKey(WindowBase* w, uint32_t keycode);
 
     // Main
@@ -156,8 +177,9 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* MazeConstructionOpen();
     void WindowMazeConstructionUpdatePressedWidgets();
 
-    // Multiplatyer
+    // Multiplayer
     WindowBase* MultiplayerOpen();
+    void MultiplayerRefreshList();
 
     // NewCampaign
     WindowBase* NewCampaignOpen(int16_t campaignType);
@@ -172,8 +194,9 @@ namespace OpenRCT2::Ui::Windows
     // News
     WindowBase* NewsOpen();
 
-    // NewsOptions
-    WindowBase* NewsOptionsOpen();
+    // NewsTicker
+    WindowBase* newsTickerOpen();
+    void newsTickerInvalidateNewsItem();
 
     // NetworkStatus
     WindowBase* NetworkStatusOpen(const std::string& text, CloseCallback onClose);
@@ -188,8 +211,7 @@ namespace OpenRCT2::Ui::Windows
 
     // OverwritePrompt
     WindowBase* WindowOverwritePromptOpen(
-        const std::string_view name, const std::string_view path, LoadSaveAction action, LoadSaveType type,
-        TrackDesign* trackDesignPtr);
+        std::string_view name, std::string_view path, LoadSaveAction action, LoadSaveType type, TrackDesign* trackDesignPtr);
     void WindowLoadSaveOverwritePromptInputKey(WindowBase* w, uint32_t keycode);
 
     // Park
@@ -198,6 +220,9 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* ParkGuestsOpen();
     WindowBase* ParkObjectiveOpen();
     WindowBase* ParkRatingOpen();
+
+    // ParkInfoPanel
+    WindowBase* parkInfoPanelOpen();
 
     // Player
     WindowBase* PlayerOpen(uint8_t id);
@@ -218,12 +243,12 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* ResearchOpen();
     void WindowResearchDevelopmentMouseUp(WidgetIndex widgetIndex, WidgetIndex baseWidgetIndex);
     void WindowResearchDevelopmentPrepareDraw(WindowBase* w, WidgetIndex baseWidgetIndex);
-    void WindowResearchDevelopmentDraw(WindowBase* w, DrawPixelInfo& dpi, WidgetIndex baseWidgetIndex);
+    void WindowResearchDevelopmentDraw(WindowBase* w, Drawing::RenderTarget& rt, WidgetIndex baseWidgetIndex);
     void WindowResearchFundingMouseDown(WindowBase* w, WidgetIndex widgetIndex, WidgetIndex baseWidgetIndex);
     void WindowResearchFundingMouseUp(WidgetIndex widgetIndex, WidgetIndex baseWidgetIndex);
     void WindowResearchFundingDropdown(WidgetIndex widgetIndex, int32_t selectedIndex, WidgetIndex baseWidgetIndex);
     void WindowResearchFundingPrepareDraw(WindowBase* w, WidgetIndex baseWidgetIndex);
-    void WindowResearchFundingDraw(WindowBase* w, DrawPixelInfo& dpi);
+    void WindowResearchFundingDraw(WindowBase* w, Drawing::RenderTarget& rt);
 
     // Ride
     WindowBase* RideMainOpen(const Ride& ride);
@@ -270,9 +295,9 @@ namespace OpenRCT2::Ui::Windows
     // Scenery
     WindowBase* SceneryOpen();
     void WindowScenerySetSelectedItem(
-        const ScenerySelection& sceneryconst, std::optional<colour_t> primary, const std::optional<colour_t> secondary,
-        const std::optional<colour_t> tertiary, const std::optional<colour_t> rotation);
-    void WindowScenerySetSelectedTab(const ObjectEntryIndex sceneryGroupIndex);
+        const ScenerySelection& sceneryconst, std::optional<Drawing::Colour> primary, std::optional<Drawing::Colour> secondary,
+        std::optional<Drawing::Colour> tertiary, std::optional<uint8_t> rotation);
+    void WindowScenerySetSelectedTab(ObjectEntryIndex sceneryGroupIndex);
     void WindowScenerySetDefaultPlacementConfiguration();
     void WindowSceneryInit();
     void WindowSceneryResetSelectedSceneryItems();
@@ -294,8 +319,8 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* ShortcutKeysOpen();
 
     // Sign
-    WindowBase* SignOpen(rct_windownumber number);
-    WindowBase* SignSmallOpen(rct_windownumber number);
+    WindowBase* SignOpen(WindowNumber number);
+    WindowBase* SignSmallOpen(WindowNumber number);
 
     // Staff
     WindowBase* StaffOpen(Peep* peep);
@@ -344,7 +369,7 @@ namespace OpenRCT2::Ui::Windows
 
     // Tooltip
     void WindowTooltipReset(const ScreenCoordsXY& screenCoords);
-    void WindowTooltipShow(const OpenRCT2String& message, ScreenCoordsXY screenCoords);
+    void WindowTooltipShow(const StringWithArgs& message, ScreenCoordsXY screenCoords);
     void WindowTooltipOpen(WindowBase* widgetWindow, WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords);
     void WindowTooltipClose();
 
@@ -352,12 +377,12 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* TopToolbarOpen();
 
     // TrackDesignPlace
-    WindowBase* TrackPlaceOpen(const struct TrackDesignFileRef* tdFileRef);
+    WindowBase* TrackPlaceOpen(const TrackDesignFileRef* tdFileRef);
     void TrackPlaceClearProvisionalTemporarily();
     void TrackPlaceRestoreProvisional();
 
     // TrackDesignManage
-    WindowBase* TrackManageOpen(struct TrackDesignFileRef* tdFileRef);
+    WindowBase* TrackManageOpen(TrackDesignFileRef* tdFileRef);
 
     // TrackList
     // rct2: 0x00F635EE

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <string>
+
 namespace OpenRCT2::Ui
 {
     class OpenGLShader final
@@ -47,8 +48,8 @@ namespace OpenRCT2::Ui
         explicit OpenGLShaderProgram(OpenGLShaderProgram&&) = default;
         virtual ~OpenGLShaderProgram();
 
-        GLuint GetAttributeLocation(const char* name);
-        GLuint GetUniformLocation(const char* name);
+        GLint GetAttributeLocation(const char* name);
+        GLint GetUniformLocation(const char* name);
         void Use();
 
     private:

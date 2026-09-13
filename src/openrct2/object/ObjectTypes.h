@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,50 +9,52 @@
 
 #pragma once
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <span>
 
-using ObjectEntryIndex = uint16_t;
-constexpr ObjectEntryIndex kObjectEntryIndexNull = std::numeric_limits<ObjectEntryIndex>::max();
-
-// First 0xF of RCTObjectEntry->flags
-enum class ObjectType : uint8_t
+namespace OpenRCT2
 {
-    ride,
-    smallScenery,
-    largeScenery,
-    walls,
-    banners,
-    paths,
-    pathAdditions,
-    sceneryGroup,
-    parkEntrance,
-    water,
-    scenarioText,
-    terrainSurface,
-    terrainEdge,
-    station,
-    music,
-    footpathSurface,
-    footpathRailings,
-    audio,
-    peepNames,
-    peepAnimations,
-    climate,
+    using ObjectEntryIndex = uint16_t;
+    constexpr ObjectEntryIndex kObjectEntryIndexNull = std::numeric_limits<ObjectEntryIndex>::max();
 
-    count,
-    none = 255
-};
+    // First 0xF of RCTObjectEntry->flags
+    enum class ObjectType : uint8_t
+    {
+        ride,
+        smallScenery,
+        largeScenery,
+        walls,
+        banners,
+        paths,
+        pathAdditions,
+        sceneryGroup,
+        parkEntrance,
+        water,
+        scenarioMeta,
+        terrainSurface,
+        terrainEdge,
+        station,
+        music,
+        footpathSurface,
+        footpathRailings,
+        audio,
+        peepNames,
+        peepAnimations,
+        climate,
 
-static constexpr size_t kNumTransientObjectTypes = 19;
-static constexpr size_t kNumIntransientObjectTypes = 2;
+        count,
+        none = 255
+    };
 
-bool ObjectTypeIsTransient(ObjectType type);
-bool ObjectTypeIsIntransient(ObjectType type);
+    static constexpr size_t kNumTransientObjectTypes = 19;
+    static constexpr size_t kNumIntransientObjectTypes = 2;
 
-std::span<const ObjectType> getAllObjectTypes();
-std::span<const ObjectType> getTransientObjectTypes();
-std::span<const ObjectType> getIntransientObjectTypes();
+    bool ObjectTypeIsTransient(ObjectType type);
+    bool ObjectTypeIsIntransient(ObjectType type);
+
+    std::span<const ObjectType> getAllObjectTypes();
+    std::span<const ObjectType> getTransientObjectTypes();
+    std::span<const ObjectType> getIntransientObjectTypes();
+} // namespace OpenRCT2

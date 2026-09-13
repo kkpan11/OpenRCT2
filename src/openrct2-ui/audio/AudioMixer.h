@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -13,7 +13,7 @@
 #include "AudioFormat.h"
 #include "SDLAudioSource.h"
 
-#include <SDL.h>
+#include <SDL_audio.h>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -33,7 +33,7 @@ namespace OpenRCT2::Audio
         std::vector<std::unique_ptr<SDLAudioSource>> _sources;
 
         SDL_AudioDeviceID _deviceId = 0;
-        AudioFormat _format = {};
+        AudioFormat _outputFormat = {};
         std::list<std::shared_ptr<ISDLAudioChannel>> _channels;
         float _volume = 1.0f;
         float _adjustSoundVolume = 0.0f;
@@ -67,11 +67,9 @@ namespace OpenRCT2::Audio
 
         /**
          * Resample the given buffer into _effectBuffer.
-         * Assumes that srcBuffer is the same format as _format.
+         * Assumes that srcBuffer is the same format as _outputFormat.
          */
-        size_t ApplyResample(
-            ISDLAudioChannel* channel, const void* srcBuffer, int32_t srcSamples, int32_t dstSamples, int32_t inRate,
-            int32_t outRate);
+        size_t ApplyResample(const void* srcBuffer, int32_t srcSamples, int32_t dstSamples, int32_t inRate, int32_t outRate);
         void ApplyPan(const IAudioChannel* channel, void* buffer, size_t len, size_t sampleSize);
         int32_t ApplyVolume(const IAudioChannel* channel, void* buffer, size_t len);
         static void EffectPanS16(const IAudioChannel* channel, int16_t* data, int32_t length);

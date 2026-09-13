@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,12 +12,11 @@
 #include "../object/ObjectTypes.h"
 
 #include <cstdint>
-#include <limits>
 
 struct ScenerySelection
 {
     uint8_t SceneryType{};
-    ObjectEntryIndex EntryIndex = kObjectEntryIndexNull;
+    OpenRCT2::ObjectEntryIndex EntryIndex = OpenRCT2::kObjectEntryIndexNull;
 
     inline bool operator==(const ScenerySelection& rhs) const
     {
@@ -31,6 +30,6 @@ struct ScenerySelection
 
     bool IsUndefined() const
     {
-        return EntryIndex == kObjectEntryIndexNull;
+        return EntryIndex == OpenRCT2::kObjectEntryIndexNull;
     }
 };

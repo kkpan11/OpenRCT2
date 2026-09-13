@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,19 +7,18 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "../../../GameState.h"
 #include "../../../entity/EntityRegistry.h"
 #include "../../../entity/Guest.h"
 #include "../../../interface/Viewport.h"
 #include "../../../ride/Ride.h"
 #include "../../../ride/RideEntry.h"
-#include "../../../ride/Track.h"
 #include "../../../ride/TrackPaint.h"
 #include "../../../ride/Vehicle.h"
 #include "../../Boundbox.h"
 #include "../../Paint.h"
 #include "../../support/WoodenSupports.h"
 #include "../../tile_element/Segment.h"
-#include "../../track/Segment.h"
 
 using namespace OpenRCT2;
 
@@ -51,12 +50,12 @@ static void PaintFerrisWheelRiders(
 {
     for (int32_t i = 0; i < 32; i += 2)
     {
-        auto* peep = GetEntity<Guest>(vehicle.peep[i]);
-        if (peep == nullptr || peep->State != PeepState::OnRide)
+        auto* peep = getGameState().entities.getEntity<Guest>(vehicle.peep[i]);
+        if (peep == nullptr || peep->state != PeepState::onRide)
             continue;
 
-        auto frameNum = (vehicle.Pitch + i * 4) % 128;
-        auto imageIndex = rideEntry.Cars[0].base_image_id + 32 + direction * 128 + frameNum;
+        auto frameNum = (vehicle.flatRideAnimationFrame + i * 4) % 128;
+        auto imageIndex = rideEntry.Cars[0].baseImageId + 32 + direction * 128 + frameNum;
         auto imageId = ImageId(imageIndex, vehicle.peep_tshirt_colours[i], vehicle.peep_tshirt_colours[i + 1]);
         PaintAddImageAsChild(session, imageId, offset, bb);
     }
@@ -69,10 +68,10 @@ static void PaintFerrisWheelStructure(
     if (rideEntry == nullptr)
         return;
 
-    auto vehicle = GetEntity<Vehicle>(ride.vehicles[0]);
-    if (ride.lifecycleFlags & RIDE_LIFECYCLE_ON_TRACK && vehicle != nullptr)
+    auto vehicle = getGameState().entities.getEntity<Vehicle>(ride.vehicles[0]);
+    if (ride.flags.has(RideFlag::onTrack) && vehicle != nullptr)
     {
-        session.InteractionType = ViewportInteractionItem::Entity;
+        session.InteractionType = ViewportInteractionItem::entity;
         session.CurrentlyDrawnEntity = vehicle;
     }
 
@@ -87,9 +86,9 @@ static void PaintFerrisWheelStructure(
         wheelImageTemplate = stationColour;
     }
 
-    auto imageOffset = vehicle != nullptr ? vehicle->Pitch % 8 : 0;
+    auto imageOffset = vehicle != nullptr ? vehicle->flatRideAnimationFrame % 8 : 0;
     auto leftSupportImageId = supportsImageTemplate.WithIndex(22150 + (direction & 1) * 2);
-    auto wheelImageId = wheelImageTemplate.WithIndex(rideEntry->Cars[0].base_image_id + direction * 8 + imageOffset);
+    auto wheelImageId = wheelImageTemplate.WithIndex(rideEntry->Cars[0].baseImageId + direction * 8 + imageOffset);
     auto rightSupportImageId = leftSupportImageId.WithIndexOffset(1);
 
     PaintAddImageAsParent(session, leftSupportImageId, offset, bb);
@@ -101,7 +100,7 @@ static void PaintFerrisWheelStructure(
     PaintAddImageAsChild(session, rightSupportImageId, offset, bb);
 
     session.CurrentlyDrawnEntity = nullptr;
-    session.InteractionType = ViewportInteractionItem::Ride;
+    session.InteractionType = ViewportInteractionItem::ride;
 }
 
 static void PaintFerrisWheel(
@@ -122,11 +121,11 @@ static void PaintFerrisWheel(
 
     auto stationColour = GetStationColourScheme(session, trackElement);
     WoodenASupportsPaintSetupRotated(
-        session, WoodenSupportType::Truss, WoodenSupportSubType::NeSw, direction, height, stationColour);
+        session, WoodenSupportType::truss, WoodenSupportSubType::neSw, direction, height, stationColour);
 
     const StationObject* stationObject = ride.getStationObject();
 
-    TrackPaintUtilPaintFloor(session, edges, session.TrackColours, height, kFloorSpritesCork, stationObject);
+    TrackPaintUtilPaintFloor(session, edges, session.TrackColours, height, kFloorSpritesMulch, stationObject);
 
     ImageId imageId;
     uint8_t rotation = session.CurrentRotation;
@@ -173,9 +172,9 @@ static void PaintFerrisWheel(
     PaintUtilSetGeneralSupportHeight(session, height + 176);
 }
 
-TrackPaintFunction GetTrackPaintFunctionFerrisWheel(OpenRCT2::TrackElemType trackType)
+TrackPaintFunction GetTrackPaintFunctionFerrisWheel(TrackElemType trackType)
 {
-    if (trackType != TrackElemType::FlatTrack1x4C)
+    if (trackType != TrackElemType::flatTrack1x4C)
     {
         return TrackPaintFunctionDummy;
     }

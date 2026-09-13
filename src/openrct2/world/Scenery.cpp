@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,31 +10,27 @@
 #include "Scenery.h"
 
 #include "../Cheats.h"
-#include "../Context.h"
-#include "../Game.h"
 #include "../GameState.h"
 #include "../OpenRCT2.h"
-#include "../actions/BannerRemoveAction.h"
-#include "../actions/FootpathAdditionRemoveAction.h"
-#include "../actions/LargeSceneryRemoveAction.h"
-#include "../actions/SmallSceneryRemoveAction.h"
-#include "../actions/WallRemoveAction.h"
+#include "../actions/GameActionRunner.h"
+#include "../actions/footpath/FootpathAdditionRemoveAction.h"
+#include "../actions/scenery/BannerRemoveAction.h"
+#include "../actions/scenery/LargeSceneryRemoveAction.h"
+#include "../actions/scenery/SmallSceneryRemoveAction.h"
+#include "../actions/scenery/WallRemoveAction.h"
 #include "../core/CodepointView.hpp"
-#include "../entity/Fountain.h"
+#include "../entity/JumpingFountain.h"
 #include "../network/Network.h"
 #include "../object/BannerSceneryEntry.h"
 #include "../object/LargeSceneryEntry.h"
 #include "../object/ObjectEntryManager.h"
 #include "../object/ObjectLimits.h"
-#include "../object/ObjectList.h"
-#include "../object/ObjectManager.h"
 #include "../object/PathAdditionEntry.h"
 #include "../object/SceneryGroupEntry.h"
-#include "../object/SceneryGroupObject.h"
 #include "../object/SmallSceneryEntry.h"
 #include "../object/WallSceneryEntry.h"
-#include "Footpath.h"
-#include "Park.h"
+#include "../world/ScenerySelection.h"
+#include "Map.h"
 #include "tile_element/PathElement.h"
 #include "tile_element/SmallSceneryElement.h"
 
@@ -58,6 +54,7 @@ int16_t gSceneryCtrlPressed;
 int16_t gSceneryCtrlPressZ;
 
 using namespace OpenRCT2;
+using OpenRCT2::GameActions::CommandFlag;
 
 // rct2: 0x009A3E74
 const CoordsXY SceneryQuadrantOffsets[] = {
@@ -74,7 +71,7 @@ LargeSceneryText::LargeSceneryText(const RCTLargeSceneryText& original)
         offset[i].x = original.offset[i].x;
         offset[i].y = original.offset[i].y;
     }
-    max_width = original.max_width;
+    maxWidth = original.maxWidth;
     flags = original.flags;
     num_images = original.num_images;
     for (size_t i = 0; i < std::size(original.glyphs); i++)
@@ -124,96 +121,93 @@ int32_t LargeSceneryText::MeasureHeight(std::string_view text) const
 
 void SceneryUpdateTile(const CoordsXY& sceneryPos)
 {
-    TileElement* tileElement;
-
-    tileElement = MapGetFirstElementAt(sceneryPos);
+    TileElement* tileElement = MapGetFirstElementAt(sceneryPos);
     if (tileElement == nullptr)
         return;
     do
     {
         // Ghosts are purely this-client-side and should not cause any interaction,
         // as that may lead to a desync.
-        if (NetworkGetMode() != NETWORK_MODE_NONE)
+        if (Network::GetMode() != Network::Mode::none)
         {
-            if (tileElement->IsGhost())
+            if (tileElement->isGhost())
                 continue;
         }
 
-        if (tileElement->GetType() == TileElementType::SmallScenery)
+        if (tileElement->getType() == TileElementType::smallScenery)
         {
-            tileElement->AsSmallScenery()->UpdateAge(sceneryPos);
+            tileElement->asSmallScenery()->updateAge(sceneryPos);
         }
-        else if (tileElement->GetType() == TileElementType::Path)
+        else if (tileElement->getType() == TileElementType::path)
         {
-            if (tileElement->AsPath()->HasAddition() && !tileElement->AsPath()->AdditionIsGhost())
+            if (tileElement->asPath()->hasAddition() && !tileElement->asPath()->additionIsGhost())
             {
-                auto* pathAddEntry = tileElement->AsPath()->GetAdditionEntry();
+                auto* pathAddEntry = tileElement->asPath()->getAdditionEntry();
                 if (pathAddEntry != nullptr)
                 {
                     if (pathAddEntry->flags & PATH_ADDITION_FLAG_JUMPING_FOUNTAIN_WATER)
                     {
-                        JumpingFountain::StartAnimation(JumpingFountainType::Water, sceneryPos, tileElement);
+                        JumpingFountain::startAnimation(JumpingFountainType::water, sceneryPos, tileElement);
                     }
                     else if (pathAddEntry->flags & PATH_ADDITION_FLAG_JUMPING_FOUNTAIN_SNOW)
                     {
-                        JumpingFountain::StartAnimation(JumpingFountainType::Snow, sceneryPos, tileElement);
+                        JumpingFountain::startAnimation(JumpingFountainType::snow, sceneryPos, tileElement);
                     }
                 }
             }
         }
-    } while (!(tileElement++)->IsLastForTile());
+    } while (!(tileElement++)->isLastForTile());
 }
 
 /**
  *
  *  rct2: 0x006E33D9
  */
-void SmallSceneryElement::UpdateAge(const CoordsXY& sceneryPos)
+void SmallSceneryElement::updateAge(const CoordsXY& sceneryPos)
 {
-    auto* sceneryEntry = GetEntry();
+    auto* sceneryEntry = getEntry();
     if (sceneryEntry == nullptr)
     {
         return;
     }
 
-    auto& gameState = GetGameState();
-    if (gameState.Cheats.disablePlantAging && sceneryEntry->HasFlag(SMALL_SCENERY_FLAG_CAN_BE_WATERED))
+    auto& gameState = getGameState();
+    if (gameState.cheats.disablePlantAging && sceneryEntry->flags.has(SmallSceneryFlag::canBeWatered))
     {
         return;
     }
 
-    if (!sceneryEntry->HasFlag(SMALL_SCENERY_FLAG_CAN_BE_WATERED) || WeatherIsDry(gameState.WeatherCurrent.weatherType)
-        || GetAge() < 5)
+    if (!sceneryEntry->flags.has(SmallSceneryFlag::canBeWatered) || Weather::isDry() || getAge() < 5)
     {
-        IncreaseAge(sceneryPos);
+        increaseAge(sceneryPos);
         return;
     }
 
     // Check map elements above, presumably to see if map element is blocked from weather
     TileElement* tileElementAbove = reinterpret_cast<TileElement*>(this);
     // Change from original: RCT2 only checked for the first three quadrants, which was very likely to be a bug.
-    while (!(tileElementAbove->GetOccupiedQuadrants()))
+    while (!(tileElementAbove->getOccupiedQuadrants()))
     {
         tileElementAbove++;
 
         // Ghosts are purely this-client-side and should not cause any interaction,
         // as that may lead to a desync.
-        if (tileElementAbove->IsGhost())
+        if (tileElementAbove->isGhost())
             continue;
 
-        switch (tileElementAbove->GetType())
+        switch (tileElementAbove->getType())
         {
-            case TileElementType::LargeScenery:
-            case TileElementType::Entrance:
-            case TileElementType::Path:
-                MapInvalidateTileZoom1({ sceneryPos, tileElementAbove->GetBaseZ(), tileElementAbove->GetClearanceZ() });
-                IncreaseAge(sceneryPos);
+            case TileElementType::largeScenery:
+            case TileElementType::entrance:
+            case TileElementType::path:
+                MapInvalidateTileZoom1({ sceneryPos, tileElementAbove->getBaseZ(), tileElementAbove->getClearanceZ() });
+                increaseAge(sceneryPos);
                 return;
-            case TileElementType::SmallScenery:
-                sceneryEntry = tileElementAbove->AsSmallScenery()->GetEntry();
-                if (sceneryEntry->HasFlag(SMALL_SCENERY_FLAG_VOFFSET_CENTRE))
+            case TileElementType::smallScenery:
+                sceneryEntry = tileElementAbove->asSmallScenery()->getEntry();
+                if (sceneryEntry->flags.has(SmallSceneryFlag::vOffsetCentre))
                 {
-                    IncreaseAge(sceneryPos);
+                    increaseAge(sceneryPos);
                     return;
                 }
                 break;
@@ -223,8 +217,8 @@ void SmallSceneryElement::UpdateAge(const CoordsXY& sceneryPos)
     }
 
     // Reset age / water plant
-    SetAge(0);
-    MapInvalidateTileZoom1({ sceneryPos, GetBaseZ(), GetClearanceZ() });
+    setAge(0);
+    MapInvalidateTileZoom1({ sceneryPos, getBaseZ(), getClearanceZ() });
 }
 
 /**
@@ -233,15 +227,16 @@ void SmallSceneryElement::UpdateAge(const CoordsXY& sceneryPos)
  */
 void SceneryRemoveGhostToolPlacement()
 {
+    auto& gameState = getGameState();
+
     if (gSceneryGhostType & SCENERY_GHOST_FLAG_0)
     {
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_0;
 
-        auto removeSceneryAction = SmallSceneryRemoveAction(
+        auto removeSceneryAction = GameActions::SmallSceneryRemoveAction(
             gSceneryGhostPosition, gSceneryQuadrant, gSceneryPlaceObject.EntryIndex);
-        removeSceneryAction.SetFlags(
-            GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_NO_SPEND | GAME_COMMAND_FLAG_GHOST);
-        removeSceneryAction.Execute();
+        removeSceneryAction.SetFlags({ CommandFlag::allowDuringPaused, CommandFlag::noSpend, CommandFlag::ghost });
+        GameActions::Execute(&removeSceneryAction, gameState);
     }
 
     if (gSceneryGhostType & SCENERY_GHOST_FLAG_1)
@@ -254,18 +249,17 @@ void SceneryRemoveGhostToolPlacement()
             if (tileElement == nullptr)
                 break;
 
-            if (tileElement->GetType() != TileElementType::Path)
+            if (tileElement->getType() != TileElementType::path)
                 continue;
 
-            if (tileElement->GetBaseZ() != gSceneryGhostPosition.z)
+            if (tileElement->getBaseZ() != gSceneryGhostPosition.z)
                 continue;
 
-            auto footpathAdditionRemoveAction = FootpathAdditionRemoveAction(gSceneryGhostPosition);
-            footpathAdditionRemoveAction.SetFlags(
-                GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_NO_SPEND | GAME_COMMAND_FLAG_GHOST);
-            GameActions::Execute(&footpathAdditionRemoveAction);
+            auto footpathAdditionRemoveAction = GameActions::FootpathAdditionRemoveAction(gSceneryGhostPosition);
+            footpathAdditionRemoveAction.SetFlags({ CommandFlag::allowDuringPaused, CommandFlag::noSpend, CommandFlag::ghost });
+            GameActions::Execute(&footpathAdditionRemoveAction, gameState);
             break;
-        } while (!(tileElement++)->IsLastForTile());
+        } while (!(tileElement++)->isLastForTile());
     }
 
     if (gSceneryGhostType & SCENERY_GHOST_FLAG_2)
@@ -273,29 +267,27 @@ void SceneryRemoveGhostToolPlacement()
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_2;
 
         CoordsXYZD wallLocation = { gSceneryGhostPosition, gSceneryGhostWallRotation };
-        auto wallRemoveAction = WallRemoveAction(wallLocation);
-        wallRemoveAction.SetFlags(GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_NO_SPEND | GAME_COMMAND_FLAG_GHOST);
-        wallRemoveAction.Execute();
+        auto wallRemoveAction = GameActions::WallRemoveAction(wallLocation);
+        wallRemoveAction.SetFlags({ CommandFlag::allowDuringPaused, CommandFlag::noSpend, CommandFlag::ghost });
+        GameActions::Execute(&wallRemoveAction, gameState);
     }
 
     if (gSceneryGhostType & SCENERY_GHOST_FLAG_3)
     {
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_3;
 
-        auto removeSceneryAction = LargeSceneryRemoveAction({ gSceneryGhostPosition, gSceneryPlaceRotation }, 0);
-        removeSceneryAction.SetFlags(
-            GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_NO_SPEND | GAME_COMMAND_FLAG_GHOST);
-        removeSceneryAction.Execute();
+        auto removeSceneryAction = GameActions::LargeSceneryRemoveAction({ gSceneryGhostPosition, gSceneryPlaceRotation }, 0);
+        removeSceneryAction.SetFlags({ CommandFlag::allowDuringPaused, CommandFlag::noSpend, CommandFlag::ghost });
+        GameActions::Execute(&removeSceneryAction, gameState);
     }
 
     if (gSceneryGhostType & SCENERY_GHOST_FLAG_4)
     {
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_4;
 
-        auto removeSceneryAction = BannerRemoveAction({ gSceneryGhostPosition, gSceneryPlaceRotation });
-        removeSceneryAction.SetFlags(
-            GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_NO_SPEND | GAME_COMMAND_FLAG_GHOST);
-        GameActions::Execute(&removeSceneryAction);
+        auto removeSceneryAction = GameActions::BannerRemoveAction({ gSceneryGhostPosition, gSceneryPlaceRotation });
+        removeSceneryAction.SetFlags({ CommandFlag::allowDuringPaused, CommandFlag::noSpend, CommandFlag::ghost });
+        GameActions::Execute(&removeSceneryAction, gameState);
     }
 }
 
@@ -307,8 +299,8 @@ bool IsSceneryAvailableToBuild(const ScenerySelection& item)
         return true;
     }
 
-    auto& gameState = GetGameState();
-    if (!gameState.Cheats.ignoreResearchStatus)
+    auto& gameState = getGameState();
+    if (!gameState.cheats.ignoreResearchStatus)
     {
         if (!SceneryIsInvented(item))
         {
@@ -316,7 +308,7 @@ bool IsSceneryAvailableToBuild(const ScenerySelection& item)
         }
     }
 
-    if (!gameState.Cheats.sandboxMode && !isInEditorMode())
+    if (!gameState.cheats.sandboxMode && !isInEditorMode())
     {
         if (IsSceneryItemRestricted(item))
         {
@@ -351,15 +343,15 @@ static bool IsSceneryEntryValid(const ScenerySelection& item)
     switch (item.SceneryType)
     {
         case SCENERY_TYPE_SMALL:
-            return OpenRCT2::ObjectManager::GetObjectEntry<SmallSceneryEntry>(item.EntryIndex) != nullptr;
+            return OpenRCT2::ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(item.EntryIndex) != nullptr;
         case SCENERY_TYPE_PATH_ITEM:
-            return OpenRCT2::ObjectManager::GetObjectEntry<PathAdditionEntry>(item.EntryIndex) != nullptr;
+            return OpenRCT2::ObjectEntryManager::GetObjectEntry<PathAdditionEntry>(item.EntryIndex) != nullptr;
         case SCENERY_TYPE_WALL:
-            return OpenRCT2::ObjectManager::GetObjectEntry<WallSceneryEntry>(item.EntryIndex) != nullptr;
+            return OpenRCT2::ObjectEntryManager::GetObjectEntry<WallSceneryEntry>(item.EntryIndex) != nullptr;
         case SCENERY_TYPE_LARGE:
-            return OpenRCT2::ObjectManager::GetObjectEntry<LargeSceneryEntry>(item.EntryIndex) != nullptr;
+            return OpenRCT2::ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(item.EntryIndex) != nullptr;
         case SCENERY_TYPE_BANNER:
-            return OpenRCT2::ObjectManager::GetObjectEntry<BannerSceneryEntry>(item.EntryIndex) != nullptr;
+            return OpenRCT2::ObjectEntryManager::GetObjectEntry<BannerSceneryEntry>(item.EntryIndex) != nullptr;
         default:
             return false;
     }
@@ -367,38 +359,38 @@ static bool IsSceneryEntryValid(const ScenerySelection& item)
 
 bool IsSceneryItemRestricted(const ScenerySelection& item)
 {
-    auto& gameState = GetGameState();
-    return std::find(std::begin(gameState.RestrictedScenery), std::end(gameState.RestrictedScenery), item)
-        != std::end(gameState.RestrictedScenery);
+    auto& gameState = getGameState();
+    return std::find(std::begin(gameState.restrictedScenery), std::end(gameState.restrictedScenery), item)
+        != std::end(gameState.restrictedScenery);
 }
 
 void ClearRestrictedScenery()
 {
-    GetGameState().RestrictedScenery.clear();
+    getGameState().restrictedScenery.clear();
 }
 
 std::vector<ScenerySelection>& GetRestrictedScenery()
 {
-    return GetGameState().RestrictedScenery;
+    return getGameState().restrictedScenery;
 }
 
 void SetSceneryItemRestricted(const ScenerySelection& item, bool on)
 {
-    auto& gameState = GetGameState();
-    auto existingItem = std::find(std::begin(gameState.RestrictedScenery), std::end(gameState.RestrictedScenery), item);
-    const bool existingItemIsPresent = existingItem != std::end(gameState.RestrictedScenery);
+    auto& gameState = getGameState();
+    auto existingItem = std::find(std::begin(gameState.restrictedScenery), std::end(gameState.restrictedScenery), item);
+    const bool existingItemIsPresent = existingItem != std::end(gameState.restrictedScenery);
     if (on)
     {
         if (!existingItemIsPresent)
         {
-            gameState.RestrictedScenery.push_back(item);
+            gameState.restrictedScenery.push_back(item);
         }
     }
     else
     {
         if (existingItemIsPresent)
         {
-            gameState.RestrictedScenery.erase(existingItem);
+            gameState.restrictedScenery.erase(existingItem);
         }
     }
 }
@@ -433,7 +425,7 @@ static MiscScenery GetAllMiscScenery()
     std::vector<ObjectEntryIndex> sceneryGroupIds;
     for (ObjectEntryIndex i = 0; i < kMaxSceneryGroupObjects; i++)
     {
-        const auto* sgEntry = OpenRCT2::ObjectManager::GetObjectEntry<SceneryGroupEntry>(i);
+        const auto* sgEntry = OpenRCT2::ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(i);
         if (sgEntry != nullptr)
         {
             referencedBySceneryGroups.insert(
@@ -452,35 +444,35 @@ static MiscScenery GetAllMiscScenery()
             {
                 case ObjectType::smallScenery:
                 {
-                    const auto* objectEntry = OpenRCT2::ObjectManager::GetObjectEntry<SmallSceneryEntry>(i);
+                    const auto* objectEntry = OpenRCT2::ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(i);
                     if (objectEntry != nullptr)
                         linkedSceneryGroup = objectEntry->scenery_tab_id;
                     break;
                 }
                 case ObjectType::largeScenery:
                 {
-                    const auto* objectEntry = OpenRCT2::ObjectManager::GetObjectEntry<LargeSceneryEntry>(i);
+                    const auto* objectEntry = OpenRCT2::ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(i);
                     if (objectEntry != nullptr)
                         linkedSceneryGroup = objectEntry->scenery_tab_id;
                     break;
                 }
                 case ObjectType::walls:
                 {
-                    const auto* objectEntry = OpenRCT2::ObjectManager::GetObjectEntry<WallSceneryEntry>(i);
+                    const auto* objectEntry = OpenRCT2::ObjectEntryManager::GetObjectEntry<WallSceneryEntry>(i);
                     if (objectEntry != nullptr)
                         linkedSceneryGroup = objectEntry->scenery_tab_id;
                     break;
                 }
                 case ObjectType::banners:
                 {
-                    const auto* objectEntry = OpenRCT2::ObjectManager::GetObjectEntry<BannerSceneryEntry>(i);
+                    const auto* objectEntry = OpenRCT2::ObjectEntryManager::GetObjectEntry<BannerSceneryEntry>(i);
                     if (objectEntry != nullptr)
                         linkedSceneryGroup = objectEntry->scenery_tab_id;
                     break;
                 }
                 case ObjectType::pathAdditions:
                 {
-                    const auto* objectEntry = OpenRCT2::ObjectManager::GetObjectEntry<PathAdditionEntry>(i);
+                    const auto* objectEntry = OpenRCT2::ObjectEntryManager::GetObjectEntry<PathAdditionEntry>(i);
                     if (objectEntry != nullptr)
                         linkedSceneryGroup = objectEntry->scenery_tab_id;
                     break;
@@ -522,14 +514,14 @@ static MiscScenery GetAllMiscScenery()
 
 void RestrictAllMiscScenery()
 {
-    auto& gameState = GetGameState();
+    auto& gameState = getGameState();
     auto miscScenery = GetAllMiscScenery().miscScenery;
-    gameState.RestrictedScenery.insert(gameState.RestrictedScenery.begin(), miscScenery.begin(), miscScenery.end());
+    gameState.restrictedScenery.insert(gameState.restrictedScenery.begin(), miscScenery.begin(), miscScenery.end());
 }
 
 static void MarkAllUnrestrictedSceneryInVectorInvented(const std::vector<ScenerySelection>& vector)
 {
-    auto& restrictedScenery = GetGameState().RestrictedScenery;
+    auto& restrictedScenery = getGameState().restrictedScenery;
 
     for (const auto& sceneryItem : vector)
     {

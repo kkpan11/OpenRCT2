@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,7 +11,7 @@
 #include "AudioFormat.h"
 #include "SDLAudioSource.h"
 
-#include <SDL.h>
+#include <SDL_audio.h>
 #include <algorithm>
 #include <openrct2/audio/AudioSource.h>
 #include <stdexcept>
@@ -55,7 +55,7 @@ namespace OpenRCT2::Audio
                 auto src = _data.data();
                 if (src != nullptr)
                 {
-                    std::copy_n(src + offset, bytesToRead, reinterpret_cast<uint8_t*>(dst));
+                    std::copy_n(src + offset, bytesToRead, static_cast<uint8_t*>(dst));
                 }
             }
             return bytesToRead;

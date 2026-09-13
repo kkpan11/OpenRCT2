@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -14,20 +14,25 @@
 #include "Input.h"
 #include "OpenRCT2.h"
 #include "ReplayManager.h"
-#include "actions/GameAction.h"
+#include "actions/GameActionRunner.h"
 #include "config/Config.h"
+#include "drawing/Palette.h"
 #include "entity/EntityTweener.h"
 #include "entity/PatrolArea.h"
 #include "interface/Screenshot.h"
 #include "platform/Platform.h"
 #include "profiling/Profiling.h"
 #include "ride/Vehicle.h"
+#include "scenario/Scenario.h"
+#include "scenes/editor/EditorScene.h"
 #include "scenes/title/TitleScene.h"
 #include "scenes/title/TitleSequencePlayer.h"
 #include "scripting/ScriptEngine.h"
 #include "ui/UiContext.h"
 #include "windows/Intent.h"
+#include "world/Map.h"
 #include "world/MapAnimation.h"
+#include "world/Park.h"
 #include "world/Scenery.h"
 
 using namespace OpenRCT2::Scripting;
@@ -36,12 +41,12 @@ namespace OpenRCT2
 {
     static auto _gameState = std::make_unique<GameState_t>();
 
-    GameState_t& GetGameState()
+    GameState_t& getGameState()
     {
         return *_gameState;
     }
 
-    void SwapGameState(std::unique_ptr<GameState_t>& otherState)
+    void swapGameState(std::unique_ptr<GameState_t>& otherState)
     {
         _gameState.swap(otherState);
     }
@@ -54,22 +59,22 @@ namespace OpenRCT2
         PROFILED_FUNCTION();
 
         gInMapInitCode = true;
-        gameState.CurrentTicks = 0;
+        gameState.currentTicks = 0;
 
         MapInit(mapSize);
-        Park::Initialise(gameState);
+        Park::Initialise(gameState.park, gameState);
         FinanceInit();
         BannerInit(gameState);
         RideInitAll();
-        ResetAllEntities();
+        gameState.entities.resetAllEntities();
         UpdateConsolidatedPatrolAreas();
         ResetDate();
-        ClimateReset();
+        Weather::reset();
         News::InitQueue(gameState);
 
         gInMapInitCode = false;
 
-        gameState.NextGuestNumber = 1;
+        gameState.nextGuestNumber = 1;
 
         ContextInit();
 
@@ -79,7 +84,7 @@ namespace OpenRCT2
         auto clipboardIntent = Intent(INTENT_ACTION_CLEAR_TILE_INSPECTOR_CLIPBOARD);
         ContextBroadcastIntent(&clipboardIntent);
 
-        LoadPalette();
+        Drawing::LoadPalette();
 
         CheatsReset();
         ClearRestrictedScenery();
@@ -89,7 +94,7 @@ namespace OpenRCT2
         scriptEngine.ClearParkStorage();
 #endif
 
-        EntityTweener::Get().Reset();
+        EntityTweener::get().reset();
     }
 
     /**
@@ -111,19 +116,19 @@ namespace OpenRCT2
 
         if (GameIsNotPaused() && gPreviewingTitleSequenceInGame)
         {
-            auto player = GetContext()->GetUiContext()->GetTitleSequencePlayer();
+            auto player = GetContext()->GetUiContext().GetTitleSequencePlayer();
             if (player != nullptr)
             {
                 player->Update();
             }
         }
 
-        NetworkUpdate();
+        Network::Update();
 
-        if (NetworkGetMode() == NETWORK_MODE_CLIENT && NetworkGetStatus() == NETWORK_STATUS_CONNECTED
-            && NetworkGetAuthstatus() == NetworkAuth::Ok)
+        if (Network::GetMode() == Network::Mode::client && Network::GetStatus() == Network::Status::connected
+            && Network::GetAuthstatus() == Network::Auth::ok)
         {
-            numUpdates = std::clamp<uint32_t>(NetworkGetServerTick() - GetGameState().CurrentTicks, 0, 10);
+            numUpdates = std::clamp<uint32_t>(Network::GetServerTick() - getGameState().currentTicks, 0, 10);
         }
         else
         {
@@ -136,10 +141,10 @@ namespace OpenRCT2
         }
 
         bool isPaused = GameIsPaused();
-        if (NetworkGetMode() == NETWORK_MODE_SERVER && Config::Get().network.PauseServerIfNoClients)
+        if (Network::GetMode() == Network::Mode::server && Config::Get().network.pauseServerIfNoClients)
         {
             // If we are headless we always have 1 player (host), pause if no one else is around.
-            if (gOpenRCT2Headless && NetworkGetNumPlayers() == 1)
+            if (gOpenRCT2Headless && Network::GetNumPlayers() == 1)
             {
                 isPaused |= true;
             }
@@ -148,7 +153,7 @@ namespace OpenRCT2
         bool didRunSingleFrame = false;
         if (isPaused)
         {
-            if (gDoSingleUpdate && NetworkGetMode() == NETWORK_MODE_NONE)
+            if (gDoSingleUpdate && Network::GetMode() == Network::Mode::none)
             {
                 didRunSingleFrame = true;
                 PauseToggle();
@@ -160,26 +165,29 @@ namespace OpenRCT2
                 // If the game is paused it will not call UpdateLogic at all.
                 numUpdates = 0;
 
-                if (NetworkGetMode() == NETWORK_MODE_SERVER)
+                if (Network::GetMode() == Network::Mode::server)
                 {
                     // Make sure the client always knows about what tick the host is on.
-                    NetworkSendTick();
+                    Network::SendTick();
                 }
 
                 // Keep updating the money effect even when paused.
-                UpdateMoneyEffect();
-
-                // Update the animation list. Note this does not
-                // increment the map animation.
-                MapAnimationInvalidateAll();
+                auto& gameState = getGameState();
+                gameState.entities.updateMoneyEffect();
 
                 // Post-tick network update
-                NetworkProcessPending();
+                Network::PostTick();
 
                 // Post-tick game actions.
-                GameActions::ProcessQueue();
-                UpdateEntitiesSpatialIndex();
+                GameActions::ProcessQueue(gameState);
+                gameState.entities.updateEntitiesSpatialIndex();
             }
+        }
+
+        // Network has to always tick.
+        if (numUpdates == 0)
+        {
+            Network::Tick();
         }
 
         // Update the game one or more times
@@ -188,11 +196,11 @@ namespace OpenRCT2
             gameStateUpdateLogic();
             if (gGameSpeed == 1)
             {
-                if (InputGetState() == InputState::Reset || InputGetState() == InputState::Normal)
+                if (InputGetState() == InputState::reset || InputGetState() == InputState::normal)
                 {
-                    if (InputTestFlag(INPUT_FLAG_VIEWPORT_SCROLLING))
+                    if (gInputFlags.has(InputFlag::viewportScrolling))
                     {
-                        InputSetFlag(INPUT_FLAG_VIEWPORT_SCROLLING, false);
+                        gInputFlags.unset(InputFlag::viewportScrolling);
                         break;
                     }
                 }
@@ -207,11 +215,11 @@ namespace OpenRCT2
                 break;
         }
 
-        NetworkFlush();
+        Network::Flush();
 
         if (!gOpenRCT2Headless)
         {
-            InputSetFlag(INPUT_FLAG_VIEWPORT_SCROLLING, false);
+            gInputFlags.unset(InputFlag::viewportScrolling);
         }
 
         // Always perform autosave check, even when paused
@@ -237,7 +245,7 @@ namespace OpenRCT2
 
         auto& snapshot = snapshots->CreateSnapshot();
         snapshots->Capture(snapshot);
-        snapshots->LinkSnapshot(snapshot, GetGameState().CurrentTicks, ScenarioRandState().s0);
+        snapshots->LinkSnapshot(snapshot, getGameState().currentTicks, ScenarioRandState().s0);
     }
 
     void gameStateUpdateLogic()
@@ -252,41 +260,41 @@ namespace OpenRCT2
 
         GetContext()->GetReplayManager()->Update();
 
-        NetworkUpdate();
+        Network::Tick();
 
-        auto& gameState = GetGameState();
+        auto& gameState = getGameState();
 
-        if (NetworkGetMode() == NETWORK_MODE_SERVER)
+        if (Network::GetMode() == Network::Mode::server)
         {
-            if (NetworkGamestateSnapshotsEnabled())
+            if (Network::GamestateSnapshotsEnabled())
             {
                 gameStateCreateStateSnapshot();
             }
 
             // Send current tick out.
-            NetworkSendTick();
+            Network::SendTick();
         }
-        else if (NetworkGetMode() == NETWORK_MODE_CLIENT)
+        else if (Network::GetMode() == Network::Mode::client)
         {
             // Don't run past the server, this condition can happen during map changes.
-            if (NetworkGetServerTick() == gameState.CurrentTicks)
+            if (Network::GetServerTick() == gameState.currentTicks)
             {
                 gInUpdateCode = false;
                 return;
             }
 
             // Check desync.
-            bool desynced = NetworkCheckDesynchronisation();
+            bool desynced = Network::CheckDesynchronisation();
             if (desynced)
             {
                 // If desync debugging is enabled and we are still connected request the specific game state from server.
-                if (NetworkGamestateSnapshotsEnabled() && NetworkGetStatus() == NETWORK_STATUS_CONNECTED)
+                if (Network::GamestateSnapshotsEnabled() && Network::GetStatus() == Network::Status::connected)
                 {
                     // Create snapshot from this tick so we can compare it later
                     // as we won't pause the game on this event.
                     gameStateCreateStateSnapshot();
 
-                    NetworkRequestGamestateSnapshot();
+                    Network::RequestGamestateSnapshot();
                 }
             }
         }
@@ -294,13 +302,13 @@ namespace OpenRCT2
 #ifdef ENABLE_SCRIPTING
         // Stash the current day number before updating the date so that we
         // know if the day number changes on this tick.
-        auto day = gameState.Date.GetDay();
+        auto day = gameState.date.GetDay();
 #endif
 
         DateUpdate(gameState);
 
         ScenarioUpdate(gameState);
-        ClimateUpdate();
+        Weather::update();
         MapUpdateTiles();
 
         // Temporarily remove provisional paths to prevent peep from interacting with them
@@ -312,29 +320,31 @@ namespace OpenRCT2
         auto restoreProvisionalIntent = Intent(INTENT_ACTION_RESTORE_PROVISIONAL_ELEMENTS);
         ContextBroadcastIntent(&restoreProvisionalIntent);
         VehicleUpdateAll();
-        UpdateAllMiscEntities();
+        gameState.entities.updateAllMiscEntities();
         Ride::updateAll();
 
         if (!isInEditorMode())
         {
-            Park::Update(gameState, gameState.Date);
+            auto& park = gameState.park;
+            Park::Update(park, gameState);
         }
 
         ResearchUpdate();
-        RideRatingsUpdateAll();
+        RideRating::UpdateAll();
         RideMeasurementsUpdate();
         News::UpdateCurrentItem();
 
-        MapAnimationInvalidateAll();
+        MapAnimations::InvalidateAndUpdateAll();
         VehicleSoundsUpdate();
         PeepUpdateCrowdNoise();
-        ClimateUpdateSound();
-        EditorOpenWindowsForCurrentStep();
+        Weather::updateSound();
+
+        EditorScene::OpenWindowsForCurrentStep();
 
         // Update windows
         // WindowDispatchUpdateAll();
 
-        UpdateEntitiesSpatialIndex();
+        gameState.entities.updateEntitiesSpatialIndex();
 
         // Start autosave timer after update
         if (gLastAutoSaveUpdate == kAutosavePause)
@@ -342,20 +352,20 @@ namespace OpenRCT2
             gLastAutoSaveUpdate = Platform::GetTicks();
         }
 
-        GameActions::ProcessQueue();
+        GameActions::ProcessQueue(gameState);
 
-        NetworkProcessPending();
-        NetworkFlush();
+        Network::PostTick();
+        Network::Flush();
 
-        gameState.CurrentTicks++;
+        gameState.currentTicks++;
 
 #ifdef ENABLE_SCRIPTING
         auto& hookEngine = GetContext()->GetScriptEngine().GetHookEngine();
-        hookEngine.Call(HOOK_TYPE::INTERVAL_TICK, true);
+        hookEngine.Call(HookType::intervalTick, true);
 
-        if (day != gameState.Date.GetDay())
+        if (day != gameState.date.GetDay())
         {
-            hookEngine.Call(HOOK_TYPE::INTERVAL_DAY, true);
+            hookEngine.Call(HookType::intervalDay, true);
         }
 #endif
 

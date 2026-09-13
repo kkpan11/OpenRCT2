@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,18 +9,24 @@
 
 #pragma once
 
-#include <openrct2/interface/Window.h>
+#include <cstdint>
+
+struct ScreenCoordsXY;
 
 namespace OpenRCT2
 {
     enum class MouseState : uint32_t
     {
-        Released,
-        LeftPress,
-        LeftRelease,
-        RightPress,
-        RightRelease
+        released,
+        leftPress,
+        leftRelease,
+        rightPress,
+        rightRelease,
     };
+
+    using WidgetIndex = uint16_t;
+
+    struct WindowBase;
 
     extern ScreenCoordsXY gInputDragLast;
 
@@ -31,4 +37,6 @@ namespace OpenRCT2
     void StoreMouseInput(MouseState state, const ScreenCoordsXY& screenCoords);
 
     void InputScrollViewport(const ScreenCoordsXY& screenCoords);
+    void InputScrollViewportSmooth(const ScreenCoordsXY& screenCoords);
+    void InputScrollViewportSmooth(const ScreenCoordsXY& screenCoords, WindowBase* targetWindow);
 } // namespace OpenRCT2

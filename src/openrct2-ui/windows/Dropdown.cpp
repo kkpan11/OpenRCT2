@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,25 +8,37 @@
  *****************************************************************************/
 
 #include <algorithm>
-#include <bitset>
 #include <iterator>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Widget.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/Input.h>
 #include <openrct2/SpriteIds.h>
 #include <openrct2/config/Config.h>
-#include <openrct2/core/BitSet.hpp>
+#include <openrct2/core/String.hpp>
+#include <openrct2/drawing/ColourMap.h>
+#include <openrct2/drawing/Drawing.String.h>
 #include <openrct2/drawing/Drawing.h>
+#include <openrct2/drawing/Rectangle.h>
+#include <openrct2/drawing/RenderTarget.h>
+#include <openrct2/drawing/Text.h>
+#include <openrct2/interface/ColourWithFlags.h>
 #include <openrct2/localisation/Formatter.h>
 #include <openrct2/localisation/Formatting.h>
+#include <openrct2/localisation/Language.h>
+#include <openrct2/localisation/StringIds.h>
 #include <openrct2/ui/WindowManager.h>
+
+using namespace OpenRCT2::Drawing;
 
 namespace OpenRCT2::Ui::Windows
 {
     constexpr int32_t kDropdownItemHeight = 12;
     constexpr int32_t kDropdownItemHeightTouch = 24;
+    // Padding to the left of an item, where a marker can be drawn.
+    static constexpr int32_t kDropdownItemLeftPadding = 10;
 
     static constexpr std::array<uint8_t, 57> kAppropriateImageDropdownItemsPerRow = {
         1, 1, 1, 1, 2, 2, 3, 3, 4, 3, // 10
@@ -37,70 +49,141 @@ namespace OpenRCT2::Ui::Windows
         9, 9, 9, 9, 9, 9, 9,          // 56
     };
 
-    enum
+    enum WindowDropdownWidgetIdx : WidgetIndex
     {
         WIDX_BACKGROUND,
     };
 
     static constexpr Widget kWindowDropdownWidgets[] = {
-        MakeWidget({ 0, 0 }, { 1, 1 }, WindowWidgetType::ImgBtn, WindowColour::Primary),
+        makeWidget({ 0, 0 }, { 1, 1 }, WidgetType::imgBtn, WindowColour::primary),
     };
 
-    int32_t gDropdownNumItems;
-    Dropdown::Item gDropdownItems[Dropdown::kItemsMaxSize];
-    static ImageId _dropdownItemsImages[Dropdown::kItemsMaxSize];
-    bool gDropdownIsColour;
-    int32_t gDropdownLastColourHover;
-    int32_t gDropdownHighlightedIndex;
-    int32_t gDropdownDefaultIndex;
-    static bool _dropdownPrepareUseImages;
-
-    static void ResetDropdownFlags()
-    {
-        for (size_t i = 0; i < std::size(gDropdownItems); i++)
-        {
-            gDropdownItems[i].Flags = 0;
-        }
-    }
+    Dropdown::DropdownState gDropdown{};
 
     class DropdownWindow final : public Window
     {
-        bool UseImages;
         int32_t NumColumns;
         int32_t NumRows;
         int32_t ItemWidth;
         int32_t ItemHeight;
+        int32_t ItemPadding;
         bool ListVertically;
 
     public:
-        void OnOpen() override
+        void onOpen() override
         {
-            SetWidgets(kWindowDropdownWidgets);
+            setWidgets(kWindowDropdownWidgets);
 
             // Input state
-            gDropdownHighlightedIndex = -1;
-            ResetDropdownFlags();
-            gDropdownIsColour = false;
-            gDropdownDefaultIndex = -1;
-            InputSetState(InputState::DropdownActive);
+            gDropdown.highlightedIndex = -1;
+            gDropdown.hasTooltips = false;
+            gDropdown.defaultIndex = -1;
+            InputSetState(InputState::dropdownActive);
         }
 
         static int32_t GetDefaultRowHeight()
         {
-            return Config::Get().interface.EnlargedUi ? kDropdownItemHeightTouch : kDropdownItemHeight;
+            return Config::Get().interface.enlargedUi ? kDropdownItemHeightTouch : kDropdownItemHeight;
         }
 
         static int32_t GetAdditionalRowPadding()
         {
-            return Config::Get().interface.EnlargedUi ? 6 : 0;
+            return Config::Get().interface.enlargedUi ? 6 : 0;
         }
 
-        void OnDraw(DrawPixelInfo& dpi) override
+        void drawItem(RenderTarget& rt, ScreenCoordsXY screenCoords, int32_t i)
         {
-            DrawWidgets(dpi);
+            const int32_t highlightedIndex = gDropdown.highlightedIndex;
+            const bool highlighted = (i == highlightedIndex);
 
-            int32_t highlightedIndex = gDropdownHighlightedIndex;
-            for (int32_t i = 0; i < gDropdownNumItems; i++)
+            const auto& item = gDropdown.items[i];
+            switch (item.type)
+            {
+                case Dropdown::ItemType::regular:
+                {
+                    auto formatString = STR_OPTIONS_DROPDOWN_ITEM;
+                    if (i < Dropdown::kItemsMaxSize && gDropdown.items[i].isChecked())
+                        formatString = STR_OPTIONS_DROPDOWN_ITEM_SELECTED;
+
+                    drawTextItem(rt, screenCoords, width, item, highlighted, formatString, colours[0].colour);
+                    break;
+                }
+                case Dropdown::ItemType::toggle:
+                {
+                    auto formatString = STR_TOGGLE_OPTION;
+                    if (i < Dropdown::kItemsMaxSize && gDropdown.items[i].isChecked())
+                        formatString = STR_TOGGLE_OPTION_CHECKED;
+
+                    drawTextItem(rt, screenCoords, width, item, highlighted, formatString, colours[0].colour);
+                    break;
+                }
+                case Dropdown::ItemType::plain:
+                {
+                    drawTextItem(rt, screenCoords, width, item, highlighted, STR_STRING, colours[0].colour);
+                    break;
+                }
+                case Dropdown::ItemType::image:
+                {
+                    GfxDrawSprite(rt, item.image, screenCoords);
+                    break;
+                }
+                case Dropdown::ItemType::colour:
+                {
+                    auto image = item.image;
+                    if (highlightedIndex == i)
+                        image = image.WithIndexOffset(1);
+                    GfxDrawSprite(rt, image, screenCoords);
+                    break;
+                }
+                case Dropdown::ItemType::separator:
+                    break;
+            }
+        }
+
+        void drawSeparator(RenderTarget& rt, ScreenCoordsXY screenCoords)
+        {
+            const auto leftTop = screenCoords + ScreenCoordsXY{ 2, (ItemHeight / 2) - 1 };
+            const auto rightBottom = leftTop + ScreenCoordsXY{ ItemWidth - 4, 0 };
+            const auto shadowOffset = ScreenCoordsXY{ 0, 1 };
+
+            if (colours[0].flags.has(ColourFlag::translucent))
+            {
+                auto palette = kTranslucentWindowPalettes[EnumValue(colours[0].colour)];
+                Rectangle::filter(rt, { leftTop, rightBottom }, palette.highlight);
+                Rectangle::filter(rt, { leftTop + shadowOffset, rightBottom + shadowOffset }, palette.shadow);
+            }
+            else
+            {
+                Rectangle::fill(rt, { leftTop, rightBottom }, getColourMap(colours[0].colour).midDark);
+                Rectangle::fill(
+                    rt, { leftTop + shadowOffset, rightBottom + shadowOffset }, getColourMap(colours[0].colour).lightest);
+            }
+        }
+
+        void drawTextItem(
+            RenderTarget& rt, ScreenCoordsXY screenCoords, int32_t ddWidth, const Dropdown::Item& item, bool highlighted,
+            StringId format, Colour background)
+        {
+            ColourWithFlags colour = { background };
+            if (highlighted)
+                colour.colour = Colour::white;
+            if (item.isDisabled())
+                colour = { background, { ColourFlag::inset } };
+
+            auto yOffset = ItemPadding;
+            Formatter ft;
+            ft.Add<const utf8*>(item.text);
+
+            drawTextEllipsised(rt, { screenCoords.x + 2, screenCoords.y + yOffset }, ddWidth - 7, format, ft, { colour });
+        }
+
+        void onDraw(RenderTarget& rt) override
+        {
+            drawWidgets(rt);
+
+            int32_t highlightedIndex = gDropdown.highlightedIndex;
+
+            for (int32_t i = 0; i < gDropdown.numItems; i++)
             {
                 ScreenCoordsXY cellCoords;
                 if (ListVertically)
@@ -111,64 +194,29 @@ namespace OpenRCT2::Ui::Windows
                 ScreenCoordsXY screenCoords = windowPos
                     + ScreenCoordsXY{ 2 + (cellCoords.x * ItemWidth), 2 + (cellCoords.y * ItemHeight) };
 
-                if (gDropdownItems[i].IsSeparator())
+                bool highlighted = (i == highlightedIndex);
+                if (highlighted)
                 {
-                    const auto leftTop = screenCoords + ScreenCoordsXY{ 2, (ItemHeight / 2) - 1 };
-                    const auto rightBottom = leftTop + ScreenCoordsXY{ ItemWidth - 4, 0 };
-                    const auto shadowOffset = ScreenCoordsXY{ 0, 1 };
+                    // Darken the cell's background slightly when highlighted
+                    const ScreenCoordsXY rightBottom = screenCoords + ScreenCoordsXY{ ItemWidth - 1, ItemHeight - 1 };
+                    Rectangle::filter(rt, { screenCoords, rightBottom }, FilterPaletteID::paletteDarken3);
+                }
 
-                    if (colours[0].hasFlag(ColourFlag::translucent))
+                if (gDropdown.items[i].isSeparator())
+                {
+                    drawSeparator(rt, screenCoords);
+                }
+                else if (gDropdown.cellDrawFunction.has_value())
+                {
+                    RenderTarget clippedRT;
+                    if (ClipRenderTarget(clippedRT, rt, screenCoords, ItemWidth, ItemHeight))
                     {
-                        TranslucentWindowPalette palette = TranslucentWindowPalettes[colours[0].colour];
-                        GfxFilterRect(dpi, { leftTop, rightBottom }, palette.highlight);
-                        GfxFilterRect(dpi, { leftTop + shadowOffset, rightBottom + shadowOffset }, palette.shadow);
-                    }
-                    else
-                    {
-                        GfxFillRect(dpi, { leftTop, rightBottom }, ColourMapA[colours[0].colour].mid_dark);
-                        GfxFillRect(
-                            dpi, { leftTop + shadowOffset, rightBottom + shadowOffset },
-                            ColourMapA[colours[0].colour].lightest);
+                        gDropdown.cellDrawFunction.value()(clippedRT, gDropdown.items[i], highlighted);
                     }
                 }
                 else
                 {
-                    if (i == highlightedIndex)
-                    {
-                        // Darken the cell's background slightly when highlighted
-                        const ScreenCoordsXY rightBottom = screenCoords + ScreenCoordsXY{ ItemWidth - 1, ItemHeight - 1 };
-                        GfxFilterRect(dpi, { screenCoords, rightBottom }, FilterPaletteID::PaletteDarken3);
-                    }
-
-                    StringId item = gDropdownItems[i].Format;
-                    if (item == Dropdown::kFormatLandPicker || item == Dropdown::kFormatColourPicker)
-                    {
-                        // Image item
-                        auto image = UseImages ? _dropdownItemsImages[i]
-                                               : ImageId(static_cast<uint32_t>(gDropdownItems[i].Args));
-                        if (item == Dropdown::kFormatColourPicker && highlightedIndex == i)
-                            image = image.WithIndexOffset(1);
-                        GfxDrawSprite(dpi, image, screenCoords);
-                    }
-                    else
-                    {
-                        // Text item
-                        if (i < Dropdown::kItemsMaxSize && Dropdown::IsChecked(i))
-                            item++;
-
-                        // Calculate colour
-                        ColourWithFlags colour = { colours[0].colour };
-                        if (i == highlightedIndex)
-                            colour.colour = COLOUR_WHITE;
-                        if (i < Dropdown::kItemsMaxSize && Dropdown::IsDisabled(i))
-                            colour = { colours[0].colour, EnumToFlag(ColourFlag::inset) };
-
-                        // Draw item string
-                        auto yOffset = GetAdditionalRowPadding();
-                        Formatter ft(reinterpret_cast<uint8_t*>(&gDropdownItems[i].Args));
-                        DrawTextEllipsised(
-                            dpi, { screenCoords.x + 2, screenCoords.y + yOffset }, width - 7, item, ft, { colour });
-                    }
+                    drawItem(rt, screenCoords, i);
                 }
             }
         }
@@ -182,19 +230,21 @@ namespace OpenRCT2::Ui::Windows
             return std::max(1, mainWindow->height - (screenPos.y + dropdownButtonHeight + 5));
         }
 
-        void SetTextItems(
-            const ScreenCoordsXY& screenPos, int32_t extraY, ColourWithFlags colour, uint8_t customItemHeight, uint8_t txtFlags,
-            size_t numItems, int32_t itemWidth, int32_t numRowsPerColumn)
+        void setTextItems(
+            const ScreenCoordsXY& screenPos, int32_t extraY, ColourWithFlags colour, uint8_t customItemHeight,
+            Dropdown::Flags txtFlags, size_t numItems, int32_t itemWidth, int32_t numRowsPerColumn)
         {
             // Set and calculate num items, rows and columns
-            ItemHeight = (txtFlags & Dropdown::Flag::CustomHeight) ? customItemHeight : GetDefaultRowHeight();
+            const auto hasCustomHeight = txtFlags.has(Dropdown::Flag::customHeight);
+            ItemHeight = hasCustomHeight ? customItemHeight : GetDefaultRowHeight();
+            ItemPadding = hasCustomHeight ? 0 : GetAdditionalRowPadding();
 
-            gDropdownNumItems = static_cast<int32_t>(numItems);
-            if (gDropdownNumItems > 1)
+            gDropdown.numItems = static_cast<int32_t>(numItems);
+            if (gDropdown.numItems > 1)
             {
                 int32_t numAvailableRows = std::max(1, getSpaceUntilBottom(screenPos, extraY) / ItemHeight);
-                NumRows = std::min({ gDropdownNumItems, numAvailableRows, numRowsPerColumn });
-                NumColumns = (gDropdownNumItems + NumRows - 1) / NumRows;
+                NumRows = std::min({ gDropdown.numItems, numAvailableRows, numRowsPerColumn });
+                NumColumns = (gDropdown.numItems + NumRows - 1) / NumRows;
             }
             else
             {
@@ -210,25 +260,22 @@ namespace OpenRCT2::Ui::Windows
 
             UpdateSizeAndPosition(screenPos, extraY);
 
-            if (colour.hasFlag(ColourFlag::translucent))
-                flags |= WF_TRANSPARENT;
+            if (colour.flags.has(ColourFlag::translucent))
+                flags |= WindowFlag::transparent;
             colours[0] = colour;
         }
 
-        void SetImageItems(
+        void setImageItems(
             const ScreenCoordsXY& screenPos, int32_t extraY, ColourWithFlags colour, int32_t numItems, int32_t itemWidth,
             int32_t itemHeight, int32_t numColumns)
         {
-            UseImages = _dropdownPrepareUseImages;
-            _dropdownPrepareUseImages = false;
-
             // Set and calculate num items, rows and columns
             ItemWidth = itemWidth;
             ItemHeight = itemHeight;
-            gDropdownNumItems = numItems;
+            gDropdown.numItems = numItems;
 
             // There must always be at least one column and row to prevent dividing by zero
-            if (gDropdownNumItems == 0)
+            if (gDropdown.numItems == 0)
             {
                 NumColumns = 1;
                 NumRows = 1;
@@ -236,8 +283,8 @@ namespace OpenRCT2::Ui::Windows
             else
             {
                 NumColumns = std::max(1, numColumns);
-                NumRows = gDropdownNumItems / NumColumns;
-                if (gDropdownNumItems % NumColumns != 0)
+                NumRows = gDropdown.numItems / NumColumns;
+                if (gDropdown.numItems % NumColumns != 0)
                     NumRows++;
             }
 
@@ -246,8 +293,8 @@ namespace OpenRCT2::Ui::Windows
 
             UpdateSizeAndPosition(screenPos, extraY);
 
-            if (colour.hasFlag(ColourFlag::translucent))
-                flags |= WF_TRANSPARENT;
+            if (colour.flags.has(ColourFlag::translucent))
+                flags |= WindowFlag::transparent;
             colours[0] = colour;
         }
 
@@ -278,7 +325,7 @@ namespace OpenRCT2::Ui::Windows
             else
                 dropdownIndex = rowNum * NumColumns + columnNum;
 
-            if (dropdownIndex >= gDropdownNumItems)
+            if (dropdownIndex >= gDropdown.numItems)
                 return -1;
 
             return dropdownIndex;
@@ -301,13 +348,21 @@ namespace OpenRCT2::Ui::Windows
             widgets[WIDX_BACKGROUND].right = ddWidth;
             widgets[WIDX_BACKGROUND].bottom = ddHeight;
 
-            Invalidate();
+            invalidate();
             width = ddWidth + 1;
             height = ddHeight + 1;
             windowPos = boundedScreenPos + ScreenCoordsXY{ 0, extraY };
-            Invalidate();
+            invalidate();
         }
     };
+
+    static void copyItemsToGlobal(std::span<const Dropdown::Item> items)
+    {
+        for (size_t i = 0; i < items.size(); i++)
+        {
+            gDropdown.items[i] = items[i];
+        }
+    }
 
     /**
      * Shows a text dropdown menu.
@@ -321,22 +376,31 @@ namespace OpenRCT2::Ui::Windows
      * @param colour (al)
      */
     void WindowDropdownShowText(
-        const ScreenCoordsXY& screenPos, int32_t extray, ColourWithFlags colour, uint8_t flags, size_t num_items,
+        const ScreenCoordsXY& screenPos, int32_t extray, ColourWithFlags colour, Dropdown::Flags flags, size_t num_items,
         size_t prefRowsPerColumn)
     {
-        char buffer[256];
-
         // Calculate the longest string width
-        int32_t max_string_width = 0;
+        int32_t maxStringWidth = 0;
         for (size_t i = 0; i < num_items; i++)
         {
-            FormatStringLegacy(buffer, 256, gDropdownItems[i].Format, static_cast<void*>(&gDropdownItems[i].Args));
-            int32_t string_width = GfxGetStringWidth(buffer, FontStyle::Medium);
-            max_string_width = std::max(string_width, max_string_width);
+            int32_t stringWidth = getStringWidth(gDropdown.items[i].text, FontStyle::medium);
+            if (gDropdown.items[i].type != Dropdown::ItemType::plain)
+                stringWidth += kDropdownItemLeftPadding;
+            maxStringWidth = std::max(stringWidth, maxStringWidth);
         }
 
         WindowDropdownShowTextCustomWidth(
-            screenPos, extray, colour, 0, flags, num_items, max_string_width + 3, prefRowsPerColumn);
+            screenPos, extray, colour, 0, flags, num_items, maxStringWidth + 3, prefRowsPerColumn);
+
+        gDropdown.cellDrawFunction = std::nullopt;
+    }
+
+    void WindowDropdownShowText(
+        const ScreenCoordsXY& screenPos, int32_t extray, ColourWithFlags colour, Dropdown::Flags flags,
+        std::span<const Dropdown::Item> items, size_t prefRowsPerColumn)
+    {
+        copyItemsToGlobal(items);
+        WindowDropdownShowText(screenPos, extray, colour, flags, items.size(), prefRowsPerColumn);
     }
 
     /**
@@ -352,24 +416,35 @@ namespace OpenRCT2::Ui::Windows
      * @param customItemHeight (ah) requires flag set as well
      */
     void WindowDropdownShowTextCustomWidth(
-        const ScreenCoordsXY& screenPos, int32_t extray, ColourWithFlags colour, uint8_t customItemHeight, uint8_t flags,
-        size_t num_items, int32_t width, size_t prefRowsPerColumn)
+        const ScreenCoordsXY& screenPos, int32_t extray, ColourWithFlags colour, uint8_t customItemHeight,
+        Dropdown::Flags flags, size_t num_items, int32_t width, size_t prefRowsPerColumn)
     {
-        InputSetFlag(static_cast<INPUT_FLAGS>(INPUT_FLAG_DROPDOWN_STAY_OPEN | INPUT_FLAG_DROPDOWN_MOUSE_UP), false);
-        if (flags & Dropdown::Flag::StayOpen || Config::Get().interface.TouchEnhancements)
-            InputSetFlag(INPUT_FLAG_DROPDOWN_STAY_OPEN, true);
+        gInputFlags.unset(InputFlag::dropdownAutoclose, InputFlag::dropdownMouseUp);
+        if (flags.has(Dropdown::Flag::autoClose) && !Config::Get().interface.touchEnhancements)
+            gInputFlags.set(InputFlag::dropdownAutoclose);
 
         WindowDropdownClose();
 
         // Create the window (width/height position are set later)
         auto* windowMgr = GetWindowManager();
         auto* w = windowMgr->Create<DropdownWindow>(
-            WindowClass::Dropdown, width, customItemHeight, WF_STICK_TO_FRONT | WF_NO_TITLE_BAR);
+            WindowClass::dropdown, { width, customItemHeight }, { WindowFlag::stickToFront, WindowFlag::noTitleBar });
         if (w != nullptr)
         {
             auto numRowsPerColumn = prefRowsPerColumn > 0 ? static_cast<int32_t>(prefRowsPerColumn) : Dropdown::kItemsMaxSize;
-            w->SetTextItems(screenPos, extray, colour, customItemHeight, flags, num_items, width, numRowsPerColumn);
+            w->setTextItems(screenPos, extray, colour, customItemHeight, flags, num_items, width, numRowsPerColumn);
         }
+
+        gDropdown.cellDrawFunction = std::nullopt;
+    }
+
+    void WindowDropdownShowTextCustomWidth(
+        const ScreenCoordsXY& screenPos, int32_t extray, ColourWithFlags colour, uint8_t custom_height, Dropdown::Flags flags,
+        std::span<const Dropdown::Item> items, int32_t width, size_t prefRowsPerColumn)
+    {
+        copyItemsToGlobal(items);
+        WindowDropdownShowTextCustomWidth(
+            screenPos, extray, colour, custom_height, flags, items.size(), width, prefRowsPerColumn);
     }
 
     /**
@@ -387,29 +462,41 @@ namespace OpenRCT2::Ui::Windows
      * @param numColumns (bl)
      */
     void WindowDropdownShowImage(
-        int32_t x, int32_t y, int32_t extray, ColourWithFlags colour, uint8_t flags, int32_t numItems, int32_t itemWidth,
-        int32_t itemHeight, int32_t numColumns)
+        const ScreenCoordsXY& screenPos, int32_t extray, ColourWithFlags colour, Dropdown::Flags flags, int32_t numItems,
+        int32_t itemWidth, int32_t itemHeight, int32_t numColumns)
     {
-        InputSetFlag(static_cast<INPUT_FLAGS>(INPUT_FLAG_DROPDOWN_STAY_OPEN | INPUT_FLAG_DROPDOWN_MOUSE_UP), false);
-        if (flags & Dropdown::Flag::StayOpen || Config::Get().interface.TouchEnhancements)
-            InputSetFlag(INPUT_FLAG_DROPDOWN_STAY_OPEN, true);
+        gInputFlags.unset(InputFlag::dropdownAutoclose, InputFlag::dropdownMouseUp);
+        if (flags.has(Dropdown::Flag::autoClose) && !Config::Get().interface.touchEnhancements)
+            gInputFlags.set(InputFlag::dropdownAutoclose);
 
         // Close existing dropdown
         WindowDropdownClose();
 
         // Create the window (width/height position are set later)
         auto* windowMgr = GetWindowManager();
-        auto* w = windowMgr->Create<DropdownWindow>(WindowClass::Dropdown, itemWidth, itemHeight, WF_STICK_TO_FRONT);
+        auto* w = windowMgr->Create<DropdownWindow>(WindowClass::dropdown, { itemWidth, itemHeight }, WindowFlag::stickToFront);
         if (w != nullptr)
         {
-            w->SetImageItems({ x, y }, extray, colour, numItems, itemWidth, itemHeight, numColumns);
+            w->setImageItems(screenPos, extray, colour, numItems, itemWidth, itemHeight, numColumns);
         }
+
+        gDropdown.cellDrawFunction = std::nullopt;
+    }
+
+    void WindowDropdownShowCustom(
+        const ScreenCoordsXY& screenPos, int32_t extraY, ColourWithFlags colour, Dropdown::Flags flags,
+        Dropdown::CellDrawFunction drawFunction, int32_t numItems, int32_t itemWidth, int32_t itemHeight, int32_t numColumns)
+    {
+        // Fall back to image internals
+        WindowDropdownShowImage(screenPos, extraY, colour, flags, numItems, itemWidth, itemHeight, numColumns);
+
+        gDropdown.cellDrawFunction = drawFunction;
     }
 
     void WindowDropdownClose()
     {
-        auto* windowMgr = Ui::GetWindowManager();
-        windowMgr->CloseByClass(WindowClass::Dropdown);
+        auto* windowMgr = GetWindowManager();
+        windowMgr->CloseByClass(WindowClass::dropdown);
     }
 
     /**
@@ -418,7 +505,7 @@ namespace OpenRCT2::Ui::Windows
      */
     int32_t DropdownIndexFromPoint(const ScreenCoordsXY& loc, WindowBase* w)
     {
-        if (w->classification == WindowClass::Dropdown)
+        if (w->classification == WindowClass::dropdown)
         {
             auto* ddWnd = static_cast<DropdownWindow*>(w);
             return ddWnd->GetIndexFromPoint(loc);
@@ -426,73 +513,101 @@ namespace OpenRCT2::Ui::Windows
         return -1;
     }
 
-    // colour_t ordered for use in color dropdown
-    static constexpr colour_t kColoursDropdownOrder[] = {
-        COLOUR_BLACK,
-        COLOUR_SATURATED_RED,
-        COLOUR_DARK_ORANGE,
-        COLOUR_DARK_YELLOW,
-        COLOUR_GRASS_GREEN_DARK,
-        COLOUR_SATURATED_GREEN,
-        COLOUR_AQUA_DARK,
-        COLOUR_DARK_BLUE,
-        COLOUR_SATURATED_PURPLE_DARK,
+    // Colour ordered for use in colour dropdown
+    static constexpr Colour kColoursDropdownOrder[] = {
+        Colour::black,          Colour::saturatedRed,   Colour::darkOrange,   Colour::darkYellow,
+        Colour::forestGreen,    Colour::saturatedGreen, Colour::deepWater,    Colour::darkBlue,
+        Colour::violet,
 
-        COLOUR_GREY,
-        COLOUR_BRIGHT_RED,
-        COLOUR_LIGHT_ORANGE,
-        COLOUR_YELLOW,
-        COLOUR_MOSS_GREEN,
-        COLOUR_BRIGHT_GREEN,
-        COLOUR_TEAL,
-        COLOUR_LIGHT_BLUE,
-        COLOUR_BRIGHT_PURPLE,
+        Colour::grey,           Colour::brightRed,      Colour::lightOrange,  Colour::yellow,
+        Colour::mossGreen,      Colour::brightGreen,    Colour::darkWater,    Colour::lightBlue,
+        Colour::brightPurple,
 
-        COLOUR_WHITE,
-        COLOUR_LIGHT_PINK,
-        COLOUR_ORANGE_LIGHT,
-        COLOUR_BRIGHT_YELLOW,
-        COLOUR_GRASS_GREEN_LIGHT,
-        COLOUR_SATURATED_GREEN_LIGHT,
-        COLOUR_AQUAMARINE,
-        COLOUR_ICY_BLUE,
-        COLOUR_SATURATED_PURPLE_LIGHT,
+        Colour::white,          Colour::lightPink,      Colour::pastelOrange, Colour::brightYellow,
+        Colour::chartreuse,     Colour::limeGreen,      Colour::lightWater,   Colour::icyBlue,
+        Colour::lavender,
 
-        COLOUR_DULL_BROWN_DARK,
-        COLOUR_BORDEAUX_RED_DARK,
-        COLOUR_TAN_DARK,
-        COLOUR_SATURATED_BROWN,
-        COLOUR_DARK_OLIVE_DARK,
-        COLOUR_OLIVE_DARK,
-        COLOUR_DULL_GREEN_DARK,
-        COLOUR_DARK_PURPLE,
-        COLOUR_DARK_PINK,
+        Colour::umber,          Colour::maroon,         Colour::sepia,        Colour::saturatedBrown,
+        Colour::armyGreen,      Colour::hunterGreen,    Colour::viridian,     Colour::darkPurple,
+        Colour::darkPink,
 
-        COLOUR_DARK_BROWN,
-        COLOUR_BORDEAUX_RED,
-        COLOUR_SALMON_PINK,
-        COLOUR_LIGHT_BROWN,
-        COLOUR_DARK_OLIVE_GREEN,
-        COLOUR_OLIVE_GREEN,
-        COLOUR_DARK_GREEN,
-        COLOUR_LIGHT_PURPLE,
-        COLOUR_BRIGHT_PINK,
+        Colour::darkBrown,      Colour::bordeauxRed,    Colour::salmonPink,   Colour::lightBrown,
+        Colour::darkOliveGreen, Colour::oliveGreen,     Colour::darkGreen,    Colour::lightPurple,
+        Colour::brightPink,
 
-        COLOUR_DULL_BROWN_LIGHT,
-        COLOUR_BORDEAUX_RED_LIGHT,
-        COLOUR_TAN_LIGHT,
-        COLOUR_SATURATED_BROWN_LIGHT,
-        COLOUR_DARK_OLIVE_LIGHT,
-        COLOUR_OLIVE_LIGHT,
-        COLOUR_DULL_GREEN_LIGHT,
-        COLOUR_DULL_PURPLE_LIGHT,
-        COLOUR_MAGENTA_LIGHT,
+        Colour::beige,          Colour::coralPink,      Colour::peach,        Colour::tan,
+        Colour::honeyDew,       Colour::celadon,        Colour::seafoamGreen, Colour::periwinkle,
+        Colour::pastelPink,
 
-        COLOUR_INVISIBLE,
-        COLOUR_VOID,
+        Colour::invisible,      Colour::voidBackground,
     };
 
-    colour_t ColourDropDownIndexToColour(uint8_t ddidx)
+    constexpr std::array kColourTooltips = {
+        STR_COLOUR_BLACK_TIP,
+        STR_COLOUR_SATURATED_RED_TIP,
+        STR_COLOUR_DARK_ORANGE_TIP,
+        STR_COLOUR_DARK_YELLOW_TIP,
+        STR_COLOUR_GRASS_GREEN_DARK_TIP,
+        STR_COLOUR_SATURATED_GREEN_TIP,
+        STR_COLOUR_DEEP_WATER_TIP,
+        STR_COLOUR_DARK_BLUE_TIP,
+        STR_COLOUR_SATURATED_PURPLE_DARK_TIP,
+
+        STR_COLOUR_GREY_TIP,
+        STR_COLOUR_BRIGHT_RED_TIP,
+        STR_COLOUR_LIGHT_ORANGE_TIP,
+        STR_COLOUR_YELLOW_TIP,
+        STR_COLOUR_MOSS_GREEN_TIP,
+        STR_COLOUR_BRIGHT_GREEN_TIP,
+        STR_COLOUR_DARK_WATER_TIP,
+        STR_COLOUR_LIGHT_BLUE_TIP,
+        STR_COLOUR_BRIGHT_PURPLE_TIP,
+
+        STR_COLOUR_WHITE_TIP,
+        STR_COLOUR_LIGHT_PINK_TIP,
+        STR_COLOUR_ORANGE_LIGHT_TIP,
+        STR_COLOUR_BRIGHT_YELLOW_TIP,
+        STR_COLOUR_GRASS_GREEN_LIGHT_TIP,
+        STR_COLOUR_SATURATED_GREEN_LIGHT_TIP,
+        STR_COLOUR_LIGHT_WATER_TIP,
+        STR_COLOUR_ICY_BLUE_TIP,
+        STR_COLOUR_SATURATED_PURPLE_LIGHT_TIP,
+
+        STR_COLOUR_DULL_BROWN_DARK_TIP,
+        STR_COLOUR_BORDEAUX_RED_DARK_TIP,
+        STR_COLOUR_TAN_DARK_TIP,
+        STR_COLOUR_SATURATED_BROWN_TIP,
+        STR_COLOUR_DARK_OLIVE_DARK_TIP,
+        STR_COLOUR_OLIVE_DARK_TIP,
+        STR_COLOUR_DULL_GREEN_DARK_TIP,
+        STR_COLOUR_DARK_PURPLE_TIP,
+        STR_COLOUR_DARK_PINK_TIP,
+
+        STR_COLOUR_DARK_BROWN_TIP,
+        STR_COLOUR_BORDEAUX_RED_TIP,
+        STR_COLOUR_SALMON_PINK_TIP,
+        STR_COLOUR_LIGHT_BROWN_TIP,
+        STR_COLOUR_DARK_OLIVE_GREEN_TIP,
+        STR_COLOUR_OLIVE_GREEN_TIP,
+        STR_COLOUR_DARK_GREEN_TIP,
+        STR_COLOUR_LIGHT_PURPLE_TIP,
+        STR_COLOUR_BRIGHT_PINK_TIP,
+
+        STR_COLOUR_DULL_BROWN_LIGHT_TIP,
+        STR_COLOUR_BORDEAUX_RED_LIGHT_TIP,
+        STR_COLOUR_TAN_LIGHT_TIP,
+        STR_COLOUR_SATURATED_BROWN_LIGHT_TIP,
+        STR_COLOUR_DARK_OLIVE_LIGHT_TIP,
+        STR_COLOUR_OLIVE_LIGHT_TIP,
+        STR_COLOUR_DULL_GREEN_LIGHT_TIP,
+        STR_COLOUR_DULL_PURPLE_LIGHT_TIP,
+        STR_COLOUR_MAGENTA_LIGHT_TIP,
+
+        STR_COLOUR_INVISIBLE_TIP,
+        STR_COLOUR_VOID_TIP,
+    };
+
+    Colour ColourDropDownIndexToColour(uint8_t ddidx)
     {
         return kColoursDropdownOrder[ddidx];
     }
@@ -501,12 +616,12 @@ namespace OpenRCT2::Ui::Windows
      *  rct2: 0x006ED43D
      */
     void WindowDropdownShowColour(
-        WindowBase* w, Widget* widget, ColourWithFlags dropdownColour, colour_t selectedColour, bool alwaysHideSpecialColours)
+        WindowBase* w, Widget* widget, ColourWithFlags dropdownColour, Colour selectedColour, bool alwaysHideSpecialColours)
     {
         int32_t defaultIndex = -1;
 
-        const bool specialColoursEnabled = !alwaysHideSpecialColours && GetGameState().Cheats.allowSpecialColourSchemes;
-        auto numColours = specialColoursEnabled ? static_cast<uint8_t>(COLOUR_COUNT) : kColourNumNormal;
+        const bool specialColoursEnabled = !alwaysHideSpecialColours && getGameState().cheats.allowSpecialColourSchemes;
+        auto numColours = specialColoursEnabled ? static_cast<uint8_t>(Drawing::kColourNumTotal) : kColourNumNormal;
         // Set items
         for (uint64_t i = 0; i < numColours; i++)
         {
@@ -514,24 +629,30 @@ namespace OpenRCT2::Ui::Windows
             if (selectedColour == orderedColour)
                 defaultIndex = i;
 
-            // Use special graphic for Invisible colour
-            auto imageId = (orderedColour == COLOUR_INVISIBLE) ? ImageId(SPR_G2_ICON_PALETTE_INVISIBLE, COLOUR_WHITE)
+            ImageId imageId;
+            if (Config::Get().interface.enlargedUi)
+            {
+                imageId = (orderedColour == Colour::invisible) ? ImageId(SPR_G2_ICON_PALETTE_INVISIBLE_LARGE, Colour::white)
+                                                               : ImageId(SPR_G2_ICON_PALETTE_LARGE, orderedColour);
+            }
+            else
+            {
+                imageId = (orderedColour == Colour::invisible) ? ImageId(SPR_G2_ICON_PALETTE_INVISIBLE, Colour::white)
                                                                : ImageId(SPR_PALETTE_BTN, orderedColour);
+            }
 
-            gDropdownItems[i].Format = Dropdown::kFormatColourPicker;
-            Dropdown::SetImage(i, imageId);
+            gDropdown.items[i] = { .type = Dropdown::ItemType::colour, .image = imageId, .tooltip = kColourTooltips[i] };
         }
 
         // Show dropdown
         auto squareSize = DropdownWindow::GetDefaultRowHeight();
         WindowDropdownShowImage(
-            w->windowPos.x + widget->left, w->windowPos.y + widget->top, widget->height() + 1, dropdownColour,
-            Dropdown::Flag::StayOpen, numColours, squareSize, squareSize,
-            DropdownGetAppropriateImageDropdownItemsPerRow(static_cast<uint32_t>(numColours)));
+            w->windowPos + ScreenCoordsXY{ widget->left, widget->top }, widget->height(), dropdownColour, {}, numColours,
+            squareSize, squareSize, DropdownGetAppropriateImageDropdownItemsPerRow(static_cast<uint32_t>(numColours)));
 
-        gDropdownIsColour = true;
-        gDropdownLastColourHover = -1;
-        gDropdownDefaultIndex = defaultIndex;
+        gDropdown.hasTooltips = true;
+        gDropdown.lastTooltipHover = -1;
+        gDropdown.defaultIndex = defaultIndex;
     }
 
     uint32_t DropdownGetAppropriateImageDropdownItemsPerRow(uint32_t numItems)
@@ -542,57 +663,59 @@ namespace OpenRCT2::Ui::Windows
     }
 } // namespace OpenRCT2::Ui::Windows
 
-using namespace OpenRCT2::Ui::Windows;
-using namespace OpenRCT2;
-
-bool Dropdown::IsChecked(int32_t index)
+namespace OpenRCT2::Dropdown
 {
-    if (index < 0 || index >= static_cast<int32_t>(std::size(gDropdownItems)))
+    static Item StringItem(ItemType _type, const utf8* string)
     {
-        return false;
+        auto ret = Item{ .type = _type };
+        String::safeUtf8Copy(ret.text, string, sizeof(ret.text));
+        return ret;
     }
-    return gDropdownItems[index].IsChecked();
-}
 
-bool Dropdown::IsDisabled(int32_t index)
-{
-    if (index < 0 || index >= static_cast<int32_t>(std::size(gDropdownItems)))
+    Item MenuLabel(StringId stringId)
     {
-        return true;
+        return StringItem(ItemType::regular, LanguageGetString(stringId));
     }
-    return gDropdownItems[index].IsDisabled();
-}
 
-void Dropdown::SetChecked(int32_t index, bool value)
-{
-    if (index < 0 || index >= static_cast<int32_t>(std::size(gDropdownItems)))
+    Item MenuLabel(u8string string)
     {
-        return;
+        return StringItem(ItemType::regular, string.c_str());
     }
-    if (value)
-        gDropdownItems[index].Flags |= EnumValue(Dropdown::ItemFlag::IsChecked);
-    else
-        gDropdownItems[index].Flags &= ~EnumValue(Dropdown::ItemFlag::IsChecked);
-}
 
-void Dropdown::SetDisabled(int32_t index, bool value)
-{
-    if (index < 0 || index >= static_cast<int32_t>(std::size(gDropdownItems)))
+    Item MenuLabel(const utf8* string)
     {
-        return;
+        return StringItem(ItemType::regular, string);
     }
-    if (value)
-        gDropdownItems[index].Flags |= EnumValue(Dropdown::ItemFlag::IsDisabled);
-    else
-        gDropdownItems[index].Flags &= ~EnumValue(Dropdown::ItemFlag::IsDisabled);
-}
 
-void Dropdown::SetImage(int32_t index, ImageId image)
-{
-    if (index < 0 || index >= static_cast<int32_t>(std::size(_dropdownItemsImages)))
+    Item MenuLabel(StringId format, const Formatter& ft)
     {
-        return;
+        auto string = FormatStringIDLegacy(format, ft.Data());
+        return MenuLabel(string);
     }
-    _dropdownItemsImages[index] = image;
-    _dropdownPrepareUseImages = true;
-}
+
+    Item PlainMenuLabel(u8string string)
+    {
+        return StringItem(ItemType::plain, string.c_str());
+    }
+
+    Item PlainMenuLabel(const utf8* string)
+    {
+        return StringItem(ItemType::plain, string);
+    }
+
+    Item PlainMenuLabel(StringId stringId)
+    {
+        return StringItem(ItemType::plain, LanguageGetString(stringId));
+    }
+
+    Item PlainMenuLabel(StringId format, const Formatter& ft)
+    {
+        auto string = FormatStringIDLegacy(format, ft.Data());
+        return StringItem(ItemType::plain, string.c_str());
+    }
+
+    Item ToggleOption(StringId stringId)
+    {
+        return StringItem(ItemType::toggle, LanguageGetString(stringId));
+    }
+} // namespace OpenRCT2::Dropdown

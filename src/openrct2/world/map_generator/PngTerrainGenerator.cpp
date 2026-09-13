@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -40,10 +40,10 @@ namespace OpenRCT2::World::MapGenerator
     bool LoadHeightmapImage(const utf8* path)
     {
         auto format = Imaging::GetImageFormatFromPath(path);
-        if (format == IMAGE_FORMAT::PNG)
+        if (format == ImageFormat::png)
         {
             // Promote to 32-bit
-            format = IMAGE_FORMAT::PNG_32;
+            format = ImageFormat::png32;
         }
 
         try
@@ -79,10 +79,10 @@ namespace OpenRCT2::World::MapGenerator
         {
             switch (format)
             {
-                case IMAGE_FORMAT::BITMAP:
+                case ImageFormat::bitmap:
                     ContextShowError(STR_HEIGHT_MAP_ERROR, STR_ERROR_READING_BITMAP, {});
                     break;
-                case IMAGE_FORMAT::PNG_32:
+                case ImageFormat::png32:
                     ContextShowError(STR_HEIGHT_MAP_ERROR, STR_ERROR_READING_PNG, {});
                     break;
                 default:
@@ -156,9 +156,12 @@ namespace OpenRCT2::World::MapGenerator
         HeightMap dest = _heightMapData;
 
         // Get technical map size, +2 for the black tiles around the map
-        auto maxWidth = static_cast<int32_t>(dest.width + 2);
-        auto maxHeight = static_cast<int32_t>(dest.height + 2);
-        MapInit({ maxHeight, maxWidth });
+        auto mapWidth = static_cast<int32_t>(dest.width + 2);
+        auto mapHeight = static_cast<int32_t>(dest.height + 2);
+
+        // The x and y axis are flipped in the world, so this uses y for x and x for y.
+        TileCoordsXY flippedMapSize{ mapHeight, mapWidth };
+        MapInit(flippedMapSize);
 
         if (settings->smooth_height_map)
         {
@@ -203,7 +206,6 @@ namespace OpenRCT2::World::MapGenerator
         {
             for (auto x = 0; x < dest.width; x++)
             {
-                // The x and y axis are flipped in the world, so this uses y for x and x for y.
                 auto tileCoords = HeightmapCoordToTileCoordsXY(x, y);
                 auto* const surfaceElement = MapGetSurfaceElementAt(tileCoords);
                 if (surfaceElement == nullptr)
@@ -213,21 +215,21 @@ namespace OpenRCT2::World::MapGenerator
                 uint8_t value = dest[{ x, y }];
                 value = static_cast<uint8_t>(static_cast<float>(value - minValue) / rangeIn * rangeOut)
                     + (settings->heightmapLow * 2);
-                surfaceElement->BaseHeight = value;
+                surfaceElement->baseHeight = value;
 
                 // Floor to even number
-                surfaceElement->BaseHeight /= 2;
-                surfaceElement->BaseHeight *= 2;
-                surfaceElement->ClearanceHeight = surfaceElement->BaseHeight;
+                surfaceElement->baseHeight /= 2;
+                surfaceElement->baseHeight *= 2;
+                surfaceElement->clearanceHeight = surfaceElement->baseHeight;
 
                 // Set textures
-                surfaceElement->SetSurfaceObjectIndex(surfaceTextureId);
-                surfaceElement->SetEdgeObjectIndex(edgeTextureId);
+                surfaceElement->setSurfaceObjectIndex(surfaceTextureId);
+                surfaceElement->setEdgeObjectIndex(edgeTextureId);
 
                 // Set water level
-                if (surfaceElement->BaseHeight < settings->waterLevel)
+                if (surfaceElement->baseHeight < settings->waterLevel)
                 {
-                    surfaceElement->SetWaterHeight(settings->waterLevel * kCoordsZStep);
+                    surfaceElement->setWaterHeight(settings->waterLevel * kCoordsZStep);
                 }
             }
         }
@@ -235,22 +237,8 @@ namespace OpenRCT2::World::MapGenerator
         // Smooth tile edges
         if (settings->smoothTileEdges)
         {
-            // Keep smoothing the entire map until no tiles are changed anymore
-            while (true)
-            {
-                uint32_t numTilesChanged = 0;
-                for (auto y = 0; y < dest.height; y++)
-                {
-                    for (auto x = 0; x < dest.width; x++)
-                    {
-                        auto tileCoords = HeightmapCoordToTileCoordsXY(x, y);
-                        numTilesChanged += TileSmooth(tileCoords);
-                    }
-                }
-
-                if (numTilesChanged == 0)
-                    break;
-            }
+            // Set the tile slopes so that there are no cliffs
+            smoothMap(flippedMapSize, smoothTileWeak);
         }
     }
 } // namespace OpenRCT2::World::MapGenerator

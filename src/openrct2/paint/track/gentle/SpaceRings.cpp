@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,18 +7,16 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "../../../GameState.h"
 #include "../../../entity/EntityRegistry.h"
 #include "../../../entity/Guest.h"
 #include "../../../interface/Viewport.h"
 #include "../../../ride/RideEntry.h"
-#include "../../../ride/Track.h"
 #include "../../../ride/TrackPaint.h"
 #include "../../../ride/Vehicle.h"
 #include "../../Paint.h"
-#include "../../support/WoodenSupports.h"
 #include "../../support/WoodenSupports.hpp"
 #include "../../tile_element/Segment.h"
-#include "../../track/Segment.h"
 
 using namespace OpenRCT2;
 
@@ -46,18 +44,18 @@ static void PaintSpaceRingsStructure(
     if (rideEntry == nullptr || (ride.numStations != 0 && vehicleIndex >= ride.numTrains))
     {
         session.CurrentlyDrawnEntity = nullptr;
-        session.InteractionType = ViewportInteractionItem::Ride;
+        session.InteractionType = ViewportInteractionItem::ride;
         return;
     }
 
     int32_t frameNum = direction;
-    uint32_t baseImageId = rideEntry->Cars[0].base_image_id;
-    auto vehicle = GetEntity<Vehicle>(ride.vehicles[vehicleIndex]);
-    if (ride.lifecycleFlags & RIDE_LIFECYCLE_ON_TRACK && vehicle != nullptr)
+    uint32_t baseImageId = rideEntry->Cars[0].baseImageId;
+    auto vehicle = getGameState().entities.getEntity<Vehicle>(ride.vehicles[vehicleIndex]);
+    if (ride.flags.has(RideFlag::onTrack) && vehicle != nullptr)
     {
-        session.InteractionType = ViewportInteractionItem::Entity;
+        session.InteractionType = ViewportInteractionItem::entity;
         session.CurrentlyDrawnEntity = vehicle;
-        frameNum += static_cast<int8_t>(vehicle->Pitch) * 4;
+        frameNum += static_cast<int8_t>(vehicle->flatRideAnimationFrame) * 4;
     }
 
     if (ride.vehicleColourSettings != VehicleColourSettings::perTrain)
@@ -75,17 +73,17 @@ static void PaintSpaceRingsStructure(
 
     if (vehicle != nullptr && vehicle->num_peeps > 0)
     {
-        auto* rider = GetEntity<Guest>(vehicle->peep[0]);
+        auto* rider = getGameState().entities.getEntity<Guest>(vehicle->peep[0]);
         if (rider != nullptr)
         {
-            stationColour = ImageId(0, rider->TshirtColour, rider->TrousersColour);
+            stationColour = ImageId(0, rider->tShirtColour, rider->trousersColour);
             imageId = stationColour.WithIndex(baseImageId + 352 + frameNum);
             PaintAddImageAsChild(session, imageId, { 0, 0, height }, { { -10, -10, height }, { 20, 20, 23 } });
         }
     }
 
     session.CurrentlyDrawnEntity = nullptr;
-    session.InteractionType = ViewportInteractionItem::Ride;
+    session.InteractionType = ViewportInteractionItem::ride;
 }
 
 /** rct2: 0x00767C40 */
@@ -101,11 +99,11 @@ static void PaintSpaceRings(
     ImageId imageId;
 
     auto stationColour = GetStationColourScheme(session, trackElement);
-    DrawSupportForSequenceA<TrackElemType::FlatTrack3x3>(
+    DrawSupportForSequenceA<TrackElemType::flatTrack3x3>(
         session, supportType.wooden, trackSequence, direction, height, GetStationColourScheme(session, trackElement));
 
     const StationObject* stationObject = ride.getStationObject();
-    TrackPaintUtilPaintFloor(session, edges, session.TrackColours, height, kFloorSpritesCork, stationObject);
+    TrackPaintUtilPaintFloor(session, edges, session.TrackColours, height, kFloorSpritesMulch, stationObject);
 
     switch (trackSequence)
     {
@@ -189,9 +187,9 @@ static void PaintSpaceRings(
 /**
  * rct2: 0x0x00767A40
  */
-TrackPaintFunction GetTrackPaintFunctionSpaceRings(OpenRCT2::TrackElemType trackType)
+TrackPaintFunction GetTrackPaintFunctionSpaceRings(TrackElemType trackType)
 {
-    if (trackType != TrackElemType::FlatTrack3x3)
+    if (trackType != TrackElemType::flatTrack3x3)
     {
         return TrackPaintFunctionDummy;
     }

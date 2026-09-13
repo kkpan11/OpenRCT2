@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,11 +16,8 @@
 #include "../../OpenRCT2.h"
 #include "../../audio/Audio.h"
 #include "../../interface/Viewport.h"
-#include "../../localisation/StringIds.h"
 #include "../../ui/WindowManager.h"
-#include "../../windows/Intent.h"
-
-#include <sstream>
+#include "../../world/Map.h"
 
 using namespace OpenRCT2;
 
@@ -35,9 +32,9 @@ void PreloaderScene::Load()
     LOG_VERBOSE("PreloaderScene::Load()");
 
     gLegacyScene = LegacyScene::playing;
-    gameStateInitAll(GetGameState(), kDefaultMapSize);
-    ViewportInitAll();
-    ContextOpenWindow(WindowClass::MainWindow);
+    gameStateInitAll(getGameState(), kDefaultMapSize);
+    ContextResetSubsystems();
+    ContextOpenWindow(WindowClass::mainWindow);
     WindowSetFlagForAllViewports(VIEWPORT_FLAG_RENDERING_INHIBITED, true);
     WindowResizeGui(ContextGetWidth(), ContextGetHeight());
 
@@ -48,14 +45,19 @@ void PreloaderScene::Tick()
 {
     gInUpdateCode = true;
 
-    ContextHandleInput();
+    // Avoid race condition with background jobs modifying gWindowList.
+    const bool jobsRunning = _jobs.IsBusy();
 
-    auto* windowMgr = Ui::GetWindowManager();
-    windowMgr->InvalidateAll();
+    if (!jobsRunning)
+    {
+        ContextHandleInput();
+        auto* windowMgr = Ui::GetWindowManager();
+        windowMgr->InvalidateAll();
+    }
 
     gInUpdateCode = false;
 
-    if (!_jobs.IsBusy())
+    if (!jobsRunning)
     {
         // Make sure the job is fully completed.
         _jobs.Join();

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,20 +7,15 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
-#include "../../../SpriteIds.h"
 #include "../../../core/Numerics.hpp"
-#include "../../../interface/Viewport.h"
 #include "../../../ride/Ride.h"
-#include "../../../ride/RideData.h"
-#include "../../../ride/Track.h"
 #include "../../../ride/TrackPaint.h"
-#include "../../../world/Map.h"
+#include "../../../ride/ted/TrackElemType.h"
 #include "../../../world/tile_element/TrackElement.h"
 #include "../../Paint.h"
 #include "../../support/WoodenSupports.h"
 #include "../../tile_element/Paint.Surface.h"
 #include "../../tile_element/Segment.h"
-#include "../../track/Segment.h"
 #include "../../track/Support.h"
 
 using namespace OpenRCT2;
@@ -57,7 +52,7 @@ static void MazePaintSetup(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
     const TrackElement& trackElement, SupportType supportType)
 {
-    uint16_t mazeEntry = trackElement.GetMazeEntry();
+    uint16_t mazeEntry = trackElement.getMazeEntry();
     mazeEntry = Numerics::rol16(mazeEntry, direction * 4);
 
     uint32_t rotation = session.CurrentRotation;
@@ -66,13 +61,13 @@ static void MazePaintSetup(
     PaintAddImageAsParent(session, imageId, { 0, 0, height }, { 32, 32, 0 });
 
     WoodenASupportsPaintSetupRotated(
-        session, WoodenSupportType::Truss, WoodenSupportSubType::NwSe, rotation, height,
+        session, WoodenSupportType::truss, WoodenSupportSubType::nwSe, rotation, height,
         GetShopSupportColourScheme(session, trackElement));
 
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll & ~EnumToFlag(PaintSegment::centre), 0xFFFF, 0);
 
     int32_t baseImageId = 0;
-    switch (ride.trackColours[0].supports)
+    switch (EnumValue(ride.trackColours[0].supports))
     {
         case 0:
             baseImageId = SprMazeBaseBrick;
@@ -188,9 +183,9 @@ static void MazePaintSetup(
 /**
  * rct2: 0x008A81E8
  */
-TrackPaintFunction GetTrackPaintFunctionMaze(OpenRCT2::TrackElemType trackType)
+TrackPaintFunction GetTrackPaintFunctionMaze(TrackElemType trackType)
 {
-    if (trackType != TrackElemType::Maze)
+    if (trackType != TrackElemType::maze)
     {
         return TrackPaintFunctionDummy;
     }

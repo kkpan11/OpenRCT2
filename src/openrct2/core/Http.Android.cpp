@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -14,7 +14,7 @@
     #include "../Version.h"
     #include "../platform/Platform.h"
 
-    #include <SDL.h>
+    #include <SDL_system.h>
     #include <android/log.h>
     #include <jni.h>
 
@@ -30,7 +30,7 @@ namespace OpenRCT2::Http
         auto jstringToString = [](JNIEnv* env, jstring jstr) -> std::string {
             if (jstr == nullptr)
             {
-                return "";
+                return {};
             }
             const char* cstr = env->GetStringUTFChars(jstr, nullptr);
             std::string str = cstr;
@@ -76,13 +76,13 @@ namespace OpenRCT2::Http
         std::string method = "GET";
         switch (req.method)
         {
-            case Method::GET:
+            case Method::get:
                 method = "GET";
                 break;
-            case Method::POST:
+            case Method::post:
                 method = "POST";
                 break;
-            case Method::PUT:
+            case Method::put:
                 method = "PUT";
                 break;
         }

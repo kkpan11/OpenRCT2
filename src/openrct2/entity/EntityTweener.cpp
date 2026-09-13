@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,121 +10,179 @@
 
 #include "../entity/Guest.h"
 #include "../entity/Staff.h"
+#include "../interface/Viewport.h"
+#include "../interface/WindowTypes.h"
 #include "../ride/Vehicle.h"
 #include "EntityList.h"
-#include "EntityRegistry.h"
 
 #include <algorithm>
 #include <cmath>
 
-void EntityTweener::AddEntity(EntityBase* entity)
+namespace OpenRCT2
 {
-    Entities.push_back(entity);
-    PrePos.emplace_back(entity->GetLocation());
-}
-
-void EntityTweener::PopulateEntities()
-{
-    for (auto ent : EntityList<Guest>())
+    static inline ViewportList GetUnzoomedViewports() noexcept
     {
-        AddEntity(ent);
+        ViewportList viewports;
+        WindowVisitEach([&](WindowBase* w) {
+            if (auto* vp = WindowGetViewport(w); vp != nullptr)
+            {
+                if (!vp->isVisible)
+                {
+                    // Ignore viewports that are not visible.
+                    return;
+                }
+                if (vp->zoom > ZoomLevel{ 0 })
+                {
+                    // Ignore viewports that are zoomed out, interpolation wouldn't have much of an effect
+                    // due to the loss of detail.
+                    return;
+                }
+                viewports.push_back(vp);
+            }
+        });
+        return viewports;
     }
-    for (auto ent : EntityList<Staff>())
-    {
-        AddEntity(ent);
-    }
-    for (auto ent : EntityList<Vehicle>())
-    {
-        AddEntity(ent);
-    }
-}
 
-void EntityTweener::PreTick()
-{
-    Restore();
-    Reset();
-    PopulateEntities();
-}
-
-void EntityTweener::PostTick()
-{
-    for (auto* ent : Entities)
+    static inline bool IsEntityVisible(const ViewportList& vpList, const EntityBase* entity) noexcept
     {
-        if (ent == nullptr)
+        const auto worldLoc = entity->getLocation();
+
+        for (const auto* vp : vpList)
         {
-            // Sprite was removed, add a dummy position to keep the index aligned.
-            PostPos.emplace_back(0, 0, 0);
+            const auto screenPos = Translate3DTo2DWithZ(vp->rotation, worldLoc);
+            if (vp->Contains(screenPos))
+            {
+                // Entity is visible in at least one viewport, tween.
+                return true;
+            }
         }
-        else
+
+        return false;
+    }
+
+    void EntityTweener::addEntity(const ViewportList& vpList, EntityBase* entity)
+    {
+        if (!IsEntityVisible(vpList, entity))
         {
-            PostPos.emplace_back(ent->GetLocation());
+            return;
+        }
+
+        entities.push_back(entity);
+        prePos.emplace_back(entity->getLocation());
+    }
+
+    void EntityTweener::populateEntities()
+    {
+        const auto vpList = GetUnzoomedViewports();
+        if (vpList.empty())
+        {
+            // No viewports that fit the criteria, bail.
+            return;
+        }
+
+        for (auto ent : EntityList<Guest>())
+        {
+            addEntity(vpList, ent);
+        }
+        for (auto ent : EntityList<Staff>())
+        {
+            addEntity(vpList, ent);
+        }
+        for (auto ent : EntityList<Vehicle>())
+        {
+            addEntity(vpList, ent);
         }
     }
-}
 
-static bool CanTweenEntity(EntityBase* ent)
-{
-    if (ent->Is<Guest>() || ent->Is<Staff>() || ent->Is<Vehicle>())
-        return true;
-    return false;
-}
-
-void EntityTweener::RemoveEntity(EntityBase* entity)
-{
-    if (!CanTweenEntity(entity))
+    void EntityTweener::preTick()
     {
-        // Only peeps and vehicles are tweened, bail if type is incorrect.
-        return;
+        restore();
+        reset();
+        populateEntities();
     }
 
-    auto it = std::find(Entities.begin(), Entities.end(), entity);
-    if (it != Entities.end())
-        *it = nullptr;
-}
-
-void EntityTweener::Tween(float alpha)
-{
-    const float inv = (1.0f - alpha);
-    for (size_t i = 0; i < Entities.size(); ++i)
+    void EntityTweener::postTick()
     {
-        auto* ent = Entities[i];
-        if (ent == nullptr)
-            continue;
-
-        auto& posA = PrePos[i];
-        auto& posB = PostPos[i];
-
-        if (posA == posB)
-            continue;
-
-        ent->MoveTo({ static_cast<int32_t>(std::round(posB.x * alpha + posA.x * inv)),
-                      static_cast<int32_t>(std::round(posB.y * alpha + posA.y * inv)),
-                      static_cast<int32_t>(std::round(posB.z * alpha + posA.z * inv)) });
+        for (auto* ent : entities)
+        {
+            if (ent == nullptr)
+            {
+                // Sprite was removed, add a dummy position to keep the index aligned.
+                postPos.emplace_back(0, 0, 0);
+            }
+            else
+            {
+                postPos.emplace_back(ent->getLocation());
+            }
+        }
     }
-}
 
-void EntityTweener::Restore()
-{
-    for (size_t i = 0; i < Entities.size(); ++i)
+    static bool CanTweenEntity(EntityBase* ent)
     {
-        auto* ent = Entities[i];
-        if (ent == nullptr)
-            continue;
-
-        ent->MoveTo(PostPos[i]);
+        if (ent->is<Guest>() || ent->is<Staff>() || ent->is<Vehicle>())
+            return true;
+        return false;
     }
-}
 
-void EntityTweener::Reset()
-{
-    Entities.clear();
-    PrePos.clear();
-    PostPos.clear();
-}
+    void EntityTweener::removeEntity(EntityBase* entity)
+    {
+        if (!CanTweenEntity(entity))
+        {
+            // Only peeps and vehicles are tweened, bail if type is incorrect.
+            return;
+        }
 
-static EntityTweener tweener;
+        auto it = std::find(entities.begin(), entities.end(), entity);
+        if (it != entities.end())
+            *it = nullptr;
+    }
 
-EntityTweener& EntityTweener::Get()
-{
-    return tweener;
-}
+    void EntityTweener::tween(float alpha)
+    {
+        const float inv = (1.0f - alpha);
+        for (size_t i = 0; i < entities.size(); ++i)
+        {
+            auto* ent = entities[i];
+            if (ent == nullptr)
+                continue;
+
+            auto& posA = prePos[i];
+            auto& posB = postPos[i];
+
+            if (posA == posB)
+                continue;
+
+            ent->moveTo(
+                { static_cast<int32_t>(std::round(posB.x * alpha + posA.x * inv)),
+                  static_cast<int32_t>(std::round(posB.y * alpha + posA.y * inv)),
+                  static_cast<int32_t>(std::round(posB.z * alpha + posA.z * inv)) });
+        }
+    }
+
+    void EntityTweener::restore()
+    {
+        for (size_t i = 0; i < entities.size(); ++i)
+        {
+            auto* ent = entities[i];
+            if (ent == nullptr || prePos[i] == postPos[i])
+                continue;
+
+            ent->moveTo(postPos[i]);
+        }
+    }
+
+    void EntityTweener::reset()
+    {
+        entities.clear();
+        prePos.clear();
+        postPos.clear();
+    }
+
+    static EntityTweener tweener;
+
+    EntityTweener& EntityTweener::get()
+    {
+        return tweener;
+    }
+
+} // namespace OpenRCT2

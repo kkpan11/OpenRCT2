@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,25 +7,29 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
-#include <SDL.h>
-#include <SDL_keycode.h>
-#include <iterator>
+#include <SDL_keyboard.h>
 #include <openrct2-ui/interface/Widget.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
+#include <openrct2/Input.h>
 #include <openrct2/core/String.hpp>
 #include <openrct2/core/UTF8.h>
-#include <openrct2/drawing/Drawing.h>
+#include <openrct2/drawing/ColourMap.h>
+#include <openrct2/drawing/Drawing.String.h>
+#include <openrct2/drawing/Rectangle.h>
+#include <openrct2/drawing/RenderTarget.h>
+#include <openrct2/drawing/Text.h>
 #include <openrct2/localisation/Formatting.h>
-#include <openrct2/localisation/StringIds.h>
 #include <openrct2/ui/WindowManager.h>
+
+using namespace OpenRCT2::Drawing;
 
 namespace OpenRCT2::Ui::Windows
 {
-    static constexpr int32_t WW = 250;
-    static constexpr int32_t WH = 90;
+    static constexpr ScreenSize kWindowSize = { 250, 90 };
 
-    enum WindowTextInputWidgetIdx
+    enum WindowTextInputWidgetIdx : WidgetIndex
     {
         WIDX_BACKGROUND,
         WIDX_TITLE,
@@ -34,11 +38,10 @@ namespace OpenRCT2::Ui::Windows
         WIDX_OKAY
     };
 
-    static constexpr Widget _textInputWidgets[] = {
-        WINDOW_SHIM(kStringIdNone, WW, WH),
-        MakeWidget({ 170, 68 }, { 71, 14 }, WindowWidgetType::Button, WindowColour::Secondary, STR_CANCEL),
-        MakeWidget({ 10, 68 }, { 71, 14 }, WindowWidgetType::Button, WindowColour::Secondary, STR_OK),
-    };
+    static constexpr auto _textInputWidgets = makeWidgets(
+        makeWindowShim(kStringIdNone, kWindowSize),
+        makeWidget({ 170, 68 }, { 71, 14 }, WidgetType::button, WindowColour::secondary, STR_CANCEL),
+        makeWidget({ 10, 68 }, { 71, 14 }, WidgetType::button, WindowColour::secondary, STR_OK));
 
     class TextInputWindow final : public Window
     {
@@ -60,31 +63,31 @@ namespace OpenRCT2::Ui::Windows
         u8string _buffer;
 
     public:
-        void OnOpen() override
+        void onOpen() override
         {
-            SetWidgets(_textInputWidgets);
+            setWidgets(_textInputWidgets);
             WindowInitScrollWidgets(*this);
-            SetParentWindow(nullptr, 0);
+            setParentWindow(nullptr, 0);
         }
 
-        void SetParentWindow(WindowBase* parentWindow, WidgetIndex widgetIndex)
+        void setParentWindow(WindowBase* parentWindow, WidgetIndex widgetIndex)
         {
             // Save calling window details so that the information can be passed back to the correct window & widget
             if (parentWindow == nullptr)
             {
-                _parentWidget.window.classification = WindowClass::Null;
+                _parentWidget.window.classification = WindowClass::null;
                 _parentWidget.window.number = 0;
-                _parentWidget.widget_index = 0;
+                _parentWidget.widgetIndex = 0;
 
-                colours[0] = COLOUR_GREY;
-                colours[1] = COLOUR_GREY;
-                colours[2] = COLOUR_GREY;
+                colours[0] = Drawing::Colour::grey;
+                colours[1] = Drawing::Colour::grey;
+                colours[2] = Drawing::Colour::grey;
             }
             else
             {
                 _parentWidget.window.classification = parentWindow->classification;
                 _parentWidget.window.number = parentWindow->number;
-                _parentWidget.widget_index = widgetIndex;
+                _parentWidget.widgetIndex = widgetIndex;
 
                 colours[0] = parentWindow->colours[1];
                 colours[1] = parentWindow->colours[1];
@@ -92,14 +95,14 @@ namespace OpenRCT2::Ui::Windows
             }
         }
 
-        void SetTitle(StringId title, StringId description, const Formatter& decriptionArgs)
+        void setTitle(StringId title, StringId description, const Formatter& decriptionArgs)
         {
             _titleStringId = title;
             _descriptionStringId = description;
             _descriptionArgs = decriptionArgs;
         }
 
-        void SetTitle(std::string_view title, std::string_view description)
+        void setTitle(std::string_view title, std::string_view description)
         {
             _titleStringId = kStringIdNone;
             _title = title;
@@ -107,7 +110,7 @@ namespace OpenRCT2::Ui::Windows
             _description = description;
         }
 
-        void SetText(std::string_view text, size_t maxLength)
+        void setText(std::string_view text, size_t maxLength)
         {
             text = String::utf8TruncateCodePoints(text, maxLength);
             _buffer = u8string{ text };
@@ -115,20 +118,20 @@ namespace OpenRCT2::Ui::Windows
             SetTexboxSession(ContextStartTextInput(_buffer, maxLength));
         }
 
-        void SetCallback(std::function<void(std::string_view)> callback, std::function<void()> cancelCallback)
+        void setCallback(std::function<void(std::string_view)> callback, std::function<void()> cancelCallback)
         {
             _callback = callback;
             _cancelCallback = cancelCallback;
         }
 
-        void OnClose() override
+        void onClose() override
         {
             // Make sure that we take it out of the text input
             // mode otherwise problems may occur.
             ContextStopTextInput();
         }
 
-        void OnUpdate() override
+        void onUpdate() override
         {
             if (HasParentWindow())
             {
@@ -136,7 +139,7 @@ namespace OpenRCT2::Ui::Windows
                 auto parentWindow = GetParentWindow();
                 if (parentWindow == nullptr)
                 {
-                    Close();
+                    close();
                     return;
                 }
             }
@@ -146,10 +149,10 @@ namespace OpenRCT2::Ui::Windows
             if (_cursorBlink > 30)
                 _cursorBlink = 0;
 
-            Invalidate();
+            invalidate();
         }
 
-        void OnMouseUp(WidgetIndex widgetIndex) override
+        void onMouseUp(WidgetIndex widgetIndex) override
         {
             switch (widgetIndex)
             {
@@ -157,22 +160,22 @@ namespace OpenRCT2::Ui::Windows
                 case WIDX_CLOSE:
                     ContextStopTextInput();
                     ExecuteCallback(false);
-                    Close();
+                    close();
                     break;
                 case WIDX_OKAY:
                     ContextStopTextInput();
                     ExecuteCallback(true);
-                    Close();
+                    close();
             }
         }
 
-        void OnPrepareDraw() override
+        void onPrepareDraw() override
         {
             // Change window size if required.
             int32_t newHeight = CalculateWindowHeight(_buffer.data());
             if (newHeight != height)
             {
-                WindowSetResize(*this, { WW, newHeight }, { WW, newHeight });
+                WindowSetResize(*this, { kWindowSize.width, newHeight }, { kWindowSize.width, newHeight });
             }
 
             widgets[WIDX_OKAY].top = newHeight - 22;
@@ -184,34 +187,31 @@ namespace OpenRCT2::Ui::Windows
             // Set window title argument
             if (_titleStringId == kStringIdNone)
             {
-                auto ft = Formatter::Common();
-                ft.Add<const char*>(_title.c_str());
-                widgets[WIDX_TITLE].text = STR_STRING;
+                widgets[WIDX_TITLE].setString(_title.c_str());
             }
             else
             {
-                widgets[WIDX_TITLE].text = _titleStringId;
+                widgets[WIDX_TITLE].setString(_titleStringId);
             }
         }
 
-        void OnDraw(DrawPixelInfo& dpi) override
+        void onDraw(RenderTarget& rt) override
         {
-            DrawWidgets(dpi);
+            drawWidgets(rt);
 
-            auto screenCoords = windowPos + ScreenCoordsXY{ WW / 2, widgets[WIDX_TITLE].bottom + 13 };
+            auto screenCoords = windowPos + ScreenCoordsXY{ kWindowSize.width / 2, widgets[WIDX_TITLE].bottom + 13 };
 
             int32_t no_lines = 0;
 
             if (_descriptionStringId == kStringIdNone)
             {
-                auto ft = Formatter();
-                ft.Add<const char*>(_description.c_str());
-                DrawTextWrapped(dpi, screenCoords, WW, STR_STRING, ft, { colours[1], TextAlignment::CENTRE });
+                drawTextWrapped(rt, screenCoords, kWindowSize.width, _description, { colours[1], TextAlignment::centre });
             }
             else
             {
-                DrawTextWrapped(
-                    dpi, screenCoords, WW, _descriptionStringId, _descriptionArgs, { colours[1], TextAlignment::CENTRE });
+                drawTextWrapped(
+                    rt, screenCoords, kWindowSize.width, _descriptionStringId, _descriptionArgs,
+                    { colours[1], TextAlignment::centre });
             }
 
             screenCoords.y += 25;
@@ -219,13 +219,16 @@ namespace OpenRCT2::Ui::Windows
             // String length needs to add 12 either side of box
             // +13 for cursor when max length.
             u8string wrappedString;
-            GfxWrapString(
-                u8string_view{ _buffer.data(), _buffer.size() }, WW - (24 + 13), FontStyle::Medium, &wrappedString, &no_lines);
+            wrapString(
+                u8string_view{ _buffer.data(), _buffer.size() }, kWindowSize.width - (24 + 13), FontStyle::medium,
+                &wrappedString, &no_lines);
 
-            GfxFillRectInset(
-                dpi,
-                { { windowPos.x + 10, screenCoords.y }, { windowPos.x + WW - 10, screenCoords.y + 10 * (no_lines + 1) + 3 } },
-                colours[1], INSET_RECT_F_60);
+            Rectangle::fillInset(
+                rt,
+                { { windowPos.x + 10, screenCoords.y },
+                  { windowPos.x + kWindowSize.width - 10, screenCoords.y + 10 * (no_lines + 1) + 3 } },
+                colours[1], Rectangle::BorderStyle::inset, Rectangle::FillBrightness::light,
+                Rectangle::FillMode::dontLightenWhenInset);
 
             screenCoords.y += 1;
 
@@ -239,15 +242,18 @@ namespace OpenRCT2::Ui::Windows
             for (int32_t line = 0; line <= no_lines; line++)
             {
                 screenCoords.x = windowPos.x + 12;
-                DrawText(dpi, screenCoords, { colours[1], FontStyle::Medium, TextAlignment::LEFT }, wrapPointer, true);
+                drawText(
+                    rt, screenCoords, wrapPointer,
+                    { colours[1], FontStyle::medium, { TextPaintFlag::noFormatting }, TextAlignment::left });
 
                 size_t string_length = GetStringSize(wrapPointer) - 1;
                 if (!cur_drawn && (textInput->SelectionStart <= char_count + string_length))
                 {
                     // Make a view of the string for measuring the width.
                     cursorX = windowPos.x + 13
-                        + GfxGetStringWidthNoFormatting(
-                                  u8string_view{ wrapPointer, textInput->SelectionStart - char_count }, FontStyle::Medium);
+                        + getStringWidth(
+                                  u8string_view{ wrapPointer, textInput->SelectionStart - char_count }, FontStyle::medium,
+                                  true);
                     cursorY = screenCoords.y;
 
                     int32_t textWidth = 6;
@@ -258,15 +264,16 @@ namespace OpenRCT2::Ui::Windows
                         utf8 tmp[5] = {}; // This is easier than setting temp_string[0..5]
                         uint32_t codepoint = UTF8GetNext(_buffer.data() + textInput->SelectionStart, nullptr);
                         UTF8WriteCodepoint(tmp, codepoint);
-                        textWidth = std::max(GfxGetStringWidthNoFormatting(tmp, FontStyle::Medium) - 2, 4);
+                        textWidth = std::max(getStringWidth(tmp, FontStyle::medium, true) - 2, 4);
                     }
 
                     if (_cursorBlink > 15)
                     {
-                        uint8_t colour = ColourMapA[colours[1].colour].mid_light;
+                        auto colour = getColourMap(colours[1].colour).midLight;
                         // TODO: palette index addition
-                        GfxFillRect(
-                            dpi, { { cursorX, screenCoords.y + 9 }, { cursorX + textWidth, screenCoords.y + 9 } }, colour + 5);
+                        Rectangle::fill(
+                            rt, { { cursorX, screenCoords.y + 9 }, { cursorX + textWidth, screenCoords.y + 9 } },
+                            static_cast<PaletteIndex>(EnumValue(colour) + 5));
                     }
 
                     cur_drawn++;
@@ -283,7 +290,7 @@ namespace OpenRCT2::Ui::Windows
 
             if (!cur_drawn)
             {
-                cursorX = dpi.lastStringPos.x;
+                cursorX = rt.lastStringPos.x;
                 cursorY = screenCoords.y - 10;
             }
 
@@ -294,24 +301,21 @@ namespace OpenRCT2::Ui::Windows
             }
         }
 
-        void OnReturnPressed()
+        void onReturnPressed()
         {
             ContextStopTextInput();
             ExecuteCallback(true);
-            Close();
+            close();
         }
 
-        static int32_t CalculateWindowHeight(std::string_view text)
+        int32_t CalculateWindowHeight(std::string_view text)
         {
             // String length needs to add 12 either side of box +13 for cursor when max length.
             int32_t numLines{};
-            GfxWrapString(text, WW - (24 + 13), FontStyle::Medium, nullptr, &numLines);
-            return numLines * 10 + WH;
-        }
+            wrapString(text, kWindowSize.width - (24 + 13), FontStyle::medium, nullptr, &numLines);
 
-        void OnResize() override
-        {
-            ResizeFrame();
+            const auto textHeight = numLines * 10;
+            return kWindowSize.height + textHeight + getTitleBarDiffNormal();
         }
 
     private:
@@ -330,7 +334,7 @@ namespace OpenRCT2::Ui::Windows
                     auto w = GetParentWindow();
                     if (w != nullptr)
                     {
-                        w->OnTextInput(_parentWidget.widget_index, _buffer);
+                        w->onTextInput(_parentWidget.widgetIndex, _buffer);
                     }
                 }
             }
@@ -355,7 +359,7 @@ namespace OpenRCT2::Ui::Windows
 
         bool HasParentWindow() const
         {
-            return _parentWidget.window.classification != WindowClass::Null;
+            return _parentWidget.window.classification != WindowClass::null;
         }
 
         WindowBase* GetParentWindow() const
@@ -371,15 +375,16 @@ namespace OpenRCT2::Ui::Windows
         const_utf8string existing_text, int32_t maxLength)
     {
         auto* windowMgr = GetWindowManager();
-        windowMgr->CloseByClass(WindowClass::Textinput);
+        windowMgr->CloseByClass(WindowClass::textinput);
 
-        auto height = TextInputWindow::CalculateWindowHeight(existing_text);
-        auto w = windowMgr->Create<TextInputWindow>(WindowClass::Textinput, WW, height, WF_CENTRE_SCREEN | WF_STICK_TO_FRONT);
+        auto w = windowMgr->Create<TextInputWindow>(
+            WindowClass::textinput, { kWindowSize.width, kWindowSize.height + 10 },
+            { WindowFlag::centreScreen, WindowFlag::stickToFront });
         if (w != nullptr)
         {
-            w->SetParentWindow(call_w, call_widget);
-            w->SetTitle(title, description, descriptionArgs);
-            w->SetText(existing_text, maxLength);
+            w->setParentWindow(call_w, call_widget);
+            w->setTitle(title, description, descriptionArgs);
+            w->setText(existing_text, maxLength);
         }
     }
 
@@ -388,13 +393,14 @@ namespace OpenRCT2::Ui::Windows
         std::function<void(std::string_view)> callback, std::function<void()> cancelCallback)
     {
         auto* windowMgr = GetWindowManager();
-        auto height = TextInputWindow::CalculateWindowHeight(initialValue);
-        auto w = windowMgr->Create<TextInputWindow>(WindowClass::Textinput, WW, height, WF_CENTRE_SCREEN | WF_STICK_TO_FRONT);
+        auto w = windowMgr->Create<TextInputWindow>(
+            WindowClass::textinput, { kWindowSize.width, kWindowSize.height + 10 },
+            { WindowFlag::centreScreen, WindowFlag::stickToFront });
         if (w != nullptr)
         {
-            w->SetTitle(title, description);
-            w->SetText(initialValue, maxLength);
-            w->SetCallback(callback, cancelCallback);
+            w->setTitle(title, description);
+            w->setText(initialValue, maxLength);
+            w->setCallback(callback, cancelCallback);
         }
     }
 
@@ -414,10 +420,10 @@ namespace OpenRCT2::Ui::Windows
         // If the return button is pressed stop text input
         if (keycode == SDLK_RETURN || keycode == SDLK_KP_ENTER)
         {
-            if (w->classification == WindowClass::Textinput)
+            if (w->classification == WindowClass::textinput)
             {
                 auto textInputWindow = static_cast<TextInputWindow*>(w);
-                textInputWindow->OnReturnPressed();
+                textInputWindow->onReturnPressed();
             }
         }
 
@@ -425,6 +431,6 @@ namespace OpenRCT2::Ui::Windows
         auto* windowMgr = GetWindowManager();
         w = windowMgr->FindByNumber(wndClass, wndNumber);
         if (w != nullptr)
-            w->Invalidate();
+            w->invalidate();
     }
 } // namespace OpenRCT2::Ui::Windows

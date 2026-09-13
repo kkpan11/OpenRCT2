@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -19,288 +19,270 @@
 #include "../../object/PathAdditionEntry.h"
 #include "../Footpath.h"
 
-bool PathElement::IsSloped() const
+namespace OpenRCT2
 {
-    return (Flags2 & FOOTPATH_ELEMENT_FLAGS2_IS_SLOPED) != 0;
-}
-
-void PathElement::SetSloped(bool isSloped)
-{
-    Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_IS_SLOPED;
-    if (isSloped)
-        Flags2 |= FOOTPATH_ELEMENT_FLAGS2_IS_SLOPED;
-}
-
-bool PathElement::HasJunctionRailings() const
-{
-    return Flags2 & FOOTPATH_ELEMENT_FLAGS2_HAS_JUNCTION_RAILINGS;
-}
-
-void PathElement::SetJunctionRailings(bool hasJunctionRailings)
-{
-    Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_HAS_JUNCTION_RAILINGS;
-    if (hasJunctionRailings)
-        Flags2 |= FOOTPATH_ELEMENT_FLAGS2_HAS_JUNCTION_RAILINGS;
-}
-
-Direction PathElement::GetSlopeDirection() const
-{
-    return SlopeDirection;
-}
-
-void PathElement::SetSlopeDirection(Direction newSlope)
-{
-    SlopeDirection = newSlope;
-}
-
-bool PathElement::IsQueue() const
-{
-    return (Type & FOOTPATH_ELEMENT_TYPE_FLAG_IS_QUEUE) != 0;
-}
-
-void PathElement::SetIsQueue(bool isQueue)
-{
-    Type &= ~FOOTPATH_ELEMENT_TYPE_FLAG_IS_QUEUE;
-    if (isQueue)
-        Type |= FOOTPATH_ELEMENT_TYPE_FLAG_IS_QUEUE;
-}
-
-bool PathElement::HasQueueBanner() const
-{
-    return (Flags2 & FOOTPATH_ELEMENT_FLAGS2_HAS_QUEUE_BANNER) != 0;
-}
-
-void PathElement::SetHasQueueBanner(bool hasQueueBanner)
-{
-    Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_HAS_QUEUE_BANNER;
-    if (hasQueueBanner)
-        Flags2 |= FOOTPATH_ELEMENT_FLAGS2_HAS_QUEUE_BANNER;
-}
-
-bool PathElement::IsBroken() const
-{
-    return (Flags2 & FOOTPATH_ELEMENT_FLAGS2_ADDITION_IS_BROKEN) != 0;
-}
-
-void PathElement::SetIsBroken(bool isBroken)
-{
-    if (isBroken)
+    bool PathElement::isSloped() const
     {
-        Flags2 |= FOOTPATH_ELEMENT_FLAGS2_ADDITION_IS_BROKEN;
+        return flags2.has(FootpathElementFlag::isSloped);
     }
-    else
+
+    void PathElement::setSloped(bool isSloped)
     {
-        Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_ADDITION_IS_BROKEN;
+        flags2.set(FootpathElementFlag::isSloped, isSloped);
     }
-}
 
-bool PathElement::IsBlockedByVehicle() const
-{
-    return (Flags2 & FOOTPATH_ELEMENT_FLAGS2_BLOCKED_BY_VEHICLE) != 0;
-}
-
-void PathElement::SetIsBlockedByVehicle(bool isBlocked)
-{
-    if (isBlocked)
+    bool PathElement::hasJunctionRailings() const
     {
-        Flags2 |= FOOTPATH_ELEMENT_FLAGS2_BLOCKED_BY_VEHICLE;
+        return flags2.has(FootpathElementFlag::hasJunctionRailings);
     }
-    else
+
+    void PathElement::setJunctionRailings(bool hasJunctionRailings)
     {
-        Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_BLOCKED_BY_VEHICLE;
+        flags2.set(FootpathElementFlag::hasJunctionRailings, hasJunctionRailings);
     }
-}
 
-::StationIndex PathElement::GetStationIndex() const
-{
-    return StationIndex;
-}
-
-void PathElement::SetStationIndex(::StationIndex newStationIndex)
-{
-    StationIndex = newStationIndex;
-}
-
-bool PathElement::IsWide() const
-{
-    return (Type & FOOTPATH_ELEMENT_TYPE_FLAG_IS_WIDE) != 0;
-}
-
-void PathElement::SetWide(bool isWide)
-{
-    Type &= ~FOOTPATH_ELEMENT_TYPE_FLAG_IS_WIDE;
-    if (isWide)
-        Type |= FOOTPATH_ELEMENT_TYPE_FLAG_IS_WIDE;
-}
-
-bool PathElement::HasAddition() const
-{
-    return Additions != 0;
-}
-
-uint8_t PathElement::GetAddition() const
-{
-    return Additions;
-}
-
-ObjectEntryIndex PathElement::GetAdditionEntryIndex() const
-{
-    // `Additions` is set to 0 when there is no addition, so the value 1 corresponds with path addition slot 0, etc.
-    return GetAddition() - 1;
-}
-
-const PathAdditionEntry* PathElement::GetAdditionEntry() const
-{
-    if (!HasAddition())
-        return nullptr;
-    return OpenRCT2::ObjectManager::GetObjectEntry<PathAdditionEntry>(GetAdditionEntryIndex());
-}
-
-void PathElement::SetAddition(uint8_t newAddition)
-{
-    Additions = newAddition;
-}
-
-void PathElement::SetAdditionEntryIndex(ObjectEntryIndex entryIndex)
-{
-    // `Additions` is set to 0 when there is no addition, so the value 1 corresponds with path addition slot 0, etc.
-    Additions = entryIndex + 1;
-}
-
-bool PathElement::AdditionIsGhost() const
-{
-    return (Flags2 & FOOTPATH_ELEMENT_FLAGS2_ADDITION_IS_GHOST) != 0;
-}
-
-void PathElement::SetAdditionIsGhost(bool isGhost)
-{
-    Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_ADDITION_IS_GHOST;
-    if (isGhost)
-        Flags2 |= FOOTPATH_ELEMENT_FLAGS2_ADDITION_IS_GHOST;
-}
-
-ObjectEntryIndex PathElement::GetLegacyPathEntryIndex() const
-{
-    if (Flags2 & FOOTPATH_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY)
-        return SurfaceIndex;
-
-    return kObjectEntryIndexNull;
-}
-
-const FootpathObject* PathElement::GetLegacyPathEntry() const
-{
-    return GetLegacyFootpathEntry(GetLegacyPathEntryIndex());
-}
-
-void PathElement::SetLegacyPathEntryIndex(ObjectEntryIndex newIndex)
-{
-    SurfaceIndex = newIndex;
-    RailingsIndex = kObjectEntryIndexNull;
-    Flags2 |= FOOTPATH_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY;
-}
-
-bool PathElement::HasLegacyPathEntry() const
-{
-    return (Flags2 & FOOTPATH_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY) != 0;
-}
-
-const PathSurfaceDescriptor* PathElement::GetSurfaceDescriptor() const
-{
-    if (HasLegacyPathEntry())
+    Direction PathElement::getSlopeDirection() const
     {
-        const auto* legacyPathEntry = GetLegacyPathEntry();
-        if (legacyPathEntry == nullptr)
+        return slopeDirection;
+    }
+
+    void PathElement::setSlopeDirection(Direction newSlope)
+    {
+        slopeDirection = newSlope;
+    }
+
+    bool PathElement::isQueue() const
+    {
+        return (type & FOOTPATH_ELEMENT_TYPE_FLAG_IS_QUEUE) != 0;
+    }
+
+    void PathElement::setIsQueue(bool isQueue)
+    {
+        type &= ~FOOTPATH_ELEMENT_TYPE_FLAG_IS_QUEUE;
+        if (isQueue)
+            type |= FOOTPATH_ELEMENT_TYPE_FLAG_IS_QUEUE;
+    }
+
+    bool PathElement::hasQueueBanner() const
+    {
+        return flags2.has(FootpathElementFlag::hasQueueBanner);
+    }
+
+    void PathElement::setHasQueueBanner(bool hasQueueBanner)
+    {
+        flags2.set(FootpathElementFlag::hasQueueBanner, hasQueueBanner);
+    }
+
+    bool PathElement::isBroken() const
+    {
+        return flags2.has(FootpathElementFlag::additionIsBroken);
+    }
+
+    void PathElement::setIsBroken(bool isBroken)
+    {
+        flags2.set(FootpathElementFlag::additionIsBroken, isBroken);
+    }
+
+    bool PathElement::isBlockedByVehicle() const
+    {
+        return flags2.has(FootpathElementFlag::blockedByVehicle);
+    }
+
+    void PathElement::setIsBlockedByVehicle(bool isBlocked)
+    {
+        flags2.set(FootpathElementFlag::blockedByVehicle, isBlocked);
+    }
+
+    ::StationIndex PathElement::getStationIndex() const
+    {
+        return stationIndex;
+    }
+
+    void PathElement::setStationIndex(::StationIndex newStationIndex)
+    {
+        stationIndex = newStationIndex;
+    }
+
+    bool PathElement::isWide() const
+    {
+        return (type & FOOTPATH_ELEMENT_TYPE_FLAG_IS_WIDE) != 0;
+    }
+
+    void PathElement::setWide(bool isWide)
+    {
+        type &= ~FOOTPATH_ELEMENT_TYPE_FLAG_IS_WIDE;
+        if (isWide)
+            type |= FOOTPATH_ELEMENT_TYPE_FLAG_IS_WIDE;
+    }
+
+    bool PathElement::hasAddition() const
+    {
+        return additions != 0;
+    }
+
+    uint8_t PathElement::getAddition() const
+    {
+        return additions;
+    }
+
+    ObjectEntryIndex PathElement::getAdditionEntryIndex() const
+    {
+        // `Additions` is set to 0 when there is no addition, so the value 1 corresponds with path addition slot 0, etc.
+        return getAddition() - 1;
+    }
+
+    const PathAdditionEntry* PathElement::getAdditionEntry() const
+    {
+        if (!hasAddition())
+            return nullptr;
+        return ObjectEntryManager::GetObjectEntry<PathAdditionEntry>(getAdditionEntryIndex());
+    }
+
+    void PathElement::setAddition(uint8_t newAddition)
+    {
+        additions = newAddition;
+    }
+
+    void PathElement::setAdditionEntryIndex(ObjectEntryIndex entryIndex)
+    {
+        // `Additions` is set to 0 when there is no addition, so the value 1 corresponds with path addition slot 0, etc.
+        additions = entryIndex + 1;
+    }
+
+    bool PathElement::additionIsGhost() const
+    {
+        return flags2.has(FootpathElementFlag::additionIsGhost);
+    }
+
+    void PathElement::setAdditionIsGhost(bool isGhost)
+    {
+        flags2.set(FootpathElementFlag::additionIsGhost, isGhost);
+    }
+
+    ObjectEntryIndex PathElement::getLegacyPathEntryIndex() const
+    {
+        if (flags2.has(FootpathElementFlag::isLegacyPathEntry))
+            return surfaceIndex;
+
+        return kObjectEntryIndexNull;
+    }
+
+    const FootpathObject* PathElement::getLegacyPathEntry() const
+    {
+        return GetLegacyFootpathEntry(getLegacyPathEntryIndex());
+    }
+
+    void PathElement::setLegacyPathEntryIndex(ObjectEntryIndex newIndex)
+    {
+        surfaceIndex = newIndex;
+        railingsIndex = kObjectEntryIndexNull;
+        flags2.set(FootpathElementFlag::isLegacyPathEntry);
+    }
+
+    bool PathElement::hasLegacyPathEntry() const
+    {
+        return flags2.has(FootpathElementFlag::isLegacyPathEntry);
+    }
+
+    const PathSurfaceDescriptor* PathElement::getSurfaceDescriptor() const
+    {
+        if (hasLegacyPathEntry())
+        {
+            const auto* legacyPathEntry = getLegacyPathEntry();
+            if (legacyPathEntry == nullptr)
+                return nullptr;
+
+            if (isQueue())
+                return &legacyPathEntry->GetQueueSurfaceDescriptor();
+
+            return &legacyPathEntry->GetPathSurfaceDescriptor();
+        }
+
+        const auto* surfaceEntry = getSurfaceEntry();
+        if (surfaceEntry == nullptr)
             return nullptr;
 
-        if (IsQueue())
-            return &legacyPathEntry->GetQueueSurfaceDescriptor();
-
-        return &legacyPathEntry->GetPathSurfaceDescriptor();
+        return &surfaceEntry->GetDescriptor();
     }
 
-    const auto* surfaceEntry = GetSurfaceEntry();
-    if (surfaceEntry == nullptr)
-        return nullptr;
-
-    return &surfaceEntry->GetDescriptor();
-}
-
-const PathRailingsDescriptor* PathElement::GetRailingsDescriptor() const
-{
-    if (HasLegacyPathEntry())
+    const PathRailingsDescriptor* PathElement::getRailingsDescriptor() const
     {
-        const auto* legacyPathEntry = GetLegacyPathEntry();
-        if (legacyPathEntry == nullptr)
+        if (hasLegacyPathEntry())
+        {
+            const auto* legacyPathEntry = getLegacyPathEntry();
+            if (legacyPathEntry == nullptr)
+                return nullptr;
+
+            return &legacyPathEntry->GetPathRailingsDescriptor();
+        }
+
+        const auto* railingsEntry = getRailingsEntry();
+        if (railingsEntry == nullptr)
             return nullptr;
 
-        return &legacyPathEntry->GetPathRailingsDescriptor();
+        return &railingsEntry->GetDescriptor();
     }
 
-    const auto* railingsEntry = GetRailingsEntry();
-    if (railingsEntry == nullptr)
-        return nullptr;
+    ObjectEntryIndex PathElement::getSurfaceEntryIndex() const
+    {
+        if (flags2.has(FootpathElementFlag::isLegacyPathEntry))
+            return kObjectEntryIndexNull;
 
-    return &railingsEntry->GetDescriptor();
-}
+        return surfaceIndex;
+    }
 
-ObjectEntryIndex PathElement::GetSurfaceEntryIndex() const
-{
-    if (Flags2 & FOOTPATH_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY)
-        return kObjectEntryIndexNull;
+    const FootpathSurfaceObject* PathElement::getSurfaceEntry() const
+    {
+        auto& objMgr = GetContext()->GetObjectManager();
+        return objMgr.GetLoadedObject<FootpathSurfaceObject>(getSurfaceEntryIndex());
+    }
 
-    return SurfaceIndex;
-}
+    void PathElement::setSurfaceEntryIndex(ObjectEntryIndex newIndex)
+    {
+        surfaceIndex = newIndex;
+        flags2.unset(FootpathElementFlag::isLegacyPathEntry);
+    }
 
-const FootpathSurfaceObject* PathElement::GetSurfaceEntry() const
-{
-    auto& objMgr = OpenRCT2::GetContext()->GetObjectManager();
-    return objMgr.GetLoadedObject<FootpathSurfaceObject>(GetSurfaceEntryIndex());
-}
+    ObjectEntryIndex PathElement::getRailingsEntryIndex() const
+    {
+        if (flags2.has(FootpathElementFlag::isLegacyPathEntry))
+            return kObjectEntryIndexNull;
 
-void PathElement::SetSurfaceEntryIndex(ObjectEntryIndex newIndex)
-{
-    SurfaceIndex = newIndex;
-    Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY;
-}
+        return railingsIndex;
+    }
 
-ObjectEntryIndex PathElement::GetRailingsEntryIndex() const
-{
-    if (Flags2 & FOOTPATH_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY)
-        return kObjectEntryIndexNull;
+    const FootpathRailingsObject* PathElement::getRailingsEntry() const
+    {
+        auto& objMgr = GetContext()->GetObjectManager();
+        return objMgr.GetLoadedObject<FootpathRailingsObject>(getRailingsEntryIndex());
+    }
 
-    return RailingsIndex;
-}
+    void PathElement::setRailingsEntryIndex(ObjectEntryIndex newIndex)
+    {
+        railingsIndex = newIndex;
+        flags2.unset(FootpathElementFlag::isLegacyPathEntry);
+    }
 
-const FootpathRailingsObject* PathElement::GetRailingsEntry() const
-{
-    auto& objMgr = OpenRCT2::GetContext()->GetObjectManager();
-    return objMgr.GetLoadedObject<FootpathRailingsObject>(GetRailingsEntryIndex());
-}
+    uint8_t PathElement::getQueueBannerDirection() const
+    {
+        return ((type & FOOTPATH_ELEMENT_TYPE_DIRECTION_MASK) >> 6);
+    }
 
-void PathElement::SetRailingsEntryIndex(ObjectEntryIndex newEntryIndex)
-{
-    RailingsIndex = newEntryIndex;
-    Flags2 &= ~FOOTPATH_ELEMENT_FLAGS2_LEGACY_PATH_ENTRY;
-}
+    void PathElement::setQueueBannerDirection(uint8_t direction)
+    {
+        type &= ~FOOTPATH_ELEMENT_TYPE_DIRECTION_MASK;
+        type |= (direction << 6);
+    }
 
-uint8_t PathElement::GetQueueBannerDirection() const
-{
-    return ((Type & FOOTPATH_ELEMENT_TYPE_DIRECTION_MASK) >> 6);
-}
+    bool PathElement::shouldDrawPathOverSupports() const
+    {
+        // TODO: make this an actual decision of the tile element.
+        const auto* const railings = getRailingsDescriptor();
+        return railings != nullptr ? railings->flags & RAILING_ENTRY_FLAG_DRAW_PATH_OVER_SUPPORTS : false;
+    }
 
-void PathElement::SetQueueBannerDirection(uint8_t direction)
-{
-    Type &= ~FOOTPATH_ELEMENT_TYPE_DIRECTION_MASK;
-    Type |= (direction << 6);
-}
-
-bool PathElement::ShouldDrawPathOverSupports() const
-{
-    // TODO: make this an actual decision of the tile element.
-    return (GetRailingsDescriptor()->Flags & RAILING_ENTRY_FLAG_DRAW_PATH_OVER_SUPPORTS);
-}
-
-void PathElement::SetShouldDrawPathOverSupports(bool on)
-{
-    LOG_VERBOSE("Setting 'draw path over supports' to %d", static_cast<size_t>(on));
-}
+    void PathElement::setShouldDrawPathOverSupports(bool on)
+    {
+        LOG_VERBOSE("Setting 'draw path over supports' to %d", static_cast<size_t>(on));
+    }
+} // namespace OpenRCT2

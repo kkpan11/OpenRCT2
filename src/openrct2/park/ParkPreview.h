@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,13 +10,18 @@
 #pragma once
 
 #include "../core/Money.hpp"
-#include "../world/Location.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-struct DrawPixelInfo;
+struct ScreenCoordsXY;
+
+namespace OpenRCT2::Drawing
+{
+    enum class PaletteIndex : uint8_t;
+    struct RenderTarget;
+} // namespace OpenRCT2::Drawing
 
 namespace OpenRCT2
 {
@@ -34,7 +39,7 @@ namespace OpenRCT2
         PreviewImageType type;
         uint8_t width;
         uint8_t height;
-        uint8_t pixels[kMaxPreviewImageSize * kMaxPreviewImageSize]{};
+        Drawing::PaletteIndex pixels[kMaxPreviewImageSize * kMaxPreviewImageSize]{};
     };
 
     struct ParkPreview
@@ -54,5 +59,5 @@ namespace OpenRCT2
     struct GameState_t;
 
     ParkPreview generatePreviewFromGameState(const GameState_t& gameState);
-    void drawPreviewImage(const PreviewImage& image, DrawPixelInfo& dpi, ScreenCoordsXY screenPos);
+    void drawPreviewImage(const PreviewImage& image, Drawing::RenderTarget& rt, ScreenCoordsXY screenPos);
 } // namespace OpenRCT2

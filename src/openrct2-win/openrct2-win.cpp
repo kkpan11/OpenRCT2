@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,6 +8,9 @@
  *****************************************************************************/
 
 // Windows.h needs to be included first
+#ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 
 // Enable visual styles
@@ -19,13 +22,10 @@
 #include <algorithm>
 #include <iterator>
 #include <openrct2-ui/Ui.h>
+#include <openrct2/core/EnumUtils.hpp>
 #include <openrct2/core/String.hpp>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string>
 #include <vector>
-
-using namespace OpenRCT2;
 
 static std::vector<std::string> GetCommandLineArgs(int argc, wchar_t** argvW);
 
@@ -36,8 +36,8 @@ int wmain(int argc, wchar_t** argvW, [[maybe_unused]] wchar_t* envp)
 {
     auto argvStrings = GetCommandLineArgs(argc, argvW);
 
-    SetConsoleCP(OpenRCT2::CodePage::UTF8);
-    SetConsoleOutputCP(OpenRCT2::CodePage::UTF8);
+    SetConsoleCP(EnumValue(OpenRCT2::CodePage::utf8));
+    SetConsoleOutputCP(EnumValue(OpenRCT2::CodePage::utf8));
 
     std::vector<const char*> argv;
     std::transform(
@@ -54,7 +54,7 @@ static std::vector<std::string> GetCommandLineArgs(int argc, wchar_t** argvW)
     std::vector<std::string> argv;
     for (int i = 0; i < argc; i++)
     {
-        argv.push_back(String::toUtf8(argvW[i]));
+        argv.push_back(OpenRCT2::String::toUtf8(argvW[i]));
     }
     return argv;
 }

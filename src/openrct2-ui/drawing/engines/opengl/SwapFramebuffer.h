@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include "ApplyTransparencyShader.h"
-#include "OpenGLAPI.h"
 #include "OpenGLFramebuffer.h"
 
 namespace OpenRCT2::Ui
 {
+    class ApplyTransparencyShader;
+
     /**
      * Class to maintain two different framebuffers where the active framebuffer
      * will swap between the two, copying the other's pixels in the process for
@@ -29,13 +29,17 @@ namespace OpenRCT2::Ui
         OpenGLFramebuffer _opaqueFramebuffer;
         OpenGLFramebuffer _transparentFramebuffer;
         OpenGLFramebuffer _mixFramebuffer;
-        GLuint _backDepth;
+        GLuint _backDepth{};
 
     public:
         SwapFramebuffer(int32_t width, int32_t height);
         ~SwapFramebuffer();
 
         const OpenGLFramebuffer& GetFinalFramebuffer() const
+        {
+            return _opaqueFramebuffer;
+        }
+        OpenGLFramebuffer& GetFinalFramebuffer()
         {
             return _opaqueFramebuffer;
         }

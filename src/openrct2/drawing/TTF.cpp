@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,7 +7,7 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
-#ifndef NO_TTF
+#ifndef DISABLE_TTF
 
     #include "../Diagnostic.h"
 
@@ -79,10 +79,10 @@ static void TTFToggleHinting(bool)
         return;
     }
 
-    for (int32_t i = 0; i < FontStyleCount; i++)
+    for (int32_t i = 0; i < kFontStyleCount; i++)
     {
         TTFFontDescriptor* fontDesc = &(gCurrentTTFFontSet->size[i]);
-        bool use_hinting = Config::Get().fonts.EnableHinting && fontDesc->hinting_threshold;
+        bool use_hinting = Config::Get().fonts.enableHinting && fontDesc->hinting_threshold;
         TTF_SetFontHinting(fontDesc->font, use_hinting ? 1 : 0);
     }
 
@@ -105,7 +105,7 @@ bool TTFInitialise()
         return false;
     }
 
-    for (int32_t i = 0; i < FontStyleCount; i++)
+    for (int32_t i = 0; i < kFontStyleCount; i++)
     {
         TTFFontDescriptor* fontDesc = &(gCurrentTTFFontSet->size[i]);
 
@@ -141,7 +141,7 @@ void TTFDispose()
     TTFSurfaceCacheDisposeAll();
     TTFGetWidthCacheDisposeAll();
 
-    for (int32_t i = 0; i < FontStyleCount; i++)
+    for (int32_t i = 0; i < kFontStyleCount; i++)
     {
         TTFFontDescriptor* fontDesc = &(gCurrentTTFFontSet->size[i]);
         if (fontDesc->font != nullptr)
@@ -371,4 +371,4 @@ void TTFDispose()
 {
 }
 
-#endif // NO_TTF
+#endif // DISABLE_TTF

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,25 +10,24 @@
 #pragma once
 
 #include "DrawCommands.h"
-#include "GLSLTypes.h"
 #include "OpenGLShaderProgram.h"
+
 namespace OpenRCT2::Ui
 {
     class DrawLineShader final : public OpenGLShaderProgram
     {
     private:
-        GLuint uScreenSize;
+        GLint uScreenSize{ -1 };
 
-        GLuint vClip;
-        GLuint vBounds;
-        GLuint vColour;
-        GLuint vDepth;
+        GLint vBounds{ -1 };
+        GLint vColour{ -1 };
+        GLint vDepth{ -1 };
 
-        GLuint vVertMat;
+        GLint vVertMat{ -1 };
 
-        GLuint _vbo;
-        GLuint _vboInstances;
-        GLuint _vao;
+        GLuint _vbo{};
+        GLuint _vboInstances{};
+        GLuint _vao{};
 
     public:
         DrawLineShader();

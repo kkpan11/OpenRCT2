@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -56,13 +56,19 @@ const char gVersionInfoFull[] = OPENRCT2_NAME ", "
     ;
 
 #ifdef __EMSCRIPTEN__
-// This must be wrapped in extern "C", according to the emscripten docs, "to prevent C++ name mangling"
+    // This must be wrapped in extern "C", according to the emscripten docs, "to prevent C++ name mangling"
+    // Ignore -Wmissing-prototypes here, see https://github.com/llvm/llvm-project/issues/94138
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wmissing-prototypes"
+
 extern "C" {
 const char* GetVersion()
 {
     return gVersionInfoFull;
 }
 }
+
+    #pragma clang diagnostic pop
 #endif
 
 NewVersionInfo GetLatestVersion()
@@ -70,23 +76,23 @@ NewVersionInfo GetLatestVersion()
     // If the check doesn't succeed, provide current version so we don't bother user
     // with invalid data.
     std::string tag = gVersionInfoTag;
-    NewVersionInfo verinfo{ tag, "", "", "" };
-#ifndef DISABLE_HTTP
+    NewVersionInfo verinfo{ tag, "", "" };
+#if !defined(DISABLE_HTTP) && !defined(DISABLE_VERSION_CHECKER)
     auto now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    auto then = Config::Get().general.LastVersionCheckTime;
+    auto then = Config::Get().general.lastVersionCheckTime;
     using namespace std::chrono_literals;
 
     if (then < now - std::chrono::seconds(24h).count())
     {
         Http::Request request;
         request.url = "https://api.github.com/repos/OpenRCT2/OpenRCT2/releases/latest";
-        request.method = Http::Method::GET;
+        request.method = Http::Method::get;
 
         Http::Response res;
         try
         {
             res = Do(request);
-            if (res.status != Http::Status::Ok)
+            if (res.status != Http::Status::ok)
                 throw std::runtime_error("bad http status");
         }
         catch (std::exception& e)
@@ -100,9 +106,8 @@ NewVersionInfo GetLatestVersion()
         verinfo.tag = Json::GetString(root["tag_name"]);
         verinfo.name = Json::GetString(root["name"]);
         verinfo.changelog = Json::GetString(root["body"]);
-        verinfo.url = Json::GetString(root["html_url"]);
 
-        Config::Get().general.LastVersionCheckTime = now;
+        Config::Get().general.lastVersionCheckTime = now;
         Config::Save();
     }
 #endif

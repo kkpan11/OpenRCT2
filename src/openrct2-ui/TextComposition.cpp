@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -14,9 +14,8 @@
 #include "interface/InGameConsole.h"
 #include "interface/Window.h"
 
-#include <SDL.h>
-#include <openrct2-ui/windows/Windows.h>
-#include <openrct2/core/Memory.hpp>
+#include <SDL_clipboard.h>
+#include <SDL_events.h>
 #include <openrct2/core/String.hpp>
 #include <openrct2/core/UTF8.h>
 #include <openrct2/ui/UiContext.h>
@@ -150,7 +149,7 @@ void TextComposition::HandleMessage(const SDL_Event* e)
 
             auto [key, scancode] = ProcessKeyPress(rawKey, rawScancode);
 
-            GetContext()->GetUiContext()->SetKeysPressed(key, scancode);
+            GetContext()->GetUiContext().SetKeysPressed(key, scancode);
 
             // Text input
             if (_session.Buffer == nullptr)
@@ -218,7 +217,7 @@ void TextComposition::HandleMessage(const SDL_Event* e)
                 case SDLK_c:
                     if ((modifier & KB_PRIMARY_MODIFIER) && _session.Length)
                     {
-                        GetContext()->GetUiContext()->SetClipboardText(_session.Buffer->c_str());
+                        GetContext()->GetUiContext().SetClipboardText(_session.Buffer->c_str());
                         ContextShowError(STR_COPY_INPUT_TO_CLIPBOARD, kStringIdNone, {});
                     }
                     break;
@@ -228,13 +227,14 @@ void TextComposition::HandleMessage(const SDL_Event* e)
                         utf8* text = SDL_GetClipboardText();
                         Insert(text);
                         SDL_free(text);
+                        console.RefreshCaret(_session.SelectionStart);
                         Windows::WindowUpdateTextbox();
                     }
                     break;
                 case SDLK_x:
                     if ((modifier & KB_PRIMARY_MODIFIER) && _session.Length)
                     {
-                        GetContext()->GetUiContext()->SetClipboardText(_session.Buffer->c_str());
+                        GetContext()->GetUiContext().SetClipboardText(_session.Buffer->c_str());
                         Clear();
                         Windows::WindowUpdateTextbox();
                         ContextShowError(STR_COPY_INPUT_TO_CLIPBOARD, kStringIdNone, {});

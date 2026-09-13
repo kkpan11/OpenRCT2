@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,7 +9,10 @@
 
 #pragma once
 
-#include "../Location.hpp"
+#include <cstdint>
+#include <functional>
+
+struct TileCoordsXY;
 
 namespace OpenRCT2::World::MapGenerator
 {
@@ -21,6 +24,10 @@ namespace OpenRCT2::World::MapGenerator
         SLOPE_E_THRESHOLD_FLAGS = (1 << 3)
     };
 
-    int32_t MapSmooth(int32_t l, int32_t t, int32_t r, int32_t b);
-    int32_t TileSmooth(const TileCoordsXY& tileCoords);
+    using SmoothFunction = std::function<int32_t(TileCoordsXY)>;
+
+    int32_t smoothTileStrong(TileCoordsXY tileCoords);
+    int32_t smoothTileWeak(TileCoordsXY tileCoords);
+
+    void smoothMap(TileCoordsXY mapSize, SmoothFunction smoothFunc);
 } // namespace OpenRCT2::World::MapGenerator

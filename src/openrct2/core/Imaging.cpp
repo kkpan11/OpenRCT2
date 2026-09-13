@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -13,11 +13,9 @@
 
 #include "../Diagnostic.h"
 #include "../Version.h"
-#include "../drawing/Drawing.h"
 #include "FileSystem.hpp"
 #include "Guard.hpp"
 #include "IStream.hpp"
-#include "Memory.hpp"
 #include "String.hpp"
 
 #include <algorithm>
@@ -36,7 +34,7 @@ namespace OpenRCT2::Imaging
 {
     static constexpr auto kExceptionImageFormatUnknown = "Unknown image format.";
 
-    static std::unordered_map<IMAGE_FORMAT, ImageReaderFunc> _readerImplementations;
+    static std::unordered_map<ImageFormat, ImageReaderFunc> _readerImplementations;
 
     static void PngReadData(png_structp png_ptr, png_bytep data, png_size_t length)
     {
@@ -117,7 +115,10 @@ namespace OpenRCT2::Imaging
             if (colourType == PNG_COLOR_TYPE_RGB)
             {
                 // 24-bit PNG (no alpha)
-                Guard::Assert(rowBytes == pngWidth * 3, GUARD_LINE);
+                if (rowBytes != pngWidth * 3)
+                {
+                    throw std::runtime_error("PNG must have 24-bit colours in RGB mode. ");
+                }
                 for (png_uint_32 i = 0; i < pngHeight; i++)
                 {
                     auto src = rowPointers[i];
@@ -133,7 +134,10 @@ namespace OpenRCT2::Imaging
             else if (bitDepth == 8 && !expandTo32)
             {
                 // 8-bit paletted or greyscale
-                Guard::Assert(rowBytes == pngWidth, GUARD_LINE);
+                if (rowBytes != pngWidth)
+                {
+                    throw std::runtime_error("PNG must be 8-bit paletted when using \"keep\" palette. ");
+                }
                 for (png_uint_32 i = 0; i < pngHeight; i++)
                 {
                     std::copy_n(rowPointers[i], rowBytes, dst);
@@ -143,7 +147,10 @@ namespace OpenRCT2::Imaging
             else
             {
                 // 32-bit PNG (with alpha)
-                Guard::Assert(rowBytes == pngWidth * 4, GUARD_LINE);
+                if (rowBytes != pngWidth * 4)
+                {
+                    throw std::runtime_error("PNG must either have 8-bit paletted, or 24-bit/32-bit full colour data. ");
+                }
                 for (png_uint_32 i = 0; i < pngHeight; i++)
                 {
                     std::copy_n(rowPointers[i], rowBytes, dst);
@@ -209,9 +216,9 @@ namespace OpenRCT2::Imaging
                 for (size_t i = 0; i < PNG_MAX_PALETTE_LENGTH; i++)
                 {
                     const auto& entry = (*image.Palette)[i];
-                    png_palette[i].blue = entry.Blue;
-                    png_palette[i].green = entry.Green;
-                    png_palette[i].red = entry.Red;
+                    png_palette[i].blue = entry.blue;
+                    png_palette[i].green = entry.green;
+                    png_palette[i].red = entry.red;
                 }
                 png_set_PLTE(png_ptr, info_ptr, png_palette, PNG_MAX_PALETTE_LENGTH);
             }
@@ -259,22 +266,22 @@ namespace OpenRCT2::Imaging
         }
     }
 
-    IMAGE_FORMAT GetImageFormatFromPath(std::string_view path)
+    ImageFormat GetImageFormatFromPath(std::string_view path)
     {
         if (String::endsWith(path, ".png", true))
         {
-            return IMAGE_FORMAT::PNG;
+            return ImageFormat::png;
         }
 
         if (String::endsWith(path, ".bmp", true))
         {
-            return IMAGE_FORMAT::BITMAP;
+            return ImageFormat::bitmap;
         }
 
-        return IMAGE_FORMAT::UNKNOWN;
+        return ImageFormat::unknown;
     }
 
-    static ImageReaderFunc GetReader(IMAGE_FORMAT format)
+    static ImageReaderFunc GetReader(ImageFormat format)
     {
         auto result = _readerImplementations.find(format);
         if (result != _readerImplementations.end())
@@ -284,20 +291,20 @@ namespace OpenRCT2::Imaging
         return {};
     }
 
-    void SetReader(IMAGE_FORMAT format, ImageReaderFunc impl)
+    void SetReader(ImageFormat format, ImageReaderFunc impl)
     {
         _readerImplementations[format] = impl;
     }
 
-    static Image ReadFromStream(std::istream& istream, IMAGE_FORMAT format)
+    static Image ReadFromStream(std::istream& istream, ImageFormat format)
     {
         switch (format)
         {
-            case IMAGE_FORMAT::PNG:
+            case ImageFormat::png:
                 return ReadPng(istream, false);
-            case IMAGE_FORMAT::PNG_32:
+            case ImageFormat::png32:
                 return ReadPng(istream, true);
-            case IMAGE_FORMAT::AUTOMATIC:
+            case ImageFormat::automatic:
                 throw std::invalid_argument("format can not be automatic.");
             default:
             {
@@ -311,11 +318,11 @@ namespace OpenRCT2::Imaging
         }
     }
 
-    Image ReadFromFile(std::string_view path, IMAGE_FORMAT format)
+    Image ReadFromFile(std::string_view path, ImageFormat format)
     {
         switch (format)
         {
-            case IMAGE_FORMAT::AUTOMATIC:
+            case ImageFormat::automatic:
                 return ReadFromFile(path, GetImageFormatFromPath(path));
             default:
             {
@@ -325,20 +332,20 @@ namespace OpenRCT2::Imaging
         }
     }
 
-    Image ReadFromBuffer(const std::vector<uint8_t>& buffer, IMAGE_FORMAT format)
+    Image ReadFromBuffer(const std::vector<uint8_t>& buffer, ImageFormat format)
     {
         ivstream<uint8_t> istream(buffer);
         return ReadFromStream(istream, format);
     }
 
-    void WriteToFile(std::string_view path, const Image& image, IMAGE_FORMAT format)
+    void WriteToFile(std::string_view path, const Image& image, ImageFormat format)
     {
         switch (format)
         {
-            case IMAGE_FORMAT::AUTOMATIC:
+            case ImageFormat::automatic:
                 WriteToFile(path, image, GetImageFormatFromPath(path));
                 break;
-            case IMAGE_FORMAT::PNG:
+            case ImageFormat::png:
             {
 #ifndef __EMSCRIPTEN__
                 std::ofstream fs(fs::u8path(path), std::ios::binary);

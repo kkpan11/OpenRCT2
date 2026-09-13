@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,12 +12,16 @@
 #include "../Context.h"
 #include "../GameState.h"
 #include "../OpenRCT2.h"
-#include "../core/Numerics.hpp"
+#include "../SpriteIds.h"
+#include "../drawing/Drawing.Sprite.h"
 #include "../drawing/Drawing.h"
+#include "../drawing/NewDrawing.h"
 #include "../drawing/X8DrawingEngine.h"
 #include "../interface/Viewport.h"
-#include "../interface/Window.h"
+#include "../interface/WindowTypes.h"
+#include "../object/TerrainSurfaceObject.h"
 #include "../ride/RideManager.hpp"
+#include "../world/Map.h"
 #include "../world/tile_element/SurfaceElement.h"
 #include "../world/tile_element/TileElement.h"
 
@@ -28,18 +32,20 @@ namespace OpenRCT2
     static std::optional<PreviewImage> generatePreviewMap();
     static std::optional<PreviewImage> generatePreviewScreenshot();
 
+    using OpenRCT2::Drawing::PaletteIndex;
+
     ParkPreview generatePreviewFromGameState(const GameState_t& gameState)
     {
         ParkPreview preview{
-            .parkName = gameState.Park.Name,
-            .parkRating = gameState.Park.Rating,
-            .year = gameState.Date.GetYear(),
-            .month = gameState.Date.GetMonth(),
-            .day = gameState.Date.GetDay(),
-            .parkUsesMoney = !(gameState.Park.Flags & PARK_FLAGS_NO_MONEY),
-            .cash = gameState.Cash,
-            .numRides = static_cast<uint16_t>(RideManager().size()),
-            .numGuests = static_cast<uint16_t>(gameState.NumGuestsInPark),
+            .parkName = gameState.park.name,
+            .parkRating = gameState.park.rating,
+            .year = gameState.date.GetYear(),
+            .month = gameState.date.GetMonth(),
+            .day = gameState.date.GetDay(),
+            .parkUsesMoney = !gameState.park.flags.has(ParkFlag::noMoney),
+            .cash = gameState.park.cash,
+            .numRides = static_cast<uint16_t>(RideManager(gameState).size()),
+            .numGuests = static_cast<uint16_t>(gameState.park.numGuestsInPark),
         };
 
         if (auto image = generatePreviewMap(); image != std::nullopt)
@@ -51,89 +57,122 @@ namespace OpenRCT2
         return preview;
     }
 
+    static uint8_t _tileColourIndex = 0;
+
     static PaletteIndex getPreviewColourByTilePos(const TileCoordsXY& pos)
     {
-        PaletteIndex colour = PALETTE_INDEX_0;
+        PaletteIndex paletteIndex = PaletteIndex::transparent;
 
         auto tileElement = MapGetFirstElementAt(pos);
         if (tileElement == nullptr)
-            return colour;
+            return paletteIndex;
 
+        PaletteIndex surfaceColour = paletteIndex;
+        bool isOutsidePark = false;
         do
         {
-            switch (tileElement->GetType())
+            switch (tileElement->getType())
             {
-                case TileElementType::Surface:
+                case TileElementType::surface:
                 {
-                    auto* surfaceElement = tileElement->AsSurface();
+                    auto* surfaceElement = tileElement->asSurface();
                     if (surfaceElement == nullptr)
                     {
-                        colour = PALETTE_INDEX_0;
+                        surfaceColour = paletteIndex = PaletteIndex::transparent;
                         break;
                     }
 
-                    if (surfaceElement->GetWaterHeight() > 0)
+                    if (surfaceElement->getWaterHeight() > 0)
                     {
-                        colour = PALETTE_INDEX_195;
-                        break;
+                        surfaceColour = paletteIndex = PaletteIndex::pi195;
+                    }
+                    else
+                    {
+                        const auto* surfaceObject = surfaceElement->getSurfaceObject();
+                        if (surfaceObject != nullptr)
+                        {
+                            surfaceColour = paletteIndex = surfaceObject->MapColours[_tileColourIndex];
+                        }
                     }
 
-                    const auto* surfaceObject = surfaceElement->GetSurfaceObject();
-                    if (surfaceObject != nullptr)
-                    {
-                        colour = surfaceObject->MapColours[1];
-                    }
+                    isOutsidePark |= !(surfaceElement->hasOwnership(OwnershipFlag::landOwned));
                     break;
                 }
 
-                case TileElementType::Path:
-                    colour = PALETTE_INDEX_17;
+                case TileElementType::path:
+                    paletteIndex = PaletteIndex::pi17;
                     break;
 
-                case TileElementType::Track:
-                    colour = PALETTE_INDEX_183;
+                case TileElementType::track:
+                    paletteIndex = PaletteIndex::pi183;
                     break;
 
-                case TileElementType::SmallScenery:
-                case TileElementType::LargeScenery:
-                    colour = PALETTE_INDEX_99; // 64
+                case TileElementType::smallScenery:
+                case TileElementType::largeScenery:
+                    paletteIndex = PaletteIndex::pi99;
                     break;
 
-                case TileElementType::Entrance:
-                    colour = PALETTE_INDEX_186;
+                case TileElementType::entrance:
+                    paletteIndex = PaletteIndex::pi186;
                     break;
 
                 default:
                     break;
             }
-        } while (!(tileElement++)->IsLastForTile());
+        } while (!(tileElement++)->isLastForTile());
 
-        return colour;
+        // Darken every other tile that's outside of the park, unless it's a path
+        if (isOutsidePark && _tileColourIndex == 1 && paletteIndex != PaletteIndex::pi17)
+            paletteIndex = PaletteIndex::pi10;
+        // For rides, every other tile should use the surface colour
+        else if (_tileColourIndex == 1 && paletteIndex == PaletteIndex::pi183)
+            paletteIndex = surfaceColour;
+
+        _tileColourIndex = (_tileColourIndex + 1) % 2;
+
+        return paletteIndex;
     }
 
     // 0x0046DB4C
     static std::optional<PreviewImage> generatePreviewMap()
     {
-        const auto& gameState = GetGameState();
-        const auto previewSize = 128;
-        const auto longEdgeSize = std::max(gameState.MapSize.x, gameState.MapSize.y);
-        const auto nearestPower = Numerics::ceil2(longEdgeSize, previewSize);
-        const auto mapSkipFactor = nearestPower / previewSize;
-        const auto offset = mapSkipFactor > 0 ? (nearestPower - longEdgeSize) / mapSkipFactor : 1;
+        const auto& gameState = getGameState();
+        const auto drawableMapSize = TileCoordsXY{ gameState.mapSize.x - 2, gameState.mapSize.y - 2 };
+        const auto longEdgeSize = std::max(drawableMapSize.x, drawableMapSize.y);
+        const auto idealPreviewSize = 150;
+
+        auto longEdgeSizeLeft = longEdgeSize;
+        uint8_t mapSkipFactor = 1;
+        while (longEdgeSizeLeft > idealPreviewSize)
+        {
+            longEdgeSizeLeft -= idealPreviewSize;
+            mapSkipFactor++;
+        }
+
+        const uint8_t previewWidth = std::max(1, drawableMapSize.x / mapSkipFactor);
+        const uint8_t previewHeight = std::max(1, drawableMapSize.y / mapSkipFactor);
 
         PreviewImage image{
             .type = PreviewImageType::miniMap,
-            .width = previewSize,
-            .height = previewSize,
+            .width = previewWidth,
+            .height = previewHeight,
         };
 
         for (auto y = 0u; y < image.height; y++)
         {
+            int32_t mapY = 1 + (y * mapSkipFactor);
+            if (mapY > drawableMapSize.y)
+                break;
+
+            _tileColourIndex = y % 2;
+
             for (auto x = 0u; x < image.width; x++)
             {
-                auto pos = TileCoordsXY(gameState.MapSize.x - (x + 1) * mapSkipFactor + 1, y * mapSkipFactor + 1);
+                int32_t mapX = drawableMapSize.x - (x * mapSkipFactor);
+                if (mapX < 1)
+                    break;
 
-                image.pixels[(y + offset) * previewSize + (x + offset)] = getPreviewColourByTilePos(pos);
+                image.pixels[y * image.width + x] = getPreviewColourByTilePos({ mapX, mapY });
             }
         }
 
@@ -145,25 +184,27 @@ namespace OpenRCT2
         if (gOpenRCT2NoGraphics)
             return std::nullopt;
 
-        const auto& gameState = GetGameState();
+        const auto& gameState = getGameState();
         const auto mainWindow = WindowGetMain();
         const auto mainViewport = WindowGetViewport(mainWindow);
 
-        CoordsXYZ mapPosXYZ{};
+        CoordsXYZD mapPosXYZD{};
         if (mainViewport != nullptr)
         {
             const auto centre = mainViewport->viewPos
                 + ScreenCoordsXY{ mainViewport->ViewWidth() / 2, mainViewport->ViewHeight() / 2 };
             const auto mapPos = ViewportPosToMapPos(centre, 24, mainViewport->rotation);
-            mapPosXYZ = CoordsXYZ(mapPos.x, mapPos.y, int32_t{ TileElementHeight(mapPos) });
+            mapPosXYZD = CoordsXYZD(mapPos.x, mapPos.y, int32_t{ TileElementHeight(mapPos) }, mainViewport->rotation);
         }
-        else if (!gameState.Park.Entrances.empty())
+        else if (!gameState.park.entrances.empty())
         {
-            const auto& entrance = gameState.Park.Entrances[0];
-            mapPosXYZ = CoordsXYZ{ entrance.x + 16, entrance.y + 16, entrance.z + 32 };
+            const auto& entrance = gameState.park.entrances[0];
+            mapPosXYZD = CoordsXYZD(entrance.x + 16, entrance.y + 16, entrance.z + 32, DirectionReverse(entrance.direction));
         }
         else
+        {
             return std::nullopt;
+        }
 
         PreviewImage image{
             .type = PreviewImageType::screenshot,
@@ -176,10 +217,10 @@ namespace OpenRCT2
             .height = image.height,
             .flags = 0,
             .zoom = ZoomLevel{ 1 },
-            .rotation = mainViewport->rotation,
+            .rotation = mapPosXYZD.direction,
         };
 
-        auto viewPos = centre_2d_coordinates(mapPosXYZ, &saveVp);
+        auto viewPos = centre2dCoordinates(mapPosXYZD, &saveVp);
         if (viewPos == std::nullopt)
             return std::nullopt;
 
@@ -189,8 +230,10 @@ namespace OpenRCT2
         if (!drawingEngine)
             return std::nullopt;
 
-        DrawPixelInfo dpi{
-            .bits = static_cast<uint8_t*>(image.pixels),
+        drawingEngine->BeginDraw();
+
+        Drawing::RenderTarget rt{
+            .bits = image.pixels,
             .x = 0,
             .y = 0,
             .width = image.width,
@@ -200,34 +243,23 @@ namespace OpenRCT2
             .DrawingEngine = drawingEngine.get(),
         };
 
-        ViewportRender(dpi, &saveVp);
+        ViewportRender(rt, &saveVp);
+
+        drawingEngine->EndDraw();
 
         return image;
     }
 
-    void drawPreviewImage(const PreviewImage& image, DrawPixelInfo& dpi, ScreenCoordsXY screenPos)
+    void drawPreviewImage(const PreviewImage& image, Drawing::RenderTarget& rt, ScreenCoordsXY screenPos)
     {
-        auto* drawingEngine = GetContext()->GetDrawingEngine();
-        if (drawingEngine == nullptr)
-            return;
+        G1Element g1temp = {};
+        g1temp.offset = reinterpret_cast<uint8_t*>(const_cast<PaletteIndex*>(image.pixels));
+        g1temp.width = image.width;
+        g1temp.height = image.height;
 
-        const auto imageId = ImageId(0);
-        auto* g1 = const_cast<G1Element*>(GfxGetG1Element(imageId));
-        if (g1 != nullptr)
-        {
-            // Temporarily substitute a G1 image with the data in the preview image
-            const auto backupG1 = *g1;
-            *g1 = {};
-            g1->offset = const_cast<uint8_t*>(image.pixels);
-            g1->width = image.width;
-            g1->height = image.height;
-            drawingEngine->InvalidateImage(imageId.GetIndex());
-
-            // Draw preview image and restore original G1 image
-            GfxDrawSprite(dpi, imageId, screenPos);
-            *g1 = backupG1;
-            drawingEngine->InvalidateImage(imageId.GetIndex());
-        }
+        GfxSetG1Element(SPR_TEMP_PARK_PREVIEW, &g1temp);
+        DrawingEngineInvalidateImage(SPR_TEMP_PARK_PREVIEW);
+        GfxDrawSprite(rt, ImageId(SPR_TEMP_PARK_PREVIEW), screenPos);
     }
 
 } // namespace OpenRCT2

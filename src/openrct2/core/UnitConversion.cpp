@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2025 OpenRCT2 developers
+ * Copyright (c) 2014-2026 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -66,7 +66,7 @@ namespace OpenRCT2
         return (baseSpeed * 9) >> 18;
     }
 
-    uint16_t ToHumanReadableAirTime(uint16_t airTime)
+    int32_t ToHumanReadableAirTime(uint16_t airTime)
     {
         return airTime * 3;
     }
